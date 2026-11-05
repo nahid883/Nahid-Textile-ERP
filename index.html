@@ -4,68 +4,209 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Personal Textile ERP</title>
+<title>Nahid Textile ERP</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172033}
-header{background:#123b56;color:white;padding:22px}
+body{margin:0;font-family:Arial;background:#f1f5f9;color:#172033}
+header{background:#123b56;color:white;padding:20px}
 header h2{margin:0}
-header p{margin:7px 0 0;color:#d5e7f2}
-main{padding:18px;max-width:950px;margin:auto}
-.card{background:white;padding:20px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
-.stat{background:#e8f2f8;padding:18px;border-radius:10px}
-.stat b{display:block;font-size:25px;margin-top:8px;color:#123b56}
-button{background:#126b91;color:white;border:0;padding:12px 18px;border-radius:7px;cursor:pointer}
-input{padding:12px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:8px 0}
+nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+button{background:#126b91;color:white;border:0;padding:11px 15px;border-radius:7px;cursor:pointer}
+main{max-width:1100px;margin:auto;padding:15px}
+.card{background:white;padding:16px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.stat{background:#e8f2f8;padding:15px;border-radius:9px}
+.stat b{display:block;font-size:24px;margin-top:8px}
+input{padding:11px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:5px 0}
+.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
+table{width:100%;border-collapse:collapse;min-width:650px}
+th,td{padding:10px;border:1px solid #ddd;text-align:left}
+th{background:#e8f2f8}
+.scroll{overflow-x:auto}
+.matched{background:#d9f7df}
+.unmatched{background:#ffe0e0}
+small{color:#526477}
 </style>
 </head>
 <body>
 <header>
-<h2>Personal Textile ERP</h2>
-<p>Order • Production • WIP • Delivery Management</p>
+<h2>NAHID TEXTILE ERP</h2>
+<p>Order • Excel Import • Matching Management</p>
+<nav>
+<button onclick="show('dashboard')">Dashboard</button>
+<button onclick="show('orders')">Order Entry</button>
+<button onclick="show('matching')">Excel Matching</button>
+</nav>
 </header>
 <main>
+<section id="dashboard">
 <div class="card">
 <h3>Dashboard</h3>
-<p>Welcome to your Personal Textile ERP.</p>
 <div class="grid">
-<div class="stat">Total Orders<b id="orders">0</b></div>
+<div class="stat">Total Orders<b id="total">0</b></div>
 <div class="stat">Total Quantity<b id="qty">0</b></div>
-<div class="stat">Matched<b>0</b></div>
-<div class="stat">Unmatched<b>0</b></div>
+<div class="stat">Matched<b id="matchedCount">0</b></div>
+<div class="stat">Unmatched<b id="unmatchedCount">0</b></div>
 </div>
 </div>
 <div class="card">
-<h3>Order Management</h3>
+<h3>Welcome to Nahid Textile ERP</h3>
+<p>Manage your orders and compare Excel files from one place.</p>
+</div>
+</section>
+
+<section id="orders" hidden>
+<div class="card">
+<h3>Manual Order Entry</h3>
+<div class="formgrid">
 <input id="pi" placeholder="PI Number">
 <input id="color" placeholder="Color">
 <input id="construction" placeholder="Construction">
-<input id="quantity" type="number" placeholder="Order Quantity (Yds)">
+<input id="quantity" type="number" placeholder="Order Qty (Yds)">
+</div>
 <button onclick="addOrder()">Add Order</button>
 </div>
 <div class="card">
-<h3>Order List</h3>
-<div id="orderList">No orders added yet.</div>
+<h3>Import Main Order Excel</h3>
+<input type="file" id="mainFile" accept=".xlsx,.xls,.csv">
+<button onclick="importFile('mainFile','main')">Import Main File</button>
+<p><small>Excel column names should include PI, Color, Construction and Order Qty.</small></p>
 </div>
+<div class="card">
+<h3>Order List</h3>
+<div class="scroll"><table>
+<thead><tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="orderRows"></tbody>
+</table></div>
+</div>
+</section>
+
+<section id="matching" hidden>
+<div class="card">
+<h3>Upload New / Updated Excel</h3>
+<input type="file" id="newFile" accept=".xlsx,.xls,.csv">
+<button onclick="importFile('newFile','new')">Import New File</button>
+<p><small>Matching key: PI + Color + Construction</small></p>
+</div>
+<div class="card">
+<h3>Matching Result</h3>
+<p>🟢 Matched &nbsp; 🔴 Unmatched</p>
+<div class="grid">
+<div class="stat">Matched Rows<b id="mResult">0</b></div>
+<div class="stat">Unmatched Rows<b id="uResult">0</b></div>
+</div>
+</div>
+<div class="card">
+<h3>Main File – Matching Status</h3>
+<div class="scroll"><table>
+<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="mainRows"></tbody>
+</table></div>
+</div>
+<div class="card">
+<h3>New File – Matching Status</h3>
+<div class="scroll"><table>
+<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="newRows"></tbody>
+</table></div>
+</div>
+</section>
 </main>
+
 <script>
-let orders=JSON.parse(localStorage.getItem("textileOrders")||"[]");
-function render(){
-document.getElementById("orders").textContent=orders.length;
-document.getElementById("qty").textContent=orders.reduce((s,o)=>s+o.qty,0).toLocaleString();
-document.getElementById("orderList").innerHTML=orders.map(o=>`<p><b>${o.pi}</b> | ${o.color} | ${o.construction} | ${o.qty.toLocaleString()} Yds</p>`).join("")||"No orders added yet.";
+let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
+let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
+let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
+
+function save(){
+localStorage.setItem("nte_orders",JSON.stringify(orders));
+localStorage.setItem("nte_main",JSON.stringify(mainData));
+localStorage.setItem("nte_new",JSON.stringify(newData));
+}
+function show(id){
+["dashboard","orders","matching"].forEach(x=>{
+document.getElementById(x).hidden=x!==id;
+});
 }
 function addOrder(){
-let pi=document.getElementById("pi").value.trim();
-let color=document.getElementById("color").value.trim();
-let construction=document.getElementById("construction").value.trim();
-let qty=Number(document.getElementById("quantity").value);
-if(!pi||!color||!construction||qty<=0){alert("Please fill all fields");return;}
-orders.push({pi,color,construction,qty});
-localStorage.setItem("textileOrders",JSON.stringify(orders));
-["pi","color","construction","quantity"].forEach(id=>document.getElementById(id).value="");
-render();
+let o={
+pi:document.getElementById("pi").value.trim(),
+color:document.getElementById("color").value.trim(),
+construction:document.getElementById("construction").value.trim(),
+qty:Number(document.getElementById("quantity").value)||0
+};
+if(!o.pi||!o.color||!o.construction||o.qty<=0){
+alert("Please fill all fields");return;
+}
+orders.push(o);
+save();render();
+["pi","color","construction","quantity"].forEach(x=>document.getElementById(x).value="");
+alert("Order added successfully");
+}
+function key(o){
+return [o.pi,o.color,o.construction].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("|");
+}
+function normalize(row){
+let result={};
+Object.keys(row).forEach(k=>{
+let h=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
+if(["pi","pinumber","pino","proformainvoice"].includes(h))result.pi=row[k];
+if(["color","colour"].includes(h))result.color=row[k];
+if(["construction","fabricconstruction"].includes(h))result.construction=row[k];
+if(["orderqty","orderquantity","qty","quantity"].includes(h))result.qty=Number(row[k])||0;
+});
+return result;
+}
+async function importFile(inputId,type){
+let file=document.getElementById(inputId).files[0];
+if(!file){alert("Please select an Excel file");return;}
+if(!window.XLSX){alert("Excel reader could not load. Check your internet connection.");return;}
+try{
+let data=await file.arrayBuffer();
+let workbook=XLSX.read(data);
+let sheet=workbook.Sheets[workbook.SheetNames[0]];
+let rows=XLSX.utils.sheet_to_json(sheet,{defval:""});
+let parsed=rows.map(normalize).filter(x=>x.pi&&x.color&&x.construction);
+if(!parsed.length){alert("No valid rows found. Check the column headings.");return;}
+if(type==="main")mainData=parsed;
+else newData=parsed;
+save();render();
+alert(parsed.length+" rows imported successfully");
+}catch(e){alert("File reading error: "+e.message);}
+}
+function matchStatus(data,other){
+let keys=new Set(other.map(key));
+return data.map(o=>({...o,matched:keys.has(key(o))}));
+}
+function tableRows(data){
+return data.map(o=>`<tr class="${o.matched?'matched':'unmatched'}">
+<td>${o.matched?'MATCHED':'UNMATCHED'}</td>
+<td>${escapeHTML(o.pi)}</td>
+<td>${escapeHTML(o.color)}</td>
+<td>${escapeHTML(o.construction)}</td>
+<td>${Number(o.qty)||0}</td>
+</tr>`).join("");
+}
+function escapeHTML(value){
+return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function render(){
+document.getElementById("orderRows").innerHTML=orders.map(o=>`<tr>
+<td>${escapeHTML(o.pi)}</td><td>${escapeHTML(o.color)}</td>
+<td>${escapeHTML(o.construction)}</td><td>${o.qty}</td></tr>`).join("");
+let a=matchStatus(mainData,newData);
+let b=matchStatus(newData,mainData);
+let m=a.filter(x=>x.matched).length;
+let u=a.length-m;
+document.getElementById("mainRows").innerHTML=tableRows(a);
+document.getElementById("newRows").innerHTML=tableRows(b);
+document.getElementById("mResult").textContent=m;
+document.getElementById("uResult").textContent=u;
+document.getElementById("matchedCount").textContent=m;
+document.getElementById("unmatchedCount").textContent=u;
+document.getElementById("total").textContent=orders.length+mainData.length;
+document.getElementById("qty").textContent=orders.reduce((s,o)=>s+o.qty,0).toLocaleString();
 }
 render();
 </script>
