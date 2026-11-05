@@ -1,0 +1,73 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal Textile ERP</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172033}
+header{background:#123b56;color:white;padding:22px}
+header h2{margin:0}
+header p{margin:7px 0 0;color:#d5e7f2}
+main{padding:18px;max-width:950px;margin:auto}
+.card{background:white;padding:20px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.stat{background:#e8f2f8;padding:18px;border-radius:10px}
+.stat b{display:block;font-size:25px;margin-top:8px;color:#123b56}
+button{background:#126b91;color:white;border:0;padding:12px 18px;border-radius:7px;cursor:pointer}
+input{padding:12px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:8px 0}
+</style>
+</head>
+<body>
+<header>
+<h2>Personal Textile ERP</h2>
+<p>Order • Production • WIP • Delivery Management</p>
+</header>
+<main>
+<div class="card">
+<h3>Dashboard</h3>
+<p>Welcome to your Personal Textile ERP.</p>
+<div class="grid">
+<div class="stat">Total Orders<b id="orders">0</b></div>
+<div class="stat">Total Quantity<b id="qty">0</b></div>
+<div class="stat">Matched<b>0</b></div>
+<div class="stat">Unmatched<b>0</b></div>
+</div>
+</div>
+<div class="card">
+<h3>Order Management</h3>
+<input id="pi" placeholder="PI Number">
+<input id="color" placeholder="Color">
+<input id="construction" placeholder="Construction">
+<input id="quantity" type="number" placeholder="Order Quantity (Yds)">
+<button onclick="addOrder()">Add Order</button>
+</div>
+<div class="card">
+<h3>Order List</h3>
+<div id="orderList">No orders added yet.</div>
+</div>
+</main>
+<script>
+let orders=JSON.parse(localStorage.getItem("textileOrders")||"[]");
+function render(){
+document.getElementById("orders").textContent=orders.length;
+document.getElementById("qty").textContent=orders.reduce((s,o)=>s+o.qty,0).toLocaleString();
+document.getElementById("orderList").innerHTML=orders.map(o=>`<p><b>${o.pi}</b> | ${o.color} | ${o.construction} | ${o.qty.toLocaleString()} Yds</p>`).join("")||"No orders added yet.";
+}
+function addOrder(){
+let pi=document.getElementById("pi").value.trim();
+let color=document.getElementById("color").value.trim();
+let construction=document.getElementById("construction").value.trim();
+let qty=Number(document.getElementById("quantity").value);
+if(!pi||!color||!construction||qty<=0){alert("Please fill all fields");return;}
+orders.push({pi,color,construction,qty});
+localStorage.setItem("textileOrders",JSON.stringify(orders));
+["pi","color","construction","quantity"].forEach(id=>document.getElementById(id).value="");
+render();
+}
+render();
+</script>
+</body>
+</html>
