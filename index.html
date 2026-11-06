@@ -6,1536 +6,559 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nahid Textile ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172033}
-header{background:#123b56;color:white;padding:20px}
-header h2{margin:0}
-nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
-button{background:#126b91;color:white;border:0;padding:11px 15px;border-radius:7px;cursor:pointer;margin:3px}
-button:hover{opacity:.85}
-button:disabled{opacity:.5;cursor:not-allowed}
-.danger{background:#dc3545}
-.secondary{background:#64748b}
-.active{background:#0b455e;outline:2px solid #fff}
-main{max-width:1200px;margin:auto;padding:15px}
-.card{background:white;padding:16px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6fa;color:#202938}
+header{background:#142b4a;color:white;padding:18px}
+header h2{margin:0 0 7px}
+header p{margin:0;color:#cbd8e8;font-size:13px}
+nav{display:flex;overflow-x:auto;background:#203d60;padding:8px;gap:6px}
+nav button{white-space:nowrap;background:#365779;color:white;border:0;padding:11px 14px;border-radius:6px}
+nav button.active{background:#13a078}
+main{padding:14px;max-width:1200px;margin:auto}
+.page{display:none}
+.page.active{display:block}
+.card{background:white;padding:16px;border-radius:10px;margin:12px 0;box-shadow:0 2px 8px #0000000c}
+h3{margin-top:0;color:#183b60}
+input,select{padding:11px;border:1px solid #cbd5e1;border-radius:6px;width:100%;margin:5px 0 12px;background:white}
+button{cursor:pointer;border:0;border-radius:6px;padding:10px 14px;background:#1769aa;color:white;margin:3px}
+button.secondary{background:#64748b}
+button.danger{background:#dc3545}
+button.success{background:#13865e}
+button.warning{background:#d68a14}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
-.stat{background:#e8f2f8;padding:15px;border-radius:9px}
-.stat b{display:block;font-size:24px;margin-top:8px}
-input,select{padding:11px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:5px 0;background:white}
-.formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
-table{width:100%;border-collapse:collapse;min-width:750px}
-th,td{padding:10px;border:1px solid #ddd;text-align:left;white-space:normal}
-th{background:#e8f2f8}
-.scroll{overflow-x:auto}
-.matched{background:#d9f7df}
-.unmatched{background:#ffe0e0}
-small{color:#526477}
-[hidden]{display:none!important}
-.status{padding:5px 8px;border-radius:5px;font-size:12px;font-weight:bold}
-.status-match{background:#b7efc2;color:#14532d}
-.status-unmatch{background:#fecaca;color:#991b1b}
-.editing{border:2px solid #e9a23b}
-.subnav{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
-.color-btn{background:#e8f2f8;color:#123b56;border:1px solid #b8cbd8}
-.color-btn.selected{background:#126b91;color:white}
-.info{background:#e8f2f8;padding:12px;border-radius:8px;margin:10px 0}
-.warning{background:#fff3cd;padding:12px;border-radius:8px;margin:10px 0}
-.success{color:#137333}
-.error{color:#c62828}
-.detail-table{min-width:500px}
-.detail-table th{width:30%}
-.result-card{border-left:4px solid #126b91}
-.search-summary{background:#e8f2f8;padding:12px;border-radius:8px;margin:10px 0}
+.stat{background:#edf5ff;padding:16px;border-radius:8px;text-align:center}
+.stat strong{display:block;font-size:25px;color:#14558b;margin-top:7px}
+table{border-collapse:collapse;width:100%;min-width:650px}
+th,td{border:1px solid #dbe2ea;padding:9px;text-align:left;font-size:13px}
+th{background:#e9f0f7}
+.tablewrap{overflow-x:auto;margin-top:10px}
+.green{background:#e1f5e9}
+.red{background:#ffe4e4}
+.muted{color:#64748b;font-size:13px}
+.result{padding:12px;background:#f0f5fa;border-radius:7px;margin:8px 0}
+.hidden{display:none!important}
+label{font-size:13px;font-weight:bold}
+.badge{padding:4px 8px;border-radius:5px;font-size:12px}
+.badge.green{color:#08743e}
+.badge.red{color:#b42318}
+@media(min-width:700px){.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
 </style>
 </head>
-
 <body>
 
 <header>
 <h2>NAHID TEXTILE ERP</h2>
 <p>Order Management • Excel Import • Matching System • Order Update • Global Search</p>
-<nav>
-<button onclick="show('dashboard')">Dashboard</button>
-<button onclick="show('orders')">Order Entry</button>
-<button onclick="show('matching')">Excel Matching</button>
-<button onclick="show('orderUpdate')">Order Update</button>
-<button onclick="show('globalSearch')">Global Search</button>
-</nav>
 </header>
+
+<nav>
+<button class="active" onclick="showPage('dashboard',this)">Dashboard</button>
+<button onclick="showPage('entry',this)">Order Entry</button>
+<button onclick="showPage('matching',this)">Excel Matching</button>
+<button onclick="showPage('update',this)">Order Update</button>
+<button onclick="showPage('global',this)">Global Search</button>
+</nav>
 
 <main>
 
-<!-- DASHBOARD -->
-<section id="dashboard">
+<section id="dashboard" class="page active">
 <div class="card">
 <h3>Dashboard</h3>
 <div class="grid">
-<div class="stat">Total Orders<b id="total">0</b></div>
-<div class="stat">Total Quantity<b id="qty">0</b></div>
-<div class="stat">Matched<b id="matchedCount">0</b></div>
-<div class="stat">Unmatched<b id="unmatchedCount">0</b></div>
+<div class="stat">Total Orders<strong id="totalOrders">0</strong></div>
+<div class="stat">Total Quantity<strong id="totalQty">0</strong></div>
+<div class="stat">Matched<strong id="matchedCount">0</strong></div>
+<div class="stat">Unmatched<strong id="unmatchedCount">0</strong></div>
 </div>
 </div>
-
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p>Manage your textile orders and compare Excel files from one place.</p>
-<p><small>Current version: Global Search 5.0</small></p>
+<p class="muted">Current version: Global Search 6.0</p>
 </div>
 </section>
 
-<!-- ORDER ENTRY -->
-<section id="orders" hidden>
-
-<div class="card" id="orderFormCard">
-<h3 id="formTitle">Manual Order Entry</h3>
+<section id="entry" class="page">
+<div class="card">
+<h3>Manual Order Entry</h3>
 <div class="formgrid">
-<input id="pi" placeholder="PI Number">
-<input id="color" placeholder="Color">
-<input id="construction" placeholder="Construction">
-<input id="quantity" type="number" min="0" placeholder="Order Qty (Yds)">
+<div><label>PI Number</label><input id="piInput" placeholder="Enter PI Number"></div>
+<div><label>Color</label><input id="colorInput" placeholder="Enter Color"></div>
+<div><label>Construction</label><input id="constructionInput" placeholder="Enter Construction"></div>
+<div><label>Order Qty</label><input id="qtyInput" type="number" placeholder="Enter Order Qty"></div>
 </div>
-<button id="saveOrderBtn" onclick="addOrder()">Add Order</button>
-<button id="cancelEditBtn" class="secondary" onclick="cancelEdit()" hidden>Cancel Edit</button>
+<button onclick="addOrder()">Add Order</button>
+<button class="secondary" onclick="resetOrderForm()">Cancel Edit</button>
 </div>
 
 <div class="card">
 <h3>Import Main Order Excel</h3>
-<input type="file" id="mainFile" accept=".xlsx,.xls,.csv">
-<button onclick="importFile('mainFile','main')">Import Main File</button>
-<p><small>Required columns: PI, Color, Construction and Order Qty.</small></p>
-<p id="mainImportInfo"></p>
+<input type="file" id="mainFile" accept=".xlsx,.xls,.xlsb,.csv">
+<button onclick="importMain()">Import Main File</button>
+<p class="muted">Required columns: PI, Color, Construction and Order Qty.</p>
 </div>
 
 <div class="card">
-<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
 <h3>Order List</h3>
 <button class="danger" onclick="clearOrders()">Clear All Orders</button>
-</div>
-<div class="scroll">
+<div class="tablewrap">
 <table>
-<thead>
-<tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr>
-</thead>
-<tbody id="orderRows"></tbody>
+<thead><tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr></thead>
+<tbody id="orderTable"></tbody>
 </table>
 </div>
 </div>
 </section>
 
-<!-- EXCEL MATCHING -->
-<section id="matching" hidden>
-
+<section id="matching" class="page">
 <div class="card">
 <h3>Upload New / Updated Excel</h3>
-<input type="file" id="newFile" accept=".xlsx,.xls,.csv">
-<button onclick="importFile('newFile','new')">Import New File</button>
-<p><small>Matching key: PI + Color + Construction</small></p>
-<p id="newImportInfo"></p>
+<input type="file" id="newFile" accept=".xlsx,.xls,.xlsb,.csv">
+<button onclick="importNew()">Import New File</button>
+<p class="muted">Matching key: PI + Color + Construction</p>
 </div>
-
 <div class="card">
 <h3>Matching Result</h3>
 <p>🟢 Matched &nbsp; 🔴 Unmatched</p>
 <div class="grid">
-<div class="stat">Matched Rows<b id="mResult">0</b></div>
-<div class="stat">Unmatched Rows<b id="uResult">0</b></div>
+<div class="stat">Matched Rows<strong id="matchRows">0</strong></div>
+<div class="stat">Unmatched Rows<strong id="unmatchRows">0</strong></div>
 </div>
 </div>
-
 <div class="card">
 <h3>Main File – Matching Status</h3>
-<div class="scroll">
-<table>
-<thead>
-<tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr>
-</thead>
-<tbody id="mainRows"></tbody>
-</table>
+<div class="tablewrap">
+<table><thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="mainMatchTable"></tbody></table>
 </div>
 </div>
-
 <div class="card">
 <h3>New File – Matching Status</h3>
-<div class="scroll">
-<table>
-<thead>
-<tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr>
-</thead>
-<tbody id="newRows"></tbody>
-</table>
+<div class="tablewrap">
+<table><thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="newMatchTable"></tbody></table>
 </div>
 </div>
 </section>
 
-<!-- ORDER UPDATE -->
-<section id="orderUpdate" hidden>
-
+<section id="update" class="page">
 <div class="card">
 <h3>Order Update</h3>
 <p>Select an update category.</p>
-<div class="subnav" id="categoryButtons"></div>
-
-<div class="formgrid">
-<input id="newCategoryName" placeholder="Enter New Category Name">
-<button onclick="addNewCategory()">+ Add Category</button>
-</div>
+<div id="categoryButtons"></div>
+<button class="success" onclick="addCategory()">+ Add Category</button>
 </div>
 
 <div class="card">
-<h3 id="categoryTitle">Delivery Status</h3>
-<label><b>Upload Excel File</b></label>
-<input type="file" id="updateFile" accept=".xlsx,.xls,.csv">
-<button onclick="uploadUpdateFile()">Upload / Replace File</button>
-<p id="uploadInfo"></p>
-
-<div class="warning">
-প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে।
-নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।
-</div>
+<h3 id="selectedCategoryTitle">Delivery Status</h3>
+<label>Upload Excel File</label>
+<input type="file" id="categoryFile" accept=".xlsx,.xls,.xlsb,.csv">
+<button onclick="uploadCategoryFile()">Upload / Replace File</button>
+<p class="muted">প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে। নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।</p>
 </div>
 
 <div class="card">
 <h3>Step 1: Select Sheet</h3>
-<select id="sheetSelect" onchange="onSheetChange()">
+<select id="sheetSelect" onchange="selectUpdateSheet()">
 <option value="">Upload an Excel file first</option>
 </select>
-<p id="sheetInfo"><small>Excel-এর Sheet নির্বাচন করো।</small></p>
+<p class="muted">Excel-এর Sheet নির্বাচন করো।</p>
 </div>
 
 <div class="card">
 <h3>Step 2: Find PI</h3>
-<input id="updatePI" list="piSuggestions" placeholder="Enter or select PI Number">
-<datalist id="piSuggestions"></datalist>
-<button onclick="searchPI()">Search PI</button>
-<p id="piInfo"></p>
+<input id="updatePISearch" placeholder="Search PI" oninput="searchUpdatePI()">
+<div id="updatePIResults"></div>
 </div>
-
-<div class="card" id="colorCard" hidden>
-<h3>Step 3: Select Color</h3>
-<div id="colorList"></div>
-</div>
-
-<div class="card" id="detailCard" hidden>
-<h3>Step 4: Full Update Details</h3>
-<p id="detailHeading"></p>
-<div id="detailResult"></div>
-</div>
-
-</section>
-
-<!-- GLOBAL SEARCH -->
-<section id="globalSearch" hidden>
 
 <div class="card">
+<h3>Step 3: Select Color</h3>
+<div id="updateColorResults"></div>
+</div>
+
+<div class="card">
+<h3>Step 4: Full Update Details</h3>
+<div id="updateDetails"></div>
+</div>
+</section>
+
+<section id="global" class="page">
+<div class="card">
 <h3>Global Search</h3>
-<p>Enter PI Number to search across Main Data and all uploaded categories and sheets.</p>
-
-<input id="globalSearchInput"
-placeholder="Enter PI Number"
-onkeydown="if(event.key==='Enter')runGlobalSearch()">
-
-<button onclick="runGlobalSearch()">Search PI</button>
-<button class="secondary" onclick="clearGlobalSearch()">Clear</button>
-
-<p id="globalSearchInfo"></p>
+<p>Enter PI Number or Color to search across Main Data and all uploaded categories and sheets.</p>
+<input id="globalSearchInput" placeholder="Search by PI or Color" oninput="globalSearch()">
+<button onclick="globalSearch()">Search</button>
+<button class="secondary" onclick="clearGlobal()">Clear</button>
+<div id="globalResults">
+<p class="muted">Enter a PI Number or Color to begin searching.</p>
 </div>
-
-<div class="card" id="globalSearchResults">
-<p>Enter a PI Number to begin searching.</p>
 </div>
-
-<div class="card" id="globalColorCard" hidden>
-<h3>Step 2: Select Color</h3>
-<p id="globalSelectedSheet"></p>
-<div id="globalColorList"></div>
+<div class="card hidden" id="globalStep2">
+<h3>Step 2: Select Color / PI</h3>
+<div id="globalChoices"></div>
 </div>
-
-<div class="card" id="globalDetailCard" hidden>
+<div class="card hidden" id="globalStep3">
 <h3>Step 3: Full Update Details</h3>
-<p id="globalDetailHeading"></p>
-<div id="globalDetailResult"></div>
+<div id="globalDetails"></div>
 </div>
-
 </section>
 
 </main>
 
 <script>
-
-// ===================================
-// DATA STORAGE
-// ===================================
-
-function loadData(name){
-try{
-return JSON.parse(localStorage.getItem(name)||"[]");
-}catch(e){
-return [];
-}
-}
-
-let orders=loadData("nte_orders");
-let mainData=loadData("nte_main");
-let newData=loadData("nte_new");
-let editingIndex=-1;
-
-
-// ===================================
-// INDEXED DB FOR ORDER UPDATE FILES
-// ===================================
-
 const DB_NAME="NahidTextileERP_UpdateDB";
-const DB_VERSION=1;
 const STORE_NAME="workbooks";
 
-let updateDB=null;
-let currentCategory="delivery";
-let currentWorkbook=null;
-let currentSheetRows=[];
-let selectedColor="";
+let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
+let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
+let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
+let categories=JSON.parse(localStorage.getItem("nte_categories")||'["Delivery Status","Order Status","WIP"]');
+let selectedCategory="Delivery Status";
+let workbookCache={};
+let updateSheetRows=[];
+let editingIndex=-1;
+let globalMatches=[];
 
-const categoryNames={
-delivery:"Delivery Status",
-order:"Order Status",
-wip:"WIP"
-};
-
-function loadSavedCategories(){
-try{
-let saved=JSON.parse(localStorage.getItem("nte_categories")||"{}");
-if(saved && typeof saved==="object"){
-Object.keys(saved).forEach(key=>{
-if(key && saved[key])categoryNames[key]=saved[key];
-});
-}
-}catch(e){
-console.error("Category loading error",e);
-}
-}
-
-function saveCategories(){
-localStorage.setItem("nte_categories",JSON.stringify(categoryNames));
-}
-
-function categoryLabel(category){
-return categoryNames[category]||category;
-}
-
-function categoryKey(name){
-return String(name||"").trim().toLowerCase()
-.replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
-}
-
-function openUpdateDB(){
-return new Promise((resolve,reject)=>{
-if(!window.indexedDB){
-reject(new Error("IndexedDB is not supported in this browser."));
-return;
-}
-const request=indexedDB.open(DB_NAME,DB_VERSION);
-request.onupgradeneeded=function(e){
-const db=e.target.result;
-if(!db.objectStoreNames.contains(STORE_NAME)){
-db.createObjectStore(STORE_NAME,{keyPath:"category"});
-}
-};
-request.onsuccess=function(e){
-updateDB=e.target.result;
-resolve(updateDB);
-};
-request.onerror=function(){
-reject(request.error||new Error("Database could not be opened."));
-};
-});
-}
-
-function dbSave(record){
-return new Promise((resolve,reject)=>{
-const tx=updateDB.transaction(STORE_NAME,"readwrite");
-tx.objectStore(STORE_NAME).put(record);
-tx.oncomplete=()=>resolve();
-tx.onerror=()=>reject(tx.error||new Error("Could not save workbook."));
-});
-}
-
-function dbGet(category){
-return new Promise((resolve,reject)=>{
-const tx=updateDB.transaction(STORE_NAME,"readonly");
-const request=tx.objectStore(STORE_NAME).get(category);
-request.onsuccess=()=>resolve(request.result||null);
-request.onerror=()=>reject(request.error);
-});
-}
-
-function dbGetAll(){
-return new Promise((resolve,reject)=>{
-const tx=updateDB.transaction(STORE_NAME,"readonly");
-const request=tx.objectStore(STORE_NAME).getAll();
-request.onsuccess=()=>resolve(request.result||[]);
-request.onerror=()=>reject(request.error);
-});
-}
-
-
-// ===================================
-// SAVE DATA
-// ===================================
-
-function save(){
+function saveAll(){
 localStorage.setItem("nte_orders",JSON.stringify(orders));
 localStorage.setItem("nte_main",JSON.stringify(mainData));
 localStorage.setItem("nte_new",JSON.stringify(newData));
+localStorage.setItem("nte_categories",JSON.stringify(categories));
 }
 
-
-// ===================================
-// NAVIGATION
-// ===================================
-
-function show(id){
-["dashboard","orders","matching","orderUpdate","globalSearch"].forEach(x=>{
-document.getElementById(x).hidden=x!==id;
-});
-if(id==="orderUpdate")loadCategory();
+function showPage(id,btn){
+document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+document.getElementById(id).classList.add("active");
+document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
+if(btn)btn.classList.add("active");
 }
 
-
-// ===================================
-// NORMALIZE MATCHING KEY
-// ===================================
-
-function key(o){
-return [o.pi,o.color,o.construction].map(x=>
-String(x||"").trim().toLowerCase().replace(/\s+/g," ")
-).join("|");
+function norm(v){
+return String(v??"").trim().toLowerCase().replace(/\.0$/,"").replace(/\s+/g," ");
 }
-
-
-// ===================================
-// MANUAL ORDER ADD / UPDATE
-// ===================================
+function piNorm(v){
+return norm(v).replace(/^pi[\s:#-]*/,"");
+}
+function headerKey(v){
+return norm(v).replace(/[^a-z0-9]/g,"");
+}
+function getField(row,names){
+const keys=Object.keys(row||{});
+for(const name of names){
+const found=keys.find(k=>headerKey(k)===headerKey(name));
+if(found!==undefined)return row[found];
+}
+return "";
+}
+function getPI(r){return getField(r,["PI","PI Number","P.I","P I","Proforma Invoice"])}
+function getColor(r){return getField(r,["Color","Colour","Color Name","Colour Name"])}
+function getConstruction(r){return getField(r,["Construction","Fabric Construction"])}
+function getQty(r){return getField(r,["Order Qty","Order Quantity","Qty","Quantity"])}
+function escapeHTML(v){
+return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
 
 function addOrder(){
-
-let o={
-pi:document.getElementById("pi").value.trim(),
-color:document.getElementById("color").value.trim(),
-construction:document.getElementById("construction").value.trim(),
-qty:Number(document.getElementById("quantity").value)||0
+const item={
+PI:document.getElementById("piInput").value.trim(),
+Color:document.getElementById("colorInput").value.trim(),
+Construction:document.getElementById("constructionInput").value.trim(),
+"Order Qty":document.getElementById("qtyInput").value
 };
-
-if(!o.pi||!o.color||!o.construction||o.qty<=0){
-alert("Please fill all fields correctly");
+if(!item.PI||!item.Color||!item.Construction){
+alert("PI, Color and Construction are required.");
 return;
 }
-
-let duplicate=orders.some((x,i)=>i!==editingIndex&&key(x)===key(o));
-
-if(duplicate){
-alert("This PI + Color + Construction already exists!");
-return;
+if(editingIndex>=0){orders[editingIndex]=item;editingIndex=-1;}
+else orders.push(item);
+saveAll();resetOrderForm();renderOrders();
 }
-
-if(editingIndex>=0){
-orders[editingIndex]=o;
-alert("Order updated successfully");
-}else{
-orders.push(o);
-alert("Order added successfully");
+function resetOrderForm(){
+["piInput","colorInput","constructionInput","qtyInput"].forEach(id=>document.getElementById(id).value="");
+editingIndex=-1;
 }
-
-mainData=orders.map(x=>({...x}));
-cancelEdit();
-save();
-render();
-}
-
-
-// ===================================
-// EDIT ORDER
-// ===================================
-
 function editOrder(i){
-let o=orders[i];
-document.getElementById("pi").value=o.pi;
-document.getElementById("color").value=o.color;
-document.getElementById("construction").value=o.construction;
-document.getElementById("quantity").value=o.qty;
+const r=orders[i];
+document.getElementById("piInput").value=r.PI;
+document.getElementById("colorInput").value=r.Color;
+document.getElementById("constructionInput").value=r.Construction;
+document.getElementById("qtyInput").value=r["Order Qty"];
 editingIndex=i;
-document.getElementById("saveOrderBtn").textContent="Update Order";
-document.getElementById("cancelEditBtn").hidden=false;
-document.getElementById("formTitle").textContent="Edit Order";
-document.getElementById("orderFormCard").classList.add("editing");
-show("orders");
+showPage("entry",document.querySelectorAll("nav button")[1]);
 window.scrollTo(0,0);
 }
-
-
-// ===================================
-// CANCEL EDIT
-// ===================================
-
-function cancelEdit(){
-editingIndex=-1;
-["pi","color","construction","quantity"].forEach(x=>{
-document.getElementById(x).value="";
-});
-document.getElementById("saveOrderBtn").textContent="Add Order";
-document.getElementById("cancelEditBtn").hidden=true;
-document.getElementById("formTitle").textContent="Manual Order Entry";
-document.getElementById("orderFormCard").classList.remove("editing");
-}
-
-
-// ===================================
-// DELETE ORDER
-// ===================================
-
 function deleteOrder(i){
-if(!confirm("Are you sure you want to delete this order?"))return;
-orders.splice(i,1);
-if(editingIndex===i)cancelEdit();
-else if(editingIndex>i)editingIndex--;
-mainData=orders.map(x=>({...x}));
-save();
-render();
+if(confirm("Delete this order?")){orders.splice(i,1);saveAll();renderOrders();}
 }
-
-
-// ===================================
-// CLEAR ALL ORDERS
-// ===================================
-
 function clearOrders(){
-if(!confirm("WARNING: Delete ALL main orders?"))return;
-orders=[];
-mainData=[];
-cancelEdit();
-save();
-render();
+if(confirm("Are you sure you want to clear all orders?")){
+orders=[];saveAll();renderOrders();
+}
+}
+function renderOrders(){
+document.getElementById("orderTable").innerHTML=orders.map((r,i)=>`
+<tr><td>${escapeHTML(r.PI)}</td><td>${escapeHTML(r.Color)}</td>
+<td>${escapeHTML(r.Construction)}</td><td>${escapeHTML(r["Order Qty"])}</td>
+<td><button onclick="editOrder(${i})">Edit</button><button class="danger" onclick="deleteOrder(${i})">Delete</button></td></tr>`).join("");
+updateDashboard();
+}
+function updateDashboard(){
+document.getElementById("totalOrders").textContent=orders.length;
+document.getElementById("totalQty").textContent=orders.reduce((s,r)=>s+(Number(r["Order Qty"])||0),0).toLocaleString();
 }
 
-
-// ===================================
-// EXCEL HEADER NORMALIZATION
-// ===================================
-
-function normalize(row){
-
-let result={};
-
-Object.keys(row).forEach(k=>{
-
-let h=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
-
-if(["pi","pinumber","pino","proformainvoice","proformainvoiceno","proformainvoicenumber"].includes(h)){
-result.pi=String(row[k]??"").trim();
-}
-
-if(["color","colour"].includes(h)){
-result.color=String(row[k]??"").trim();
-}
-
-if(["construction","fabricconstruction","fabricconst"].includes(h)){
-result.construction=String(row[k]??"").trim();
-}
-
-if(["orderqty","orderqtyyds","orderquantity","orderquantityyds","qty","quantity","yds","orderquantityyards"].includes(h)){
-let v=String(row[k]??"").replace(/,/g,"").trim();
-result.qty=Number(v)||0;
-}
-
-});
-
-return result;
-}
-
-
-// ===================================
-// EXCEL IMPORT
-// ===================================
-
-async function importFile(inputId,type){
-
-let file=document.getElementById(inputId).files[0];
-
-if(!file){
-alert("Please select an Excel file");
-return;
-}
-
-if(!window.XLSX){
-alert("Excel reader could not load. Check your internet connection.");
-return;
-}
-
+function readExcel(file,callback){
+if(!file)return alert("Please select an Excel file.");
+const reader=new FileReader();
+reader.onload=e=>{
 try{
-
-let data=await file.arrayBuffer();
-let workbook=XLSX.read(data,{type:"array",cellDates:false});
-let sheet=workbook.Sheets[workbook.SheetNames[0]];
-
-let rows=XLSX.utils.sheet_to_json(sheet,{defval:""});
-
-let parsed=rows.map(normalize).filter(x=>x.pi&&x.color&&x.construction);
-
-if(!parsed.length){
-alert("No valid rows found. Check Excel column headings.");
-return;
-}
-
-if(type==="main"){
-
-if(!confirm("Import "+parsed.length+" rows as your new Main Order File? Existing main orders will be replaced."))return;
-
-orders=parsed.map(x=>({...x}));
-mainData=parsed.map(x=>({...x}));
-
-document.getElementById("mainImportInfo").textContent=
-parsed.length+" rows imported from "+file.name;
-
-}else{
-
-if(!confirm("Import "+parsed.length+" rows as your New / Updated File? Previous new file will be replaced."))return;
-
-newData=parsed;
-
-document.getElementById("newImportInfo").textContent=
-parsed.length+" rows imported from "+file.name;
-
-}
-
-cancelEdit();
-save();
-render();
-alert(parsed.length+" rows imported successfully");
-document.getElementById(inputId).value="";
-
-}catch(e){
-alert("File reading error: "+e.message);
-}
-
-}
-
-
-// ===================================
-// MATCHING ENGINE
-// ===================================
-
-function matchStatus(data,other){
-let keys=new Set(other.map(key));
-return data.map(o=>({...o,matched:keys.has(key(o))}));
-}
-
-
-// ===================================
-// HTML SAFE TEXT
-// ===================================
-
-function escapeHTML(value){
-return String(value??"").replace(/[&<>"']/g,c=>({
-"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-}[c]));
-}
-
-
-// ===================================
-// MATCHING TABLE
-// ===================================
-
-function tableRows(data){
-
-if(!data.length)return '<tr><td colspan="5">No data available</td></tr>';
-
-return data.map(o=>`
-<tr class="${o.matched?'matched':'unmatched'}">
-<td><span class="status ${o.matched?'status-match':'status-unmatch'}">${o.matched?'MATCHED':'UNMATCHED'}</span></td>
-<td>${escapeHTML(o.pi)}</td>
-<td>${escapeHTML(o.color)}</td>
-<td>${escapeHTML(o.construction)}</td>
-<td>${Number(o.qty)||0}</td>
-</tr>
-`).join("");
-
-}
-
-
-// ===================================
-// DYNAMIC CATEGORY MANAGEMENT
-// ===================================
-
-function renderCategoryButtons(){
-
-let container=document.getElementById("categoryButtons");
-if(!container)return;
-
-container.innerHTML="";
-
-Object.keys(categoryNames).forEach(category=>{
-
-let btn=document.createElement("button");
-btn.id="cat-"+category;
-btn.textContent=categoryLabel(category);
-btn.className=category===currentCategory?"active":"";
-btn.onclick=()=>selectCategory(category);
-container.appendChild(btn);
-
-});
-
-}
-
-function addNewCategory(){
-
-let name=document.getElementById("newCategoryName").value.trim();
-
-if(!name){
-alert("Please enter a category name.");
-return;
-}
-
-let keyName=categoryKey(name);
-
-if(!keyName){
-alert("Please enter a valid category name.");
-return;
-}
-
-let existing=Object.keys(categoryNames).some(k=>k.toLowerCase()===keyName.toLowerCase());
-
-if(existing){
-alert("This category already exists.");
-return;
-}
-
-categoryNames[keyName]=name;
-saveCategories();
-renderCategoryButtons();
-
-document.getElementById("newCategoryName").value="";
-selectCategory(keyName);
-alert("New category created successfully.");
-
-}
-
-
-// ===================================
-// ORDER UPDATE CATEGORY
-// ===================================
-
-function selectCategory(category){
-
-if(!categoryNames[category]){
-alert("Category not found.");
-return;
-}
-
-currentCategory=category;
-document.getElementById("categoryTitle").textContent=categoryLabel(category);
-renderCategoryButtons();
-resetUpdateResults();
-loadCategory();
-
-}
-
-function resetUpdateResults(){
-
-currentSheetRows=[];
-selectedColor="";
-
-document.getElementById("sheetSelect").innerHTML='<option value="">Select Sheet</option>';
-document.getElementById("piSuggestions").innerHTML="";
-document.getElementById("updatePI").value="";
-document.getElementById("piInfo").textContent="";
-document.getElementById("sheetInfo").innerHTML="<small>Select a sheet from the uploaded workbook.</small>";
-document.getElementById("colorCard").hidden=true;
-document.getElementById("detailCard").hidden=true;
-document.getElementById("colorList").innerHTML="";
-document.getElementById("detailResult").innerHTML="";
-
-}
-
-async function loadCategory(){
-
-if(!updateDB)return;
-
-try{
-
-let record=await dbGet(currentCategory);
-currentWorkbook=record;
-
-document.getElementById("categoryTitle").textContent=categoryLabel(currentCategory);
-renderCategoryButtons();
-resetUpdateResults();
-
-if(!record){
-document.getElementById("uploadInfo").innerHTML='<small>No file uploaded for this category yet.</small>';
-return;
-}
-
-document.getElementById("uploadInfo").innerHTML=
-'<span class="success">Saved file: '+escapeHTML(record.fileName)+' ('+(record.sheets||[]).length+' sheets)</span>';
-
-let select=document.getElementById("sheetSelect");
-select.innerHTML='<option value="">Select Sheet</option>';
-
-(record.sheets||[]).forEach((sheet,i)=>{
-let option=document.createElement("option");
-option.value=String(i);
-option.textContent=sheet.name;
-select.appendChild(option);
-});
-
-}catch(e){
-document.getElementById("uploadInfo").textContent="Could not load saved file: "+e.message;
-}
-
-}
-
-
-// ===================================
-// ORDER UPDATE EXCEL UPLOAD
-// ===================================
-
-async function uploadUpdateFile(){
-
-let file=document.getElementById("updateFile").files[0];
-
-if(!file){
-alert("Please select an Excel file.");
-return;
-}
-
-if(!window.XLSX){
-alert("Excel reader could not load. Check internet connection.");
-return;
-}
-
-if(!updateDB){
-alert("Database is not ready. Please refresh the page.");
-return;
-}
-
-if(!confirm("Upload this file as the new "+categoryLabel(currentCategory)+" file? The previous file in this category will be replaced."))return;
-
-try{
-
-document.getElementById("uploadInfo").textContent="Reading Excel file...";
-
-let buffer=await file.arrayBuffer();
-let workbook=XLSX.read(buffer,{type:"array",cellDates:false});
-let sheets=[];
-
-for(let name of workbook.SheetNames){
-
-let worksheet=workbook.Sheets[name];
-let rows=XLSX.utils.sheet_to_json(worksheet,{defval:"",raw:false});
-
-sheets.push({name:name,rows:rows});
-
-}
-
-if(!sheets.length){
-alert("No sheets found in this workbook.");
-return;
-}
-
-let record={
-category:currentCategory,
-categoryName:categoryLabel(currentCategory),
-fileName:file.name,
-uploadedAt:new Date().toISOString(),
-sheets:sheets
+const wb=XLSX.read(e.target.result,{type:"array"});
+callback(wb);
+}catch(err){alert("Excel file could not be read: "+err.message);}
 };
-
-await dbSave(record);
-currentWorkbook=record;
-document.getElementById("updateFile").value="";
-await loadCategory();
-
-alert(categoryLabel(currentCategory)+" file uploaded successfully!");
-
-}catch(e){
-document.getElementById("uploadInfo").textContent="Upload failed: "+e.message;
-alert("Upload failed: "+e.message);
+reader.readAsArrayBuffer(file);
 }
-
+function sheetToRows(wb,sheet){
+return XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:""});
 }
-
-
-// ===================================
-// FIND PI AND COLOR COLUMNS
-// ===================================
-
-function cleanHeader(value){
-return String(value??"").toLowerCase().replace(/[^a-z0-9]/g,"");
-}
-
-function findColumn(row,type){
-
-let keys=Object.keys(row||{});
-
-let piNames=["pi","pinumber","pino","proformainvoice","proformainvoiceno","proformainvoicenumber"];
-let colorNames=["color","colour","colorname","colourname"];
-
-let names=type==="pi"?piNames:colorNames;
-
-for(let k of keys){
-if(names.includes(cleanHeader(k)))return k;
-}
-
-return null;
-}
-
-function normalizePI(value){
-return String(value??"").trim().toLowerCase().replace(/\s+/g," ");
-}
-
-
-// ===================================
-// SHEET SELECTION
-// ===================================
-
-function onSheetChange(){
-
-resetSheetResults();
-
-if(!currentWorkbook)return;
-
-let index=document.getElementById("sheetSelect").value;
-if(index==="")return;
-
-let sheet=currentWorkbook.sheets[Number(index)];
-if(!sheet)return;
-
-currentSheetRows=sheet.rows||[];
-
-let piColumn=currentSheetRows.length?findColumn(currentSheetRows[0],"pi"):null;
-
-if(!piColumn){
-document.getElementById("sheetInfo").innerHTML=
-'<span class="error">PI column not found. Supported examples: PI, PI Number, PI No.</span>';
-return;
-}
-
-let pis=[...new Set(currentSheetRows.map(row=>String(row[piColumn]??"").trim()).filter(Boolean))];
-pis.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
-
-let list=document.getElementById("piSuggestions");
-list.innerHTML="";
-
-pis.forEach(pi=>{
-let option=document.createElement("option");
-option.value=pi;
-list.appendChild(option);
+function importMain(){
+const f=document.getElementById("mainFile").files[0];
+if(!f)return alert("Select Main Excel file.");
+readExcel(f,wb=>{
+const all=[];
+wb.SheetNames.forEach(s=>sheetToRows(wb,s).forEach(r=>all.push(r)));
+if(!all.length)return alert("No data found.");
+mainData=all;saveAll();renderOrdersFromMain();runMatching();
+alert("Main File Imported Successfully.");
 });
-
-document.getElementById("sheetInfo").textContent=
-"Selected Sheet: "+sheet.name+" | Total Rows: "+currentSheetRows.length+" | Unique PI: "+pis.length;
-
 }
-
-function resetSheetResults(){
-
-currentSheetRows=[];
-selectedColor="";
-
-document.getElementById("piSuggestions").innerHTML="";
-document.getElementById("updatePI").value="";
-document.getElementById("piInfo").textContent="";
-document.getElementById("colorCard").hidden=true;
-document.getElementById("detailCard").hidden=true;
-document.getElementById("colorList").innerHTML="";
-document.getElementById("detailResult").innerHTML="";
-
+function renderOrdersFromMain(){
+orders=mainData.map(r=>({
+PI:getPI(r),Color:getColor(r),Construction:getConstruction(r),"Order Qty":getQty(r)
+}));
+saveAll();renderOrders();
 }
-
-
-// ===================================
-// SEARCH PI IN ORDER UPDATE
-// ===================================
-
-function searchPI(){
-
-if(!currentSheetRows.length){
-alert("Please select a sheet first.");
-return;
-}
-
-let piInput=document.getElementById("updatePI").value.trim();
-
-if(!piInput){
-alert("Please enter a PI number.");
-return;
-}
-
-let piColumn=findColumn(currentSheetRows[0],"pi");
-
-if(!piColumn){
-alert("PI column not found in this sheet.");
-return;
-}
-
-let matches=currentSheetRows.filter(row=>
-normalizePI(row[piColumn])===normalizePI(piInput)
-);
-
-if(!matches.length){
-
-document.getElementById("piInfo").innerHTML=
-'<span class="error">No data found for PI: '+escapeHTML(piInput)+'</span>';
-
-document.getElementById("colorCard").hidden=true;
-document.getElementById("detailCard").hidden=true;
-return;
-
-}
-
-let colorColumn=findColumn(currentSheetRows[0],"color");
-
-if(!colorColumn){
-document.getElementById("piInfo").innerHTML=
-'<span class="error">PI found, but Color column was not found.</span>';
-return;
-}
-
-let colors=[...new Set(matches.map(row=>String(row[colorColumn]??"").trim()).filter(Boolean))];
-
-document.getElementById("piInfo").innerHTML=
-'<span class="success">PI found: '+matches.length+' matching rows | '+colors.length+' colors</span>';
-
-let container=document.getElementById("colorList");
-container.innerHTML="";
-
-colors.forEach(color=>{
-let btn=document.createElement("button");
-btn.className="color-btn";
-btn.textContent=color;
-btn.onclick=()=>selectColor(color,piInput);
-container.appendChild(btn);
+function importNew(){
+const f=document.getElementById("newFile").files[0];
+if(!f)return alert("Select New Excel file.");
+readExcel(f,wb=>{
+const all=[];
+wb.SheetNames.forEach(s=>sheetToRows(wb,s).forEach(r=>all.push(r)));
+newData=all;saveAll();runMatching();
+alert("New File Imported Successfully.");
 });
-
-document.getElementById("colorCard").hidden=false;
-document.getElementById("detailCard").hidden=true;
-
+}
+function matchKey(r){
+return piNorm(getPI(r))+"|"+norm(getColor(r))+"|"+norm(getConstruction(r));
+}
+function runMatching(){
+const newKeys=new Set(newData.map(matchKey));
+const mainKeys=new Set(mainData.map(matchKey));
+let matched=0,unmatched=0;
+document.getElementById("mainMatchTable").innerHTML=mainData.map(r=>{
+const ok=newKeys.has(matchKey(r));if(ok)matched++;else unmatched++;
+return `<tr class="${ok?"green":"red"}"><td>${ok?"🟢 Matched":"🔴 Unmatched"}</td><td>${escapeHTML(getPI(r))}</td><td>${escapeHTML(getColor(r))}</td><td>${escapeHTML(getConstruction(r))}</td><td>${escapeHTML(getQty(r))}</td></tr>`;
+}).join("");
+document.getElementById("newMatchTable").innerHTML=newData.map(r=>{
+const ok=mainKeys.has(matchKey(r));
+return `<tr class="${ok?"green":"red"}"><td>${ok?"🟢 Matched":"🔴 Unmatched"}</td><td>${escapeHTML(getPI(r))}</td><td>${escapeHTML(getColor(r))}</td><td>${escapeHTML(getConstruction(r))}</td><td>${escapeHTML(getQty(r))}</td></tr>`;
+}).join("");
+document.getElementById("matchRows").textContent=matched;
+document.getElementById("unmatchRows").textContent=unmatched;
+document.getElementById("matchedCount").textContent=matched;
+document.getElementById("unmatchedCount").textContent=unmatched;
 }
 
-
-// ===================================
-// SELECT COLOR IN ORDER UPDATE
-// ===================================
-
-function selectColor(color,pi){
-
-selectedColor=color;
-
-document.querySelectorAll("#colorList .color-btn").forEach(btn=>{
-btn.classList.toggle("selected",btn.textContent===color);
+function openDB(){
+return new Promise((resolve,reject)=>{
+const req=indexedDB.open(DB_NAME,1);
+req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(STORE_NAME))db.createObjectStore(STORE_NAME,{keyPath:"category"});};
+req.onsuccess=()=>resolve(req.result);
+req.onerror=()=>reject(req.error);
 });
-
-let piColumn=findColumn(currentSheetRows[0],"pi");
-let colorColumn=findColumn(currentSheetRows[0],"color");
-
-let matches=currentSheetRows.filter(row=>
-normalizePI(row[piColumn])===normalizePI(pi)&&
-String(row[colorColumn]??"").trim()===color
-);
-
-showDetails(matches,pi,color);
-
 }
-
-
-// ===================================
-// SHOW FULL DETAILS
-// ===================================
-
-function showDetails(rows,pi,color){
-
-let container=document.getElementById("detailResult");
-
-document.getElementById("detailHeading").textContent=
-"PI: "+pi+" | Color: "+color+" | Rows: "+rows.length;
-
-if(!rows.length){
-container.textContent="No details found.";
-return;
-}
-
-let html="";
-
-rows.forEach((row,index)=>{
-
-html+=`
-<div class="card">
-<h4>Record ${index+1}</h4>
-<div class="scroll">
-<table class="detail-table">
-<tbody>
-`;
-
-Object.keys(row).forEach(header=>{
-html+=`<tr><th>${escapeHTML(header)}</th><td>${escapeHTML(row[header])}</td></tr>`;
+async function saveWorkbook(category,data){
+const db=await openDB();
+return new Promise((resolve,reject)=>{
+const tx=db.transaction(STORE_NAME,"readwrite");
+tx.objectStore(STORE_NAME).put({category,data,updatedAt:new Date().toISOString()});
+tx.oncomplete=()=>{db.close();resolve();};
+tx.onerror=()=>{db.close();reject(tx.error);};
 });
-
-html+=`</tbody></table></div></div>`;
-
+}
+async function loadWorkbook(category){
+const db=await openDB();
+return new Promise((resolve,reject)=>{
+const tx=db.transaction(STORE_NAME,"readonly");
+const req=tx.objectStore(STORE_NAME).get(category);
+req.onsuccess=()=>{db.close();resolve(req.result?.data||null);};
+req.onerror=()=>{db.close();reject(req.error);};
 });
-
-container.innerHTML=html;
-document.getElementById("detailCard").hidden=false;
-
 }
-
-
-// ===================================
-// GLOBAL SEARCH - PI FIRST SYSTEM
-// ===================================
-
-let globalSearchGroups=[];
-let globalSelectedGroup=null;
-
-function globalFieldValue(row,field){
-
-let aliases={
-
-pi:[
-"pi","pinumber","pino","proformainvoice",
-"proformainvoiceno","proformainvoicenumber"
-],
-
-color:[
-"color","colour","colorname","colourname"
-],
-
-construction:[
-"construction","fabricconstruction",
-"fabricconst","fabricconstructionname"
-],
-
-buyer:[
-"buyer","buyername","customer","customername"
-]
-
-};
-
-if(!row)return "";
-
-for(let k of Object.keys(row)){
-if(aliases[field] && aliases[field].includes(cleanHeader(k))){
-return String(row[k]??"").trim();
+function renderCategories(){
+document.getElementById("categoryButtons").innerHTML=categories.map(c=>
+`<button class="${c===selectedCategory?"success":"secondary"}" onclick="chooseCategory('${escapeHTML(c).replace(/'/g,"&#39;")}')">${escapeHTML(c)}</button>`
+).join("");
+document.getElementById("selectedCategoryTitle").textContent=selectedCategory;
 }
+function chooseCategory(c){
+selectedCategory=c;
+renderCategories();
+loadCategorySheets();
 }
-
-return "";
-
+function addCategory(){
+const name=prompt("Enter new category name:");
+if(!name||!name.trim())return;
+if(categories.some(c=>norm(c)===norm(name)))return alert("Category already exists.");
+categories.push(name.trim());selectedCategory=name.trim();saveAll();renderCategories();
+loadCategorySheets();
 }
-
-function globalGetPI(row){
-return globalFieldValue(row,"pi");
-}
-
-function globalGetColor(row){
-return globalFieldValue(row,"color");
-}
-
-
-// ===================================
-// GLOBAL SEARCH BY PI
-// ===================================
-
-async function runGlobalSearch(){
-
-let query=document.getElementById("globalSearchInput").value.trim();
-
-if(!query){
-alert("Please enter PI Number.");
-return;
-}
-
-if(!updateDB){
-alert("Database is not ready. Please refresh the page.");
-return;
-}
-
-let results=document.getElementById("globalSearchResults");
-
-results.innerHTML="<p>Searching all sheets...</p>";
-
-document.getElementById("globalColorCard").hidden=true;
-document.getElementById("globalDetailCard").hidden=true;
-document.getElementById("globalSearchInfo").textContent="";
-
-globalSearchGroups=[];
-globalSelectedGroup=null;
-
+async function uploadCategoryFile(){
+const f=document.getElementById("categoryFile").files[0];
+if(!f)return alert("Select Excel file first.");
+readExcel(f,async wb=>{
+const data={sheetNames:wb.SheetNames,sheets:{}};
+wb.SheetNames.forEach(s=>data.sheets[s]=sheetToRows(wb,s));
 try{
+await saveWorkbook(selectedCategory,data);
+workbookCache[selectedCategory]=data;
+await loadCategorySheets();
+alert(selectedCategory+" uploaded successfully.");
+}catch(e){alert("Save failed: "+e.message);}
+});
+}
+async function loadCategorySheets(){
+let data=workbookCache[selectedCategory];
+if(!data){
+try{data=await loadWorkbook(selectedCategory);}catch(e){console.error(e);}
+}
+const sel=document.getElementById("sheetSelect");
+if(!data){
+sel.innerHTML='<option value="">Upload an Excel file first</option>';
+updateSheetRows=[];return;
+}
+workbookCache[selectedCategory]=data;
+sel.innerHTML='<option value="">Select Sheet</option>'+data.sheetNames.map(s=>`<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+}
+async function selectUpdateSheet(){
+const sheet=document.getElementById("sheetSelect").value;
+const data=workbookCache[selectedCategory]||await loadWorkbook(selectedCategory);
+updateSheetRows=sheet&&data?data.sheets[sheet]||[]:[];
+document.getElementById("updatePISearch").value="";
+document.getElementById("updatePIResults").innerHTML="";
+document.getElementById("updateColorResults").innerHTML="";
+document.getElementById("updateDetails").innerHTML="";
+}
+function searchUpdatePI(){
+const q=piNorm(document.getElementById("updatePISearch").value);
+const out=document.getElementById("updatePIResults");
+if(!q){out.innerHTML="";return;}
+const found=updateSheetRows.filter(r=>piNorm(getPI(r)).includes(q));
+out.innerHTML=found.length?found.map(r=>`<button class="secondary" onclick="selectUpdatePI('${escapeHTML(String(getPI(r))).replace(/'/g,"&#39;")}')">${escapeHTML(getPI(r))}</button>`).join(""):"<p>No matching PI found.</p>";
+}
+function selectUpdatePI(pi){
+const rows=updateSheetRows.filter(r=>piNorm(getPI(r))===piNorm(pi));
+const colors=[...new Set(rows.map(r=>String(getColor(r))).filter(Boolean))];
+document.getElementById("updateColorResults").innerHTML=colors.map(c=>`<button onclick="showUpdateDetails('${escapeHTML(c).replace(/'/g,"&#39;")}')">${escapeHTML(c)}</button>`).join("");
+document.getElementById("updateDetails").innerHTML="";
+}
+function showUpdateDetails(color){
+const pi=document.getElementById("updatePISearch").value;
+const rows=updateSheetRows.filter(r=>piNorm(getPI(r))===piNorm(pi)&&norm(getColor(r))===norm(color));
+renderDetailTable("updateDetails",rows);
+}
+function renderDetailTable(target,rows){
+if(!rows.length){document.getElementById(target).innerHTML="<p>No data found.</p>";return;}
+const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+document.getElementById(target).innerHTML=`<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th>${escapeHTML(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${escapeHTML(r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
 
-let allGroups=[];
-let normalizedQuery=normalizePI(query);
-
-// SEARCH MAIN DATA
-
-let mainMatches=mainData.filter(row=>
-normalizePI(globalGetPI(row))===normalizedQuery
+async function globalSearch(){
+const q=document.getElementById("globalSearchInput").value.trim();
+const out=document.getElementById("globalResults");
+document.getElementById("globalStep2").classList.add("hidden");
+document.getElementById("globalStep3").classList.add("hidden");
+if(!q){out.innerHTML="<p>Enter PI or Color.</p>";return;}
+const isPI=piNorm(q).length>0 && (
+mainData.some(r=>piNorm(getPI(r))===piNorm(q)) ||
+orders.some(r=>piNorm(r.PI)===piNorm(q))
 );
-
-if(mainMatches.length){
-
-allGroups.push({
-category:"Main Order Data",
-categoryKey:"main",
-sheet:"Main Data",
-rows:mainMatches
-});
-
-}
-
-// SEARCH ALL UPLOADED CATEGORIES AND SHEETS
-
-let records=await dbGetAll();
-
-records.forEach(record=>{
-
-(record.sheets||[]).forEach(sheet=>{
-
-let rows=sheet.rows||[];
-
-let matches=rows.filter(row=>
-normalizePI(globalGetPI(row))===normalizedQuery
-);
-
-if(matches.length){
-
-allGroups.push({
-category:record.categoryName||categoryLabel(record.category),
-categoryKey:record.category,
-sheet:sheet.name,
-rows:matches
-});
-
-}
-
-});
-
-});
-
-globalSearchGroups=allGroups;
-
-let total=allGroups.reduce((sum,group)=>sum+group.rows.length,0);
-
-document.getElementById("globalSearchInfo").innerHTML=
-'<div class="search-summary">'+
-'<b>PI: '+escapeHTML(query)+'</b><br>'+
-'Found in <b>'+allGroups.length+'</b> sheets<br>'+
-'Total matching rows: <b>'+total+'</b>'+
-'</div>';
-
-if(!allGroups.length){
-results.innerHTML='<p class="error">No matching PI found in any sheet.</p>';
-return;
-}
-
-// SHOW MATCHING SHEETS
-
-let html='<h3>Step 1: Select Matching Sheet</h3>';
-
-allGroups.forEach((group,index)=>{
-
-html+=`
-<div class="card result-card">
-<h3>${escapeHTML(group.category)}</h3>
-<p>
-<b>Sheet:</b> ${escapeHTML(group.sheet)}
-<br>
-<b>Matching Rows:</b> ${group.rows.length}
-</p>
-<button onclick="openGlobalGroup(${index})">Select This Sheet</button>
-</div>
-`;
-
-});
-
-results.innerHTML=html;
-
-}catch(e){
-
-results.innerHTML='<p class="error">Search failed: '+escapeHTML(e.message)+'</p>';
-console.error(e);
-
-}
-
-}
-
-
-// ===================================
-// SELECT SHEET AND SHOW COLORS
-// ===================================
-
-function openGlobalGroup(index){
-
-let group=globalSearchGroups[index];
-if(!group)return;
-
-globalSelectedGroup=group;
-
-document.getElementById("globalDetailCard").hidden=true;
-document.getElementById("globalDetailResult").innerHTML="";
-
-let colors=[...new Set(
-group.rows.map(row=>globalGetColor(row)).filter(Boolean)
-)];
-
-document.getElementById("globalSelectedSheet").innerHTML=
-'<b>Category:</b> '+escapeHTML(group.category)+
-'<br><b>Sheet:</b> '+escapeHTML(group.sheet)+
-'<br><b>PI:</b> '+escapeHTML(document.getElementById("globalSearchInput").value.trim())+
-'<br><b>Total Rows:</b> '+group.rows.length;
-
-let container=document.getElementById("globalColorList");
-container.innerHTML="";
-
-if(!colors.length){
-
-container.innerHTML='<p class="error">No Color column or Color values found in this sheet. Showing all matching rows.</p>';
-
-showGlobalDetails(group.rows,"All Colors");
-
+globalMatches=[];
+if(isPI){
+mainData.forEach(r=>{if(piNorm(getPI(r))===piNorm(q))globalMatches.push({category:"Main Data",sheet:"Main Data",row:r});});
 }else{
-
-colors.forEach(color=>{
-
-let btn=document.createElement("button");
-btn.className="color-btn";
-btn.textContent=color;
-
-btn.onclick=()=>selectGlobalColor(color);
-
-container.appendChild(btn);
-
-});
-
+mainData.forEach(r=>{if(norm(getColor(r)).includes(norm(q)))globalMatches.push({category:"Main Data",sheet:"Main Data",row:r});});
 }
-
-document.getElementById("globalColorCard").hidden=false;
-
-document.getElementById("globalColorCard").scrollIntoView({
-behavior:"smooth",
-block:"start"
+for(const cat of categories){
+let data=workbookCache[cat];
+if(!data){try{data=await loadWorkbook(cat);}catch(e){}}
+if(!data)continue;
+workbookCache[cat]=data;
+for(const sheet of data.sheetNames){
+(data.sheets[sheet]||[]).forEach(r=>{
+const hit=isPI?piNorm(getPI(r))===piNorm(q):norm(getColor(r)).includes(norm(q));
+if(hit)globalMatches.push({category:cat,sheet,row:r});
 });
-
 }
-
-
-// ===================================
-// SELECT COLOR AND SHOW ALL ROWS
-// ===================================
-
-function selectGlobalColor(color){
-
-if(!globalSelectedGroup)return;
-
-document.querySelectorAll("#globalColorList .color-btn").forEach(btn=>{
-btn.classList.toggle("selected",btn.textContent===color);
-});
-
-let matches=globalSelectedGroup.rows.filter(row=>
-globalGetColor(row)===color
-);
-
-// No duplicate row is removed.
-// Every matching row is displayed.
-
-showGlobalDetails(matches,color);
-
 }
-
-
-// ===================================
-// GLOBAL SEARCH FULL DETAILS
-// ===================================
-
-function showGlobalDetails(rows,color){
-
-let group=globalSelectedGroup;
-
-if(!group)return;
-
-let query=document.getElementById("globalSearchInput").value.trim();
-
-document.getElementById("globalDetailHeading").innerHTML=
-'<b>PI:</b> '+escapeHTML(query)+
-' | <b>Color:</b> '+escapeHTML(color)+
-'<br><b>Category:</b> '+escapeHTML(group.category)+
-' | <b>Sheet:</b> '+escapeHTML(group.sheet)+
-' | <b>Total Matching Rows:</b> '+rows.length;
-
-let html="";
-
-if(!rows.length){
-html="<p>No matching records found.</p>";
-}else{
-
-rows.forEach((row,index)=>{
-
-html+=`
-<div class="card">
-<h4>Record ${index+1}</h4>
-<div class="scroll">
-<table class="detail-table">
-<tbody>
-`;
-
-Object.keys(row).forEach(header=>{
-
-html+=`
-<tr>
-<th>${escapeHTML(header)}</th>
-<td>${escapeHTML(row[header])}</td>
-</tr>
-`;
-
-});
-
-html+=`
-</tbody>
-</table>
-</div>
-</div>
-`;
-
-});
-
+if(!globalMatches.length){
+out.innerHTML="<p>No matching data found.</p>";return;
 }
-
-document.getElementById("globalDetailResult").innerHTML=html;
-document.getElementById("globalDetailCard").hidden=false;
-
-document.getElementById("globalDetailCard").scrollIntoView({
-behavior:"smooth",
-block:"start"
+const groups={};
+globalMatches.forEach((m,i)=>{
+const key=m.category+"|||"+m.sheet;
+if(!groups[key])groups[key]=[];
+groups[key].push(i);
 });
-
+out.innerHTML=`<p><b>${globalMatches.length}</b> matching rows found.</p>`+
+Object.entries(groups).map(([key,ids])=>{
+const [cat,sheet]=key.split("|||");
+return `<div class="result"><b>${escapeHTML(cat)}</b> — ${escapeHTML(sheet)}<br>
+${ids.length} matching rows
+<button onclick="showGlobalGroup('${escapeHTML(key).replace(/'/g,"&#39;")}')">Select Sheet</button></div>`;
+}).join("");
 }
-
-
-// ===================================
-// CLEAR GLOBAL SEARCH
-// ===================================
-
-function clearGlobalSearch(){
-
+function showGlobalGroup(key){
+const [cat,sheet]=key.split("|||");
+const rows=globalMatches.filter(m=>m.category===cat&&m.sheet===sheet);
+const choices=[];
+rows.forEach((m,i)=>{
+const value=isGlobalSearchPI()?String(getColor(m.row)||"(No Color)"):String(getPI(m.row)||"(No PI)");
+if(!choices.includes(value))choices.push(value);
+});
+document.getElementById("globalStep2").classList.remove("hidden");
+document.getElementById("globalStep3").classList.add("hidden");
+document.getElementById("globalChoices").innerHTML=choices.map(v=>
+`<button onclick="showGlobalDetails('${escapeHTML(key).replace(/'/g,"&#39;")}','${escapeHTML(v).replace(/'/g,"&#39;")}')">${escapeHTML(v)}</button>`
+).join("");
+}
+function isGlobalSearchPI(){
+const q=piNorm(document.getElementById("globalSearchInput").value);
+return globalMatches.some(m=>piNorm(getPI(m.row))===q);
+}
+function showGlobalDetails(key,value){
+const [cat,sheet]=key.split("|||");
+const piSearch=isGlobalSearchPI();
+const rows=globalMatches.filter(m=>{
+if(m.category!==cat||m.sheet!==sheet)return false;
+return piSearch?norm(getColor(m.row))===norm(value):piNorm(getPI(m.row))===piNorm(value);
+}).map(m=>m.row);
+document.getElementById("globalStep3").classList.remove("hidden");
+renderDetailTable("globalDetails",rows);
+}
+function clearGlobal(){
 document.getElementById("globalSearchInput").value="";
-document.getElementById("globalSearchInfo").textContent="";
-document.getElementById("globalSearchResults").innerHTML=
-"<p>Enter a PI Number to begin searching.</p>";
-
-document.getElementById("globalColorList").innerHTML="";
-document.getElementById("globalSelectedSheet").textContent="";
-document.getElementById("globalDetailResult").innerHTML="";
-document.getElementById("globalDetailHeading").textContent="";
-
-document.getElementById("globalColorCard").hidden=true;
-document.getElementById("globalDetailCard").hidden=true;
-
-globalSearchGroups=[];
-globalSelectedGroup=null;
-
+document.getElementById("globalResults").innerHTML='<p class="muted">Enter a PI Number or Color to begin searching.</p>';
+document.getElementById("globalStep2").classList.add("hidden");
+document.getElementById("globalStep3").classList.add("hidden");
+globalMatches=[];
 }
 
-
-// ===================================
-// MAIN RENDER FUNCTION
-// ===================================
-
-function render(){
-
-document.getElementById("orderRows").innerHTML=
-orders.length?orders.map((o,i)=>`
-
-<tr>
-<td>${escapeHTML(o.pi)}</td>
-<td>${escapeHTML(o.color)}</td>
-<td>${escapeHTML(o.construction)}</td>
-<td>${Number(o.qty)||0}</td>
-<td>
-<button onclick="editOrder(${i})">Edit</button>
-<button class="danger" onclick="deleteOrder(${i})">Delete</button>
-</td>
-</tr>
-
-`).join(""):
-
-'<tr><td colspan="5">No orders added yet</td></tr>';
-
-let a=matchStatus(mainData,newData);
-let b=matchStatus(newData,mainData);
-
-let m=a.filter(x=>x.matched).length;
-let u=a.length-m;
-
-document.getElementById("mainRows").innerHTML=tableRows(a);
-document.getElementById("newRows").innerHTML=tableRows(b);
-
-document.getElementById("mResult").textContent=m;
-document.getElementById("uResult").textContent=u;
-
-document.getElementById("matchedCount").textContent=m;
-document.getElementById("unmatchedCount").textContent=u;
-
-document.getElementById("total").textContent=orders.length;
-
-let totalQty=orders.reduce((s,o)=>s+(Number(o.qty)||0),0);
-
-document.getElementById("qty").textContent=totalQty.toLocaleString();
-
-}
-
-
-// ===================================
-// START ERP
-// ===================================
-
-async function startERP(){
-
-render();
-loadSavedCategories();
-
-try{
-
-await openUpdateDB();
-
-let records=await dbGetAll();
-
-records.forEach(record=>{
-
-if(record.category && !categoryNames[record.category]){
-categoryNames[record.category]=record.categoryName||record.category;
-}
-
-});
-
-saveCategories();
-renderCategoryButtons();
-selectCategory("delivery");
-
-}catch(e){
-
-document.getElementById("uploadInfo").textContent=
-"Database initialization failed: "+e.message;
-
-console.error(e);
-
-}
-
-}
-
-startERP();
-
+renderOrders();
+renderCategories();
+runMatching();
+loadCategorySheets();
 </script>
-
 </body>
 </html>
