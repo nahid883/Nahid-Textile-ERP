@@ -6,41 +6,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Nahid Textile ERP</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial;background:#f1f5f9;color:#172033}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f5f9;color:#172033}
 header{background:#123b56;color:white;padding:20px}
 header h2{margin:0}
 nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
-button{background:#126b91;color:white;border:0;padding:11px 15px;border-radius:7px;cursor:pointer}
-main{max-width:1100px;margin:auto;padding:15px}
+button{background:#126b91;color:white;border:0;padding:11px 15px;border-radius:7px;cursor:pointer;margin:3px}
+button:hover{opacity:.85}
+.danger{background:#dc3545}
+.secondary{background:#64748b}
+main{max-width:1200px;margin:auto;padding:15px}
 .card{background:white;padding:16px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .stat{background:#e8f2f8;padding:15px;border-radius:9px}
 .stat b{display:block;font-size:24px;margin-top:8px}
 input{padding:11px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:5px 0}
 .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
-table{width:100%;border-collapse:collapse;min-width:650px}
+table{width:100%;border-collapse:collapse;min-width:750px}
 th,td{padding:10px;border:1px solid #ddd;text-align:left}
 th{background:#e8f2f8}
 .scroll{overflow-x:auto}
 .matched{background:#d9f7df}
 .unmatched{background:#ffe0e0}
 small{color:#526477}
+.hidden{display:none}
+.status{padding:5px 8px;border-radius:5px;font-size:12px;font-weight:bold}
+.status-match{background:#b7efc2;color:#14532d}
+.status-unmatch{background:#fecaca;color:#991b1b}
+.editing{border:2px solid #e9a23b}
 </style>
 </head>
+
 <body>
+
 <header>
 <h2>NAHID TEXTILE ERP</h2>
-<p>Order • Excel Import • Matching Management</p>
+<p>Order Management • Excel Import • Matching System</p>
 <nav>
 <button onclick="show('dashboard')">Dashboard</button>
 <button onclick="show('orders')">Order Entry</button>
 <button onclick="show('matching')">Excel Matching</button>
 </nav>
 </header>
+
 <main>
+
+<!-- DASHBOARD -->
 <section id="dashboard">
+
 <div class="card">
 <h3>Dashboard</h3>
 <div class="grid">
@@ -50,165 +65,629 @@ small{color:#526477}
 <div class="stat">Unmatched<b id="unmatchedCount">0</b></div>
 </div>
 </div>
+
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
-<p>Manage your orders and compare Excel files from one place.</p>
+<p>Manage your textile orders and compare Excel files from one place.</p>
+<p><small>Current version: Order Management 2.0</small></p>
 </div>
+
 </section>
 
+
+<!-- ORDER ENTRY -->
 <section id="orders" hidden>
-<div class="card">
-<h3>Manual Order Entry</h3>
+
+<div class="card" id="orderFormCard">
+
+<h3 id="formTitle">Manual Order Entry</h3>
+
 <div class="formgrid">
 <input id="pi" placeholder="PI Number">
 <input id="color" placeholder="Color">
 <input id="construction" placeholder="Construction">
-<input id="quantity" type="number" placeholder="Order Qty (Yds)">
+<input id="quantity" type="number" min="0" placeholder="Order Qty (Yds)">
 </div>
-<button onclick="addOrder()">Add Order</button>
+
+<button id="saveOrderBtn" onclick="addOrder()">Add Order</button>
+<button id="cancelEditBtn" class="secondary" onclick="cancelEdit()" hidden>Cancel Edit</button>
+
 </div>
+
 <div class="card">
+
 <h3>Import Main Order Excel</h3>
 <input type="file" id="mainFile" accept=".xlsx,.xls,.csv">
+
 <button onclick="importFile('mainFile','main')">Import Main File</button>
-<p><small>Excel column names should include PI, Color, Construction and Order Qty.</small></p>
+
+<p><small>Required columns: PI, Color, Construction and Order Qty.</small></p>
+<p id="mainImportInfo"></p>
+
 </div>
+
 <div class="card">
+
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
 <h3>Order List</h3>
-<div class="scroll"><table>
-<thead><tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<button class="danger" onclick="clearOrders()">Clear All Orders</button>
+</div>
+
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th>PI</th>
+<th>Color</th>
+<th>Construction</th>
+<th>Order Qty</th>
+<th>Action</th>
+</tr>
+</thead>
 <tbody id="orderRows"></tbody>
-</table></div>
+</table>
+</div>
+
 </div>
 </section>
 
+
+<!-- EXCEL MATCHING -->
 <section id="matching" hidden>
+
 <div class="card">
+
 <h3>Upload New / Updated Excel</h3>
+
 <input type="file" id="newFile" accept=".xlsx,.xls,.csv">
+
 <button onclick="importFile('newFile','new')">Import New File</button>
+
 <p><small>Matching key: PI + Color + Construction</small></p>
+<p id="newImportInfo"></p>
+
 </div>
+
 <div class="card">
+
 <h3>Matching Result</h3>
+
 <p>🟢 Matched &nbsp; 🔴 Unmatched</p>
+
 <div class="grid">
 <div class="stat">Matched Rows<b id="mResult">0</b></div>
 <div class="stat">Unmatched Rows<b id="uResult">0</b></div>
 </div>
+
 </div>
+
 <div class="card">
+
 <h3>Main File – Matching Status</h3>
-<div class="scroll"><table>
-<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>PI</th>
+<th>Color</th>
+<th>Construction</th>
+<th>Order Qty</th>
+</tr>
+</thead>
 <tbody id="mainRows"></tbody>
-</table></div>
+</table>
 </div>
+
+</div>
+
 <div class="card">
+
 <h3>New File – Matching Status</h3>
-<div class="scroll"><table>
-<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+
+<div class="scroll">
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>PI</th>
+<th>Color</th>
+<th>Construction</th>
+<th>Order Qty</th>
+</tr>
+</thead>
 <tbody id="newRows"></tbody>
-</table></div>
+</table>
 </div>
+
+</div>
+
 </section>
+
 </main>
 
+
 <script>
-let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
-let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
-let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
+
+// ===================================
+// DATA STORAGE
+// ===================================
+
+function loadData(name){
+try{
+return JSON.parse(localStorage.getItem(name)||"[]");
+}catch(e){
+return [];
+}
+}
+
+let orders=loadData("nte_orders");
+let mainData=loadData("nte_main");
+let newData=loadData("nte_new");
+
+let editingIndex=-1;
+
+
+// ===================================
+// SAVE DATA
+// ===================================
 
 function save(){
 localStorage.setItem("nte_orders",JSON.stringify(orders));
 localStorage.setItem("nte_main",JSON.stringify(mainData));
 localStorage.setItem("nte_new",JSON.stringify(newData));
 }
+
+
+// ===================================
+// NAVIGATION
+// ===================================
+
 function show(id){
 ["dashboard","orders","matching"].forEach(x=>{
 document.getElementById(x).hidden=x!==id;
 });
 }
+
+
+// ===================================
+// NORMALIZE MATCHING KEY
+// ===================================
+
+function key(o){
+return [
+o.pi,
+o.color,
+o.construction
+].map(x=>
+String(x||"")
+.trim()
+.toLowerCase()
+.replace(/\s+/g," ")
+).join("|");
+}
+
+
+// ===================================
+// MANUAL ORDER ADD / UPDATE
+// ===================================
+
 function addOrder(){
+
 let o={
 pi:document.getElementById("pi").value.trim(),
 color:document.getElementById("color").value.trim(),
 construction:document.getElementById("construction").value.trim(),
 qty:Number(document.getElementById("quantity").value)||0
 };
+
 if(!o.pi||!o.color||!o.construction||o.qty<=0){
-alert("Please fill all fields");return;
+alert("Please fill all fields correctly");
+return;
 }
+
+let duplicate=orders.some((x,i)=>
+i!==editingIndex&&key(x)===key(o)
+);
+
+if(duplicate){
+alert("This PI + Color + Construction already exists!");
+return;
+}
+
+if(editingIndex>=0){
+
+orders[editingIndex]=o;
+
+alert("Order updated successfully");
+
+}else{
+
 orders.push(o);
-save();render();
-["pi","color","construction","quantity"].forEach(x=>document.getElementById(x).value="");
+
 alert("Order added successfully");
+
 }
-function key(o){
-return [o.pi,o.color,o.construction].map(x=>String(x||"").trim().toLowerCase().replace(/\s+/g," ")).join("|");
+
+mainData=orders.map(x=>({...x}));
+
+cancelEdit();
+save();
+render();
+
 }
-function normalize(row){
-let result={};
-Object.keys(row).forEach(k=>{
-let h=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
-if(["pi","pinumber","pino","proformainvoice"].includes(h))result.pi=row[k];
-if(["color","colour"].includes(h))result.color=row[k];
-if(["construction","fabricconstruction"].includes(h))result.construction=row[k];
-if(["orderqty","orderquantity","qty","quantity"].includes(h))result.qty=Number(row[k])||0;
+
+
+// ===================================
+// EDIT ORDER
+// ===================================
+
+function editOrder(i){
+
+let o=orders[i];
+
+document.getElementById("pi").value=o.pi;
+document.getElementById("color").value=o.color;
+document.getElementById("construction").value=o.construction;
+document.getElementById("quantity").value=o.qty;
+
+editingIndex=i;
+
+document.getElementById("saveOrderBtn").textContent="Update Order";
+document.getElementById("cancelEditBtn").hidden=false;
+document.getElementById("formTitle").textContent="Edit Order";
+
+document.getElementById("orderFormCard").classList.add("editing");
+
+show("orders");
+window.scrollTo(0,0);
+
+}
+
+
+// ===================================
+// CANCEL EDIT
+// ===================================
+
+function cancelEdit(){
+
+editingIndex=-1;
+
+["pi","color","construction","quantity"].forEach(x=>{
+document.getElementById(x).value="";
 });
+
+document.getElementById("saveOrderBtn").textContent="Add Order";
+document.getElementById("cancelEditBtn").hidden=true;
+document.getElementById("formTitle").textContent="Manual Order Entry";
+
+document.getElementById("orderFormCard").classList.remove("editing");
+
+}
+
+
+// ===================================
+// DELETE ORDER
+// ===================================
+
+function deleteOrder(i){
+
+if(!confirm("Are you sure you want to delete this order?")){
+return;
+}
+
+orders.splice(i,1);
+
+if(editingIndex===i){
+cancelEdit();
+}else if(editingIndex>i){
+editingIndex--;
+}
+
+mainData=orders.map(x=>({...x}));
+
+save();
+render();
+
+}
+
+
+// ===================================
+// CLEAR ALL ORDERS
+// ===================================
+
+function clearOrders(){
+
+if(!confirm("WARNING: Delete ALL main orders?")){
+return;
+}
+
+orders=[];
+mainData=[];
+
+cancelEdit();
+save();
+render();
+
+}
+
+
+// ===================================
+// EXCEL HEADER NORMALIZATION
+// ===================================
+
+function normalize(row){
+
+let result={};
+
+Object.keys(row).forEach(k=>{
+
+let h=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
+
+if(["pi","pinumber","pino","proformainvoice"].includes(h)){
+result.pi=String(row[k]??"").trim();
+}
+
+if(["color","colour"].includes(h)){
+result.color=String(row[k]??"").trim();
+}
+
+if(["construction","fabricconstruction","fabricconst"].includes(h)){
+result.construction=String(row[k]??"").trim();
+}
+
+if([
+"orderqty",
+"orderqtyyds",
+"orderquantity",
+"orderquantityyds",
+"qty",
+"quantity",
+"yds",
+"orderquantityyards"
+].includes(h)){
+
+let v=String(row[k]??"").replace(/,/g,"").trim();
+result.qty=Number(v)||0;
+
+}
+
+});
+
 return result;
+
 }
+
+
+// ===================================
+// EXCEL IMPORT
+// ===================================
+
 async function importFile(inputId,type){
+
 let file=document.getElementById(inputId).files[0];
-if(!file){alert("Please select an Excel file");return;}
-if(!window.XLSX){alert("Excel reader could not load. Check your internet connection.");return;}
+
+if(!file){
+alert("Please select an Excel file");
+return;
+}
+
+if(!window.XLSX){
+alert("Excel reader could not load. Check your internet connection.");
+return;
+}
+
 try{
+
 let data=await file.arrayBuffer();
-let workbook=XLSX.read(data);
+
+let workbook=XLSX.read(data,{
+type:"array",
+cellDates:false
+});
+
 let sheet=workbook.Sheets[workbook.SheetNames[0]];
-let rows=XLSX.utils.sheet_to_json(sheet,{defval:""});
-let parsed=rows.map(normalize).filter(x=>x.pi&&x.color&&x.construction);
-if(!parsed.length){alert("No valid rows found. Check the column headings.");return;}
-if(type==="main")mainData=parsed;
-else newData=parsed;
-save();render();
+
+let rows=XLSX.utils.sheet_to_json(sheet,{
+defval:""
+});
+
+let parsed=rows.map(normalize).filter(x=>
+x.pi&&x.color&&x.construction
+);
+
+if(!parsed.length){
+alert("No valid rows found. Check Excel column headings.");
+return;
+}
+
+if(type==="main"){
+
+if(!confirm("Import "+parsed.length+" rows as your new Main Order File? Existing main orders will be replaced.")){
+return;
+}
+
+orders=parsed.map(x=>({...x}));
+mainData=orders.map(x=>({...x}));
+
+document.getElementById("mainImportInfo").textContent=
+parsed.length+" rows imported from "+file.name;
+
+}else{
+
+if(!confirm("Import "+parsed.length+" rows as your New / Updated File? Previous new file will be replaced.")){
+return;
+}
+
+newData=parsed;
+
+document.getElementById("newImportInfo").textContent=
+parsed.length+" rows imported from "+file.name;
+
+}
+
+cancelEdit();
+save();
+render();
+
 alert(parsed.length+" rows imported successfully");
-}catch(e){alert("File reading error: "+e.message);}
+
+document.getElementById(inputId).value="";
+
+}catch(e){
+
+alert("File reading error: "+e.message);
+
 }
+
+}
+
+
+// ===================================
+// MATCHING ENGINE
+// ===================================
+
 function matchStatus(data,other){
+
 let keys=new Set(other.map(key));
-return data.map(o=>({...o,matched:keys.has(key(o))}));
+
+return data.map(o=>({
+...o,
+matched:keys.has(key(o))
+}));
+
 }
-function tableRows(data){
-return data.map(o=>`<tr class="${o.matched?'matched':'unmatched'}">
-<td>${o.matched?'MATCHED':'UNMATCHED'}</td>
-<td>${escapeHTML(o.pi)}</td>
-<td>${escapeHTML(o.color)}</td>
-<td>${escapeHTML(o.construction)}</td>
-<td>${Number(o.qty)||0}</td>
-</tr>`).join("");
-}
+
+
+// ===================================
+// HTML SAFE TEXT
+// ===================================
+
 function escapeHTML(value){
-return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+return String(value??"").replace(/[&<>"']/g,c=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[c]));
+
 }
+
+
+// ===================================
+// MATCHING TABLE
+// ===================================
+
+function tableRows(data){
+
+if(!data.length){
+return '<tr><td colspan="5">No data available</td></tr>';
+}
+
+return data.map(o=>`
+
+<tr class="${o.matched?'matched':'unmatched'}">
+
+<td>
+<span class="status ${o.matched?'status-match':'status-unmatch'}">
+${o.matched?'MATCHED':'UNMATCHED'}
+</span>
+</td>
+
+<td>${escapeHTML(o.pi)}</td>
+
+<td>${escapeHTML(o.color)}</td>
+
+<td>${escapeHTML(o.construction)}</td>
+
+<td>${Number(o.qty)||0}</td>
+
+</tr>
+
+`).join("");
+
+}
+
+
+// ===================================
+// MAIN RENDER FUNCTION
+// ===================================
+
 function render(){
-document.getElementById("orderRows").innerHTML=orders.map(o=>`<tr>
-<td>${escapeHTML(o.pi)}</td><td>${escapeHTML(o.color)}</td>
-<td>${escapeHTML(o.construction)}</td><td>${o.qty}</td></tr>`).join("");
+
+// Order list
+
+document.getElementById("orderRows").innerHTML=
+orders.length?orders.map((o,i)=>`
+
+<tr>
+
+<td>${escapeHTML(o.pi)}</td>
+
+<td>${escapeHTML(o.color)}</td>
+
+<td>${escapeHTML(o.construction)}</td>
+
+<td>${Number(o.qty)||0}</td>
+
+<td>
+<button onclick="editOrder(${i})">Edit</button>
+<button class="danger" onclick="deleteOrder(${i})">Delete</button>
+</td>
+
+</tr>
+
+`).join(""):
+
+'<tr><td colspan="5">No orders added yet</td></tr>';
+
+
+// Matching data
+
 let a=matchStatus(mainData,newData);
 let b=matchStatus(newData,mainData);
+
 let m=a.filter(x=>x.matched).length;
 let u=a.length-m;
+
+
+// Matching tables
+
 document.getElementById("mainRows").innerHTML=tableRows(a);
 document.getElementById("newRows").innerHTML=tableRows(b);
+
+
+// Matching statistics
+
 document.getElementById("mResult").textContent=m;
 document.getElementById("uResult").textContent=u;
+
 document.getElementById("matchedCount").textContent=m;
 document.getElementById("unmatchedCount").textContent=u;
-document.getElementById("total").textContent=orders.length+mainData.length;
-document.getElementById("qty").textContent=orders.reduce((s,o)=>s+o.qty,0).toLocaleString();
+
+
+// Dashboard statistics
+
+document.getElementById("total").textContent=orders.length;
+
+let totalQty=orders.reduce((s,o)=>s+(Number(o.qty)||0),0);
+
+document.getElementById("qty").textContent=
+totalQty.toLocaleString();
+
 }
+
+
+// ===================================
+// START ERP
+// ===================================
+
 render();
+
 </script>
+
 </body>
 </html>
