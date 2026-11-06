@@ -49,6 +49,9 @@ tr:nth-child(even){background:#fafcff}
 .badge.green{background:#dcfce7;color:#166534}
 .badge.red{background:#fee2e2;color:#991b1b}
 .category-card{border:1px solid #dce3eb;padding:12px;border-radius:8px;margin:10px 0}
+.detail-section{border:1px solid #dce3eb;border-radius:9px;padding:12px;margin:14px 0;background:#fff}
+.detail-section h3{margin:0 0 8px;color:#123b63}
+.detail-empty{padding:12px;background:#f8fafc;color:#64748b;border-radius:7px;font-size:13px}
 hr{border:0;border-top:1px solid #e2e8f0;margin:18px 0}
 footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 @media(min-width:700px){
@@ -78,7 +81,6 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <button data-page="search">Global Search</button>
 </nav>
 
-<!-- DASHBOARD -->
 <section id="dashboard" class="page active">
 <h2>Dashboard</h2>
 <div class="stats">
@@ -90,11 +92,10 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <div class="result-box">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p class="muted">Manage your textile orders and compare Excel files from one place.</p>
-<p class="muted">Current version: Global Search 7.1</p>
+<p class="muted">Current version: Global Search 7.2</p>
 </div>
 </section>
 
-<!-- ORDER ENTRY -->
 <section id="entry" class="page">
 <h2>Manual Order Entry</h2>
 <div class="form-grid">
@@ -128,13 +129,11 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 </div>
 </section>
 
-<!-- MATCHING -->
 <section id="matching" class="page">
 <h2>Upload New / Updated Excel</h2>
 <input type="file" id="newFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
 <button id="importNewBtn">Import New File</button>
 <p class="muted">Matching key: PI + Color + Construction</p>
-
 <hr>
 <h3>Matching Result</h3>
 <p><span class="matched">🟢 Matched</span> &nbsp; <span class="unmatched">🔴 Unmatched</span></p>
@@ -142,7 +141,6 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <div class="stat">Matched Rows<strong id="matchRows">0</strong></div>
 <div class="stat">Unmatched Rows<strong id="unmatchRows">0</strong></div>
 </div>
-
 <h3>Main File – Matching Status</h3>
 <div class="table-wrap">
 <table>
@@ -150,7 +148,6 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <tbody id="mainMatchTable"></tbody>
 </table>
 </div>
-
 <h3>New File – Matching Status</h3>
 <div class="table-wrap">
 <table>
@@ -160,34 +157,28 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 </div>
 </section>
 
-<!-- ORDER UPDATE -->
 <section id="update" class="page">
 <h2>Order Update</h2>
 <p class="muted">Select an update category.</p>
 <div class="actions"><button id="addCategoryBtn">+ Add Category</button></div>
 <div id="categoryList"></div>
-
 <hr>
 <h3 id="categoryTitle">Delivery Status</h3>
 <label>Upload Excel File</label>
 <input type="file" id="categoryFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
 <div class="actions"><button id="uploadCategoryBtn">Upload / Replace File</button></div>
 <p class="muted">প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে। নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।</p>
-
 <hr>
 <h3>Step 1: Select Sheet</h3>
 <select id="sheetSelect"><option value="">Upload an Excel file first</option></select>
 <p class="muted">Excel-এর Sheet নির্বাচন করো।</p>
-
 <hr>
 <h3>Step 2: Find PI</h3>
 <input id="updatePiSearch" placeholder="Search PI Number">
 <div id="piResults"></div>
-
 <hr>
 <h3>Step 3: Select Color</h3>
 <div id="colorResults"></div>
-
 <hr>
 <h3>Step 4: Full Update Details</h3>
 <div class="table-wrap">
@@ -198,7 +189,6 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 </div>
 </section>
 
-<!-- GLOBAL SEARCH -->
 <section id="search" class="page">
 <h2>Global Search</h2>
 <p class="muted">Enter PI Number or Color to search across Main Data and all uploaded categories and sheets.</p>
@@ -208,46 +198,40 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <button class="secondary" id="globalClearBtn">Clear</button>
 </div>
 <div id="globalResults"><p class="muted">Enter a PI Number or Color to begin searching.</p></div>
-
 <hr>
 <h3>Step 2: Select Color / PI</h3>
 <div id="globalChoices"></div>
-
 <hr>
-<h3>Step 3: Full Update Details</h3>
-<div class="table-wrap">
-<table>
-<thead id="globalDetailHead"></thead>
-<tbody id="globalDetailBody"></tbody>
-</table>
-</div>
+<h3>Step 3: Sheet-wise Details</h3>
+<div id="globalDetails"></div>
 </section>
 
-<footer>Nahid Textile ERP • Version 7.1</footer>
+<footer>Nahid Textile ERP • Version 7.2</footer>
 </div>
 
 <script>
 "use strict";
 
-/* ---------------- DATA STORAGE ---------------- */
+/* ================= STORAGE ================= */
 
-const DB_NAME = "NahidTextileERP_DB";
-const DB_VERSION = 1;
-let db = null;
+const DB_NAME="NahidTextileERP_DB";
+const DB_VERSION=1;
+let db=null;
 
-let orders = JSON.parse(localStorage.getItem("nte_orders") || "[]");
-let manualOrders = JSON.parse(localStorage.getItem("nte_manual") || "[]");
-let mainData = JSON.parse(localStorage.getItem("nte_main") || "[]");
-let newData = JSON.parse(localStorage.getItem("nte_new") || "[]");
-let categories = JSON.parse(localStorage.getItem("nte_categories") || '["Delivery Status","Order Status","WIP"]');
+let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
+let manualOrders=JSON.parse(localStorage.getItem("nte_manual")||"[]");
+let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
+let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
+let categories=JSON.parse(localStorage.getItem("nte_categories")||'["Delivery Status","Order Status","WIP"]');
 
-let editingId = null;
-let selectedCategory = categories[0] || "Delivery Status";
-let selectedUpdatePI = "";
-let selectedUpdateColor = "";
-let selectedSheetRows = [];
-let selectedSheetHeaders = [];
-let globalRecords = [];
+let editingId=null;
+let selectedCategory=categories[0]||"Delivery Status";
+let selectedUpdatePI="";
+let selectedUpdateColor="";
+let selectedSheetRows=[];
+let selectedSheetHeaders=[];
+let globalRecords=[];
+let globalFiles=[];
 
 function saveState(){
  try{
@@ -288,7 +272,7 @@ function getCategoryFile(category){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").get(category);
-  request.onsuccess=()=>resolve(request.result || null);
+  request.onsuccess=()=>resolve(request.result||null);
   request.onerror=()=>reject(request.error);
  });
 }
@@ -297,12 +281,12 @@ function getAllCategoryFiles(){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").getAll();
-  request.onsuccess=()=>resolve(request.result || []);
+  request.onsuccess=()=>resolve(request.result||[]);
   request.onerror=()=>reject(request.error);
  });
 }
 
-/* ---------------- NAVIGATION ---------------- */
+/* ================= NAVIGATION ================= */
 
 document.querySelectorAll("nav button").forEach(button=>{
  button.addEventListener("click",()=>{
@@ -313,10 +297,10 @@ document.querySelectorAll("nav button").forEach(button=>{
  });
 });
 
-/* ---------------- COMMON HELPERS ---------------- */
+/* ================= HELPERS ================= */
 
 function clean(value){
- return String(value ?? "").trim();
+ return String(value??"").trim();
 }
 
 function normalize(value){
@@ -324,7 +308,7 @@ function normalize(value){
 }
 
 function escapeHTML(value){
- return String(value ?? "").replace(/[&<>"']/g,ch=>({
+ return String(value??"").replace(/[&<>"']/g,ch=>({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
  })[ch]);
 }
@@ -333,17 +317,21 @@ function keyOf(row){
  return [normalize(row.pi),normalize(row.color),normalize(row.construction)].join("|");
 }
 
+function pairKey(pi,color){
+ return normalize(pi)+"|"+normalize(color);
+}
+
 function numberValue(value){
  if(typeof value==="number") return value;
- const n=Number(String(value ?? "").replace(/,/g,"").trim());
+ const n=Number(String(value??"").replace(/,/g,"").trim());
  return Number.isFinite(n)?n:0;
 }
 
 function cellText(value){
- if(value instanceof Date && !isNaN(value)){
+ if(value instanceof Date&&!isNaN(value)){
   return value.toLocaleDateString("en-GB");
  }
- if(typeof value==="number" && value>20000 && value<80000){
+ if(typeof value==="number"&&value>20000&&value<80000){
   const date=XLSX.SSF.parse_date_code(value);
   if(date){
    return String(date.d).padStart(2,"0")+"/"+String(date.m).padStart(2,"0")+"/"+date.y;
@@ -352,44 +340,44 @@ function cellText(value){
  return value==null?"":String(value).trim();
 }
 
+/* ================= HEADER IDENTIFICATION ================= */
+
 function headerType(value){
  const h=normalize(value);
 
- if(["pi","pinumber","pino","pino.","pinum","piref","pinumber."].includes(h)) return "pi";
+ if(["pi","pinumber","pino","piref","pinum","pi no"].map(normalize).includes(h)) return "pi";
+ if(["buyer","buyername","buyercompany","customer","customername"].map(normalize).includes(h)) return "buyer";
 
- if(["buyer","buyername","buyercompany","customer","customername"].includes(h)) return "buyer";
+ if(["pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime"].includes(h)) return "piReceivedDate";
+ if(["delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli"].includes(h)) return "deliDate";
 
- if(["color","colour","shade","blank"].includes(h)) return "color";
+ if(["color","colour","shade","blank","colorname","colourname"].includes(h)) return "color";
+ if(["construction","fabricconstruction","constr","quality","fabricquality"].includes(h)) return "construction";
 
- if(["construction","fabricconstruction","constr","quality"].includes(h)) return "construction";
+ if(["orderqty","orderquantity","qty","quantity","orderqnty","orderqnt"].includes(h)) return "qty";
+ if(["remarks","remark","comments","comment","note","notes"].includes(h)) return "remarks";
 
- if(["orderqty","orderquantity","qty","quantity","orderqnty"].includes(h)) return "qty";
+ if(["goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive"].includes(h)) return "goodRcvd";
+ if(["short","shortqty","shortage","shortageqty","balanceqty"].includes(h)) return "short";
+ if(["presentstatus","currentstatus","deliverycondition"].includes(h)) return "presentStatus";
+ if(["deliverystatus","status","wipstatus","presentdeliverystatus"].includes(h)) return "deliveryStatus";
 
  return "";
 }
 
-/* HEADER DETECTION: FIRST 50 ROWS */
-
 function findHeaderRow(matrix){
  let best={row:-1,score:0,headers:[]};
-
- // প্রথম ৫০টি Row পর্যন্ত Header খুঁজবে
  const limit=Math.min(matrix.length,50);
 
  for(let r=0;r<limit;r++){
-  const row=matrix[r] || [];
+  const row=matrix[r]||[];
   const types=row.map(headerType);
   const score=new Set(types.filter(Boolean)).size;
 
   if(score>best.score){
-   best={
-    row:r,
-    score:score,
-    headers:row.map(v=>clean(v))
-   };
+   best={row:r,score,headers:row.map(v=>clean(v))};
   }
  }
-
  return best.score>=2?best:null;
 }
 
@@ -399,7 +387,7 @@ function normalizeOrderRow(raw){
   buyer:clean(raw.buyer),
   color:clean(raw.color),
   construction:clean(raw.construction),
-  qty:raw.qty ?? ""
+  qty:raw.qty??""
  };
 }
 
@@ -414,26 +402,37 @@ function parseSheet(sheet){
 
  headers.forEach((h,i)=>{
   const type=headerType(h);
-  if(type && typeIndexes[type]===undefined) typeIndexes[type]=i;
+  if(type&&typeIndexes[type]===undefined) typeIndexes[type]=i;
  });
 
  const rows=[];
 
  for(let r=found.row+1;r<matrix.length;r++){
-  const line=matrix[r] || [];
+  const line=matrix[r]||[];
+  const fields={};
 
-  const get=type=>typeIndexes[type]===undefined?"":cellText(line[typeIndexes[type]]);
+  Object.keys(typeIndexes).forEach(type=>{
+   fields[type]=cellText(line[typeIndexes[type]]);
+  });
 
   const obj={
-   pi:get("pi"),
-   buyer:get("buyer"),
-   color:get("color"),
-   construction:get("construction"),
-   qty:get("qty"),
+   pi:fields.pi||"",
+   buyer:fields.buyer||"",
+   color:fields.color||"",
+   construction:fields.construction||"",
+   qty:fields.qty||"",
+   piReceivedDate:fields.piReceivedDate||"",
+   deliDate:fields.deliDate||"",
+   remarks:fields.remarks||"",
+   goodRcvd:fields.goodRcvd||"",
+   short:fields.short||"",
+   presentStatus:fields.presentStatus||"",
+   deliveryStatus:fields.deliveryStatus||"",
+   _fields:fields,
    _values:line.map(cellText)
   };
 
-  if(obj.pi || obj.color || obj.construction){
+  if(obj.pi||obj.color||obj.construction){
    rows.push(obj);
   }
  }
@@ -450,7 +449,7 @@ async function readWorkbook(file){
 
  for(const name of workbook.SheetNames){
   const sheet=workbook.Sheets[name];
-  if(!sheet || !sheet["!ref"]) continue;
+  if(!sheet||!sheet["!ref"]) continue;
 
   const range=XLSX.utils.decode_range(sheet["!ref"]);
   const cellCount=(range.e.r-range.s.r+1)*(range.e.c-range.s.c+1);
@@ -475,30 +474,32 @@ async function readWorkbook(file){
  return result;
 }
 
-/* ---------------- DASHBOARD ---------------- */
+function getField(row,field){
+ if(!row) return "";
+ if(row[field]!==undefined&&row[field]!==null&&row[field]!=="") return row[field];
+ if(row._fields&&row._fields[field]!==undefined) return row._fields[field];
+ return "";
+}
+
+/* ================= DASHBOARD ================= */
 
 function updateDashboard(){
  document.getElementById("totalOrders").textContent=orders.length;
-
  document.getElementById("totalQty").textContent=
   orders.reduce((sum,o)=>sum+numberValue(o.qty),0).toLocaleString();
-
  document.getElementById("matchedCount").textContent=
-  document.getElementById("matchRows").textContent || "0";
-
+  document.getElementById("matchRows").textContent||"0";
  document.getElementById("unmatchedCount").textContent=
-  document.getElementById("unmatchRows").textContent || "0";
+  document.getElementById("unmatchRows").textContent||"0";
 }
 
-/* ---------------- ORDER ENTRY ---------------- */
+/* ================= ORDER ENTRY ================= */
 
 function clearOrderForm(){
  ["piInput","buyerInput","colorInput","constructionInput","qtyInput"].forEach(id=>{
   document.getElementById(id).value="";
  });
-
  editingId=null;
-
  document.getElementById("saveOrderBtn").textContent="Add Order";
  document.getElementById("cancelEditBtn").classList.add("hidden");
 }
@@ -515,12 +516,11 @@ function renderOrders(){
 
    [order.pi,order.buyer,order.color,order.construction,order.qty].forEach(value=>{
     const td=document.createElement("td");
-    td.textContent=value ?? "";
+    td.textContent=value??"";
     tr.appendChild(td);
    });
 
    const action=document.createElement("td");
-
    const edit=document.createElement("button");
    edit.className="small";
    edit.textContent="Edit";
@@ -537,7 +537,6 @@ function renderOrders(){
    body.appendChild(tr);
   });
  }
-
  updateDashboard();
 }
 
@@ -546,25 +545,20 @@ function editOrder(id){
  if(!order) return;
 
  editingId=id;
-
  document.getElementById("piInput").value=order.pi;
  document.getElementById("buyerInput").value=order.buyer;
  document.getElementById("colorInput").value=order.color;
  document.getElementById("constructionInput").value=order.construction;
  document.getElementById("qtyInput").value=order.qty;
-
  document.getElementById("saveOrderBtn").textContent="Update Order";
  document.getElementById("cancelEditBtn").classList.remove("hidden");
-
  document.getElementById("entry").scrollIntoView({behavior:"smooth"});
 }
 
 function deleteOrder(id){
  if(!confirm("এই Order Delete করতে চাও?")) return;
-
  orders=orders.filter(o=>o.id!==id);
  manualOrders=manualOrders.filter(o=>o.id!==id);
-
  saveState();
  renderOrders();
 }
@@ -578,27 +572,20 @@ document.getElementById("saveOrderBtn").addEventListener("click",()=>{
   qty:document.getElementById("qtyInput").value
  });
 
- if(!row.pi || !row.color){
+ if(!row.pi||!row.color){
   alert("PI Number এবং Color দিতে হবে।");
   return;
  }
 
  if(editingId){
   const old=orders.find(o=>o.id===editingId);
-  const updated={...row,id:editingId,source:old?.source || "manual"};
-
+  const updated={...row,id:editingId,source:old?.source||"manual"};
   orders=orders.map(o=>o.id===editingId?updated:o);
-
   if(updated.source==="manual"){
    manualOrders=manualOrders.map(o=>o.id===editingId?updated:o);
   }
  }else{
-  const item={
-   ...row,
-   id:Date.now()+"_"+Math.random().toString(36).slice(2),
-   source:"manual"
-  };
-
+  const item={...row,id:Date.now()+"_"+Math.random().toString(36).slice(2),source:"manual"};
   orders.push(item);
   manualOrders.push(item);
  }
@@ -612,25 +599,19 @@ document.getElementById("cancelEditBtn").addEventListener("click",clearOrderForm
 
 document.getElementById("clearOrdersBtn").addEventListener("click",()=>{
  if(!confirm("সব Order মুছে ফেলতে চাও?")) return;
-
  orders=[];
  manualOrders=[];
  mainData=[];
-
  saveState();
  renderOrders();
  renderMatching();
 });
 
-/* ---------------- MAIN EXCEL IMPORT ---------------- */
+/* ================= MAIN EXCEL IMPORT ================= */
 
 document.getElementById("importMainBtn").addEventListener("click",async()=>{
  const file=document.getElementById("mainFile").files[0];
-
- if(!file){
-  alert("আগে Excel file নির্বাচন করো।");
-  return;
- }
+ if(!file){alert("আগে Excel file নির্বাচন করো।");return;}
 
  try{
   const sheets=await readWorkbook(file);
@@ -639,11 +620,7 @@ document.getElementById("importMainBtn").addEventListener("click",async()=>{
   sheets.forEach(sheet=>{
    sheet.rows.forEach(row=>{
     if(row.pi){
-     imported.push({
-      ...normalizeOrderRow(row),
-      id:"main_"+Math.random().toString(36).slice(2),
-      source:"main"
-     });
+     imported.push({...normalizeOrderRow(row),id:"main_"+Math.random().toString(36).slice(2),source:"main"});
     }
    });
   });
@@ -655,32 +632,26 @@ document.getElementById("importMainBtn").addEventListener("click",async()=>{
 
   mainData=imported;
   orders=[...manualOrders,...mainData];
-
   saveState();
   renderOrders();
-
   alert(imported.length+"টি Order Import হয়েছে।");
-
  }catch(error){
   console.error(error);
   alert("Excel Import করা যায়নি: "+error.message);
  }
 });
 
-/* ---------------- MATCHING ---------------- */
+/* ================= MATCHING ================= */
 
 function renderMatching(){
  const mainBody=document.getElementById("mainMatchTable");
  const newBody=document.getElementById("newMatchTable");
-
  mainBody.innerHTML="";
  newBody.innerHTML="";
 
  const mainKeys=new Set(mainData.map(keyOf));
  const newKeys=new Set(newData.map(keyOf));
-
- let matched=0;
- let unmatched=0;
+ let matched=0,unmatched=0;
 
  function addRows(data,body,otherKeys){
   if(!data.length){
@@ -690,25 +661,18 @@ function renderMatching(){
 
   data.forEach(row=>{
    const yes=otherKeys.has(keyOf(row));
-
-   if(yes) matched++;
-   else unmatched++;
+   if(yes) matched++; else unmatched++;
 
    const tr=document.createElement("tr");
    const status=document.createElement("td");
-
-   status.innerHTML=yes
-    ?'<span class="badge green">Matched</span>'
-    :'<span class="badge red">Unmatched</span>';
-
+   status.innerHTML=yes?'<span class="badge green">Matched</span>':'<span class="badge red">Unmatched</span>';
    tr.appendChild(status);
 
    [row.pi,row.buyer,row.color,row.construction,row.qty].forEach(value=>{
     const td=document.createElement("td");
-    td.textContent=value ?? "";
+    td.textContent=value??"";
     tr.appendChild(td);
    });
-
    body.appendChild(tr);
   });
  }
@@ -718,17 +682,12 @@ function renderMatching(){
 
  document.getElementById("matchRows").textContent=matched;
  document.getElementById("unmatchRows").textContent=unmatched;
-
  updateDashboard();
 }
 
 document.getElementById("importNewBtn").addEventListener("click",async()=>{
  const file=document.getElementById("newFile").files[0];
-
- if(!file){
-  alert("আগে New Excel file নির্বাচন করো।");
-  return;
- }
+ if(!file){alert("আগে New Excel file নির্বাচন করো।");return;}
 
  try{
   const sheets=await readWorkbook(file);
@@ -740,24 +699,18 @@ document.getElementById("importNewBtn").addEventListener("click",async()=>{
    });
   });
 
-  if(!imported.length){
-   alert("PI Number পাওয়া যায়নি।");
-   return;
-  }
+  if(!imported.length){alert("PI Number পাওয়া যায়নি।");return;}
 
   newData=imported;
-
   saveState();
   renderMatching();
-
   alert(imported.length+"টি New File row Import হয়েছে।");
-
  }catch(error){
   alert("Import error: "+error.message);
  }
 });
 
-/* ---------------- CATEGORY MANAGEMENT ---------------- */
+/* ================= CATEGORY MANAGEMENT ================= */
 
 function renderCategories(){
  const container=document.getElementById("categoryList");
@@ -780,17 +733,14 @@ function renderCategories(){
   remove.className="small danger";
   remove.textContent="Remove";
   remove.style.marginLeft="6px";
-
   remove.addEventListener("click",async()=>{
    if(!confirm(category+" category list থেকে বাদ দিতে চাও?")) return;
-
    categories=categories.filter(c=>c!==category);
-
    saveState();
    renderCategories();
 
    if(selectedCategory===category){
-    selectedCategory=categories[0] || "";
+    selectedCategory=categories[0]||"";
     selectCategory(selectedCategory);
    }
   });
@@ -802,31 +752,22 @@ function renderCategories(){
 
 function selectCategory(category){
  selectedCategory=category;
-
- document.getElementById("categoryTitle").textContent=
-  category || "No Category Selected";
-
- document.getElementById("sheetSelect").innerHTML=
-  '<option value="">Upload an Excel file first</option>';
-
+ document.getElementById("categoryTitle").textContent=category||"No Category Selected";
+ document.getElementById("sheetSelect").innerHTML='<option value="">Upload an Excel file first</option>';
  selectedSheetRows=[];
  selectedSheetHeaders=[];
  selectedUpdatePI="";
  selectedUpdateColor="";
-
  document.getElementById("piResults").innerHTML="";
  document.getElementById("colorResults").innerHTML="";
  document.getElementById("detailHead").innerHTML="";
  document.getElementById("detailBody").innerHTML="";
-
  loadCategorySheets();
 }
 
 document.getElementById("addCategoryBtn").addEventListener("click",()=>{
  const name=prompt("নতুন Category-এর নাম লিখো:");
-
- if(!name || !name.trim()) return;
-
+ if(!name||!name.trim()) return;
  const cleanName=name.trim();
 
  if(categories.some(c=>normalize(c)===normalize(cleanName))){
@@ -835,7 +776,6 @@ document.getElementById("addCategoryBtn").addEventListener("click",()=>{
  }
 
  categories.push(cleanName);
-
  saveState();
  renderCategories();
  selectCategory(cleanName);
@@ -843,47 +783,32 @@ document.getElementById("addCategoryBtn").addEventListener("click",()=>{
 
 document.getElementById("uploadCategoryBtn").addEventListener("click",async()=>{
  const file=document.getElementById("categoryFile").files[0];
-
- if(!file){
-  alert("আগে Excel file নির্বাচন করো।");
-  return;
- }
-
- if(!selectedCategory){
-  alert("আগে Category নির্বাচন করো।");
-  return;
- }
+ if(!file){alert("আগে Excel file নির্বাচন করো।");return;}
+ if(!selectedCategory){alert("আগে Category নির্বাচন করো।");return;}
 
  try{
   const sheets=await readWorkbook(file);
-
   if(!sheets.length){
    alert("এই Excel-এ কোনো ব্যবহারযোগ্য Sheet পাওয়া যায়নি। প্রথম ৫০টি Row-তে পরিচিত Header খুঁজে পাওয়া যায়নি।");
    return;
   }
 
   await saveCategoryFile(selectedCategory,sheets);
-
   document.getElementById("categoryFile").value="";
-
   await loadCategorySheets();
-
   alert(selectedCategory+" file successfully uploaded/replaced.");
-
  }catch(error){
   alert("Upload error: "+error.message);
  }
 });
 
 async function loadCategorySheets(){
- if(!db || !selectedCategory) return;
-
+ if(!db||!selectedCategory) return;
  const record=await getCategoryFile(selectedCategory);
  const select=document.getElementById("sheetSelect");
-
  select.innerHTML="";
 
- if(!record || !record.data.length){
+ if(!record||!record.data.length){
   select.innerHTML='<option value="">Upload an Excel file first</option>';
   return;
  }
@@ -901,22 +826,18 @@ async function loadCategorySheets(){
 document.getElementById("sheetSelect").addEventListener("change",displaySelectedSheet);
 
 async function displaySelectedSheet(){
- if(!db || !selectedCategory) return;
-
+ if(!db||!selectedCategory) return;
  const record=await getCategoryFile(selectedCategory);
  if(!record) return;
 
- const index=Number(document.getElementById("sheetSelect").value || 0);
+ const index=Number(document.getElementById("sheetSelect").value||0);
  const sheet=record.data[index];
-
  if(!sheet) return;
 
- selectedSheetRows=sheet.rows || [];
- selectedSheetHeaders=sheet.headers || [];
-
+ selectedSheetRows=sheet.rows||[];
+ selectedSheetHeaders=sheet.headers||[];
  selectedUpdatePI="";
  selectedUpdateColor="";
-
  document.getElementById("updatePiSearch").value="";
  document.getElementById("piResults").innerHTML="";
  document.getElementById("colorResults").innerHTML="";
@@ -927,18 +848,15 @@ async function displaySelectedSheet(){
 function renderDetail(rows,headers,headId,bodyId){
  const head=document.getElementById(headId);
  const body=document.getElementById(bodyId);
-
  head.innerHTML="";
  body.innerHTML="";
 
  const hr=document.createElement("tr");
-
  headers.forEach(h=>{
   const th=document.createElement("th");
-  th.textContent=h || "(Blank)";
+  th.textContent=h||"(Blank)";
   hr.appendChild(th);
  });
-
  head.appendChild(hr);
 
  if(!rows.length){
@@ -948,37 +866,28 @@ function renderDetail(rows,headers,headId,bodyId){
 
  rows.forEach(row=>{
   const tr=document.createElement("tr");
-
-  (row._values || []).forEach(value=>{
+  (row._values||[]).forEach(value=>{
    const td=document.createElement("td");
-   td.textContent=value ?? "";
+   td.textContent=value??"";
    tr.appendChild(td);
   });
-
   body.appendChild(tr);
  });
 }
 
 function uniqueValues(values){
  const map=new Map();
-
  values.forEach(v=>{
   const value=clean(v);
-
-  if(value && !map.has(normalize(value))){
-   map.set(normalize(value),value);
-  }
+  if(value&&!map.has(normalize(value))) map.set(normalize(value),value);
  });
-
  return [...map.values()];
 }
 
 function renderUpdatePIResults(){
  const query=normalize(document.getElementById("updatePiSearch").value);
  const results=document.getElementById("piResults");
-
  results.innerHTML="";
-
  if(!query) return;
 
  const pis=uniqueValues(selectedSheetRows.map(r=>r.pi))
@@ -986,16 +895,13 @@ function renderUpdatePIResults(){
 
  pis.forEach(pi=>{
   const btn=document.createElement("button");
-
   btn.className="small";
   btn.style.margin="4px";
   btn.textContent=pi;
-
   btn.addEventListener("click",()=>{
    selectedUpdatePI=pi;
    renderUpdateColors();
   });
-
   results.appendChild(btn);
  });
 
@@ -1007,212 +913,272 @@ document.getElementById("updatePiSearch").addEventListener("input",renderUpdateP
 function renderUpdateColors(){
  const box=document.getElementById("colorResults");
  box.innerHTML="";
-
- const rows=selectedSheetRows.filter(r=>r.pi===selectedUpdatePI);
+ const rows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI));
  const colors=uniqueValues(rows.map(r=>r.color));
 
- if(!colors.length){
-  box.textContent="No Color found.";
-  return;
- }
+ if(!colors.length){box.textContent="No Color found.";return;}
 
  colors.forEach(color=>{
   const btn=document.createElement("button");
-
   btn.className="small";
   btn.style.margin="4px";
   btn.textContent=color;
-
   btn.addEventListener("click",()=>{
    selectedUpdateColor=color;
-
-   const matchedRows=selectedSheetRows.filter(
-    r=>r.pi===selectedUpdatePI && r.color===selectedUpdateColor
+   const matchedRows=selectedSheetRows.filter(r=>
+    normalize(r.pi)===normalize(selectedUpdatePI)&&normalize(r.color)===normalize(selectedUpdateColor)
    );
-
    renderDetail(matchedRows,selectedSheetHeaders,"detailHead","detailBody");
   });
-
   box.appendChild(btn);
  });
 }
 
-/* ---------------- GLOBAL SEARCH ---------------- */
+/* ================= GLOBAL SEARCH 7.2 ================= */
 
 document.getElementById("globalSearchBtn").addEventListener("click",runGlobalSearch);
-
 document.getElementById("globalInput").addEventListener("keydown",e=>{
  if(e.key==="Enter") runGlobalSearch();
 });
 
 document.getElementById("globalClearBtn").addEventListener("click",()=>{
  document.getElementById("globalInput").value="";
-
- document.getElementById("globalResults").innerHTML=
-  '<p class="muted">Enter a PI Number or Color to begin searching.</p>';
-
+ document.getElementById("globalResults").innerHTML='<p class="muted">Enter a PI Number or Color to begin searching.</p>';
  document.getElementById("globalChoices").innerHTML="";
- document.getElementById("globalDetailHead").innerHTML="";
- document.getElementById("globalDetailBody").innerHTML="";
-
+ document.getElementById("globalDetails").innerHTML="";
  globalRecords=[];
+ globalFiles=[];
 });
 
-async function runGlobalSearch(){
- const query=clean(document.getElementById("globalInput").value);
+function isCategory(category,kind){
+ const c=normalize(category);
+ if(kind==="order") return c.includes("orderstatus");
+ if(kind==="delivery") return c.includes("deliverystatus");
+ if(kind==="wip") return c==="wip"||c.includes("wipstatus")||c.includes("workinprogress");
+ return false;
+}
 
- if(!query){
-  alert("PI Number অথবা Color লিখো।");
-  return;
- }
+function rowMatchesPair(row,pi,color){
+ return normalize(row.pi)===normalize(pi)&&normalize(row.color)===normalize(color);
+}
 
- const q=normalize(query);
-
- const resultBox=document.getElementById("globalResults");
- const choices=document.getElementById("globalChoices");
-
- choices.innerHTML="";
- document.getElementById("globalDetailHead").innerHTML="";
- document.getElementById("globalDetailBody").innerHTML="";
-
- resultBox.innerHTML="<p>Searching...</p>";
-
- const results=[];
-
- mainData.forEach(row=>{
-  if(normalize(row.pi).includes(q) || normalize(row.color).includes(q)){
-   results.push({
-    source:"Main Data",
-    sheet:"Main Orders",
-    row,
-    headers:["PI","Buyer Name","Color","Construction","Order Qty"],
-    values:[row.pi,row.buyer,row.color,row.construction,row.qty]
-   });
-  }
- });
-
- manualOrders.forEach(row=>{
-  if(normalize(row.pi).includes(q) || normalize(row.color).includes(q)){
-   results.push({
-    source:"Manual Order",
-    sheet:"Manual Orders",
-    row,
-    headers:["PI","Buyer Name","Color","Construction","Order Qty"],
-    values:[row.pi,row.buyer,row.color,row.construction,row.qty]
-   });
-  }
- });
-
- const files=await getAllCategoryFiles();
+function categoryRowsForPair(files,kind,pi,color){
+ const found=[];
 
  files.forEach(file=>{
-  (file.data || []).forEach(sheet=>{
-   (sheet.rows || []).forEach(row=>{
-    if(normalize(row.pi).includes(q) || normalize(row.color).includes(q)){
-     results.push({
-      source:file.category,
-      sheet:sheet.name,
-      row,
-      headers:sheet.headers || [],
-      values:row._values || []
-     });
+  if(!isCategory(file.category,kind)) return;
+
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>{
+    if(rowMatchesPair(row,pi,color)){
+     found.push({category:file.category,sheet:sheet.name,row});
     }
    });
   });
  });
 
- globalRecords=results;
+ return found;
+}
 
- if(!results.length){
+function displayValue(row,field){
+ return clean(getField(row,field))||"-";
+}
+
+function renderSheetSection(title,columns,items){
+ const section=document.createElement("div");
+ section.className="detail-section";
+
+ const heading=document.createElement("h3");
+ heading.textContent=title;
+ section.appendChild(heading);
+
+ if(!items.length){
+  const empty=document.createElement("div");
+  empty.className="detail-empty";
+  empty.textContent="এই PI ও Color-এর জন্য এই Category-তে কোনো তথ্য পাওয়া যায়নি।";
+  section.appendChild(empty);
+  return section;
+ }
+
+ const sourceNames=uniqueValues(items.map(item=>item.category+" / "+item.sheet));
+ const source=document.createElement("p");
+ source.className="muted";
+ source.textContent="Source: "+sourceNames.join(", ");
+ section.appendChild(source);
+
+ const wrap=document.createElement("div");
+ wrap.className="table-wrap";
+ const table=document.createElement("table");
+ const thead=document.createElement("thead");
+ const tbody=document.createElement("tbody");
+ const headerRow=document.createElement("tr");
+
+ columns.forEach(col=>{
+  const th=document.createElement("th");
+  th.textContent=col.label;
+  headerRow.appendChild(th);
+ });
+ thead.appendChild(headerRow);
+
+ items.forEach(item=>{
+  const tr=document.createElement("tr");
+  columns.forEach(col=>{
+   const td=document.createElement("td");
+   td.textContent=displayValue(item.row,col.field);
+   tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+ });
+
+ table.append(thead,tbody);
+ wrap.appendChild(table);
+ section.appendChild(wrap);
+ return section;
+}
+
+function showGlobalDetail(pi,color){
+ const box=document.getElementById("globalDetails");
+ box.innerHTML="";
+
+ const title=document.createElement("h3");
+ title.textContent="PI: "+pi+" | Color: "+color;
+ box.appendChild(title);
+
+ const orderRows=categoryRowsForPair(globalFiles,"order",pi,color);
+ const deliveryRows=categoryRowsForPair(globalFiles,"delivery",pi,color);
+ const wipRows=categoryRowsForPair(globalFiles,"wip",pi,color);
+
+ const orderColumns=[
+  {label:"PI Number",field:"pi"},
+  {label:"Buyer",field:"buyer"},
+  {label:"PI Received Date",field:"piReceivedDate"},
+  {label:"Deli Date",field:"deliDate"},
+  {label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Remarks",field:"remarks"}
+ ];
+
+ const deliveryColumns=[
+  {label:"PI",field:"pi"},
+  {label:"Buyer",field:"buyer"},
+  {label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Good Rcvd",field:"goodRcvd"},
+  {label:"Short",field:"short"},
+  {label:"Present Status",field:"presentStatus"}
+ ];
+
+ const wipColumns=[
+  {label:"PI",field:"pi"},
+  {label:"Color",field:"color"},
+  {label:"Construction",field:"construction"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Delivery Status",field:"deliveryStatus"}
+ ];
+
+ box.appendChild(renderSheetSection("1. ORDER STATUS",orderColumns,orderRows));
+ box.appendChild(renderSheetSection("2. DELIVERY STATUS",deliveryColumns,deliveryRows));
+ box.appendChild(renderSheetSection("3. WIP",wipColumns,wipRows));
+
+ box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+async function runGlobalSearch(){
+ const query=clean(document.getElementById("globalInput").value);
+ if(!query){alert("PI Number অথবা Color লিখো।");return;}
+
+ const q=normalize(query);
+ const resultBox=document.getElementById("globalResults");
+ const choices=document.getElementById("globalChoices");
+ const details=document.getElementById("globalDetails");
+
+ choices.innerHTML="";
+ details.innerHTML="";
+ resultBox.innerHTML="<p>Searching...</p>";
+
+ try{
+  globalFiles=await getAllCategoryFiles();
+ }catch(error){
+  console.error(error);
+  globalFiles=[];
+ }
+
+ const pairs=new Map();
+
+ function addPair(row,source){
+  if(!row.pi&&!row.color) return;
+  if(!normalize(row.pi).includes(q)&&!normalize(row.color).includes(q)) return;
+
+  const key=pairKey(row.pi,row.color);
+  if(!pairs.has(key)){
+   pairs.set(key,{
+    pi:clean(row.pi)||"No PI",
+    color:clean(row.color)||"No Color",
+    construction:clean(row.construction),
+    sources:new Set()
+   });
+  }
+  pairs.get(key).sources.add(source);
+ }
+
+ mainData.forEach(row=>addPair(row,"Main Data"));
+ manualOrders.forEach(row=>addPair(row,"Manual Order"));
+
+ globalFiles.forEach(file=>{
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>addPair(row,file.category+" / "+sheet.name));
+  });
+ });
+
+ globalRecords=[...pairs.values()];
+
+ if(!globalRecords.length){
   resultBox.innerHTML='<p class="unmatched">No matching PI or Color found.</p>';
   return;
  }
 
- resultBox.innerHTML="<strong>"+results.length+" result(s) found</strong>";
+ resultBox.innerHTML="<strong>"+globalRecords.length+" PI / Color combination(s) found.</strong>";
 
- results.forEach((item,index)=>{
+ globalRecords.forEach((item,index)=>{
   const card=document.createElement("div");
   card.className="result-box";
 
   const title=document.createElement("strong");
-  title.textContent=(index+1)+". "+item.source+" — "+item.sheet;
+  title.textContent=(index+1)+". "+item.color;
 
   const info=document.createElement("p");
   info.className="muted";
-  info.textContent="PI: "+(item.row.pi || "-")+" | Color: "+(item.row.color || "-");
+  info.textContent="PI: "+item.pi+
+   (item.construction?" | Construction: "+item.construction:"")+
+   " | Found in: "+[...item.sources].join(", ");
 
   const btn=document.createElement("button");
   btn.className="small";
   btn.textContent="View Details";
-  btn.addEventListener("click",()=>showGlobalDetail(index));
+  btn.addEventListener("click",()=>showGlobalDetail(item.pi,item.color));
 
   card.append(title,info,btn);
   resultBox.appendChild(card);
  });
 
- renderGlobalChoices(results);
-}
+ const choiceTitle=document.createElement("p");
+ choiceTitle.className="muted";
+ choiceTitle.textContent="Select a PI / Color combination:";
+ choices.appendChild(choiceTitle);
 
-function renderGlobalChoices(results){
- const box=document.getElementById("globalChoices");
- box.innerHTML="";
-
- const unique=new Map();
-
- results.forEach((item,index)=>{
-  const key=normalize(item.row.pi)+"|"+normalize(item.row.color);
-
-  if(!unique.has(key)){
-   unique.set(key,{item,index});
-  }
- });
-
- unique.forEach(({item,index})=>{
+ globalRecords.forEach(item=>{
   const btn=document.createElement("button");
-
   btn.className="small";
   btn.style.margin="4px";
-
-  btn.textContent=(item.row.pi || "No PI")+" / "+(item.row.color || "No Color");
-
-  btn.addEventListener("click",()=>showGlobalDetail(index));
-
-  box.appendChild(btn);
+  btn.textContent=item.pi+" / "+item.color;
+  btn.addEventListener("click",()=>showGlobalDetail(item.pi,item.color));
+  choices.appendChild(btn);
  });
 }
 
-function showGlobalDetail(index){
- const item=globalRecords[index];
- if(!item) return;
-
- const head=document.getElementById("globalDetailHead");
- const body=document.getElementById("globalDetailBody");
-
- head.innerHTML="";
- body.innerHTML="";
-
- const trh=document.createElement("tr");
-
- item.headers.forEach(h=>{
-  const th=document.createElement("th");
-  th.textContent=h || "(Blank)";
-  trh.appendChild(th);
- });
-
- head.appendChild(trh);
-
- const tr=document.createElement("tr");
-
- item.values.forEach(v=>{
-  const td=document.createElement("td");
-  td.textContent=v ?? "";
-  tr.appendChild(td);
- });
-
- body.appendChild(tr);
-}
-
-/* ---------------- STARTUP ---------------- */
+/* ================= STARTUP ================= */
 
 async function init(){
  try{
