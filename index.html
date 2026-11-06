@@ -27,6 +27,18 @@ button.danger{background:#dc3545}
 button.success{background:#13865e}
 button.warning{background:#d68a14}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+
+/* Dashboard vertical layout */
+.dashboard-grid{
+display:flex;
+flex-direction:column;
+gap:10px;
+}
+.dashboard-grid .stat{
+width:100%;
+text-align:center;
+}
+
 .stat{background:#edf5ff;padding:16px;border-radius:8px;text-align:center}
 .stat strong{display:block;font-size:25px;color:#14558b;margin-top:7px}
 table{border-collapse:collapse;width:100%;min-width:650px}
@@ -42,7 +54,11 @@ label{font-size:13px;font-weight:bold}
 .badge{padding:4px 8px;border-radius:5px;font-size:12px}
 .badge.green{color:#08743e}
 .badge.red{color:#b42318}
-@media(min-width:700px){.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+.category-buttons{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.category-buttons button{margin:0}
+@media(min-width:700px){
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+}
 </style>
 </head>
 <body>
@@ -62,23 +78,26 @@ label{font-size:13px;font-weight:bold}
 
 <main>
 
+<!-- DASHBOARD -->
 <section id="dashboard" class="page active">
 <div class="card">
 <h3>Dashboard</h3>
-<div class="grid">
+<div class="dashboard-grid">
 <div class="stat">Total Orders<strong id="totalOrders">0</strong></div>
 <div class="stat">Total Quantity<strong id="totalQty">0</strong></div>
 <div class="stat">Matched<strong id="matchedCount">0</strong></div>
 <div class="stat">Unmatched<strong id="unmatchedCount">0</strong></div>
 </div>
 </div>
+
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p>Manage your textile orders and compare Excel files from one place.</p>
-<p class="muted">Current version: Global Search 6.0</p>
+<p class="muted">Current version: Global Search 6.1</p>
 </div>
 </section>
 
+<!-- ORDER ENTRY -->
 <section id="entry" class="page">
 <div class="card">
 <h3>Manual Order Entry</h3>
@@ -104,13 +123,16 @@ label{font-size:13px;font-weight:bold}
 <button class="danger" onclick="clearOrders()">Clear All Orders</button>
 <div class="tablewrap">
 <table>
-<thead><tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr></thead>
+<thead>
+<tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr>
+</thead>
 <tbody id="orderTable"></tbody>
 </table>
 </div>
 </div>
 </section>
 
+<!-- EXCEL MATCHING -->
 <section id="matching" class="page">
 <div class="card">
 <h3>Upload New / Updated Excel</h3>
@@ -118,6 +140,7 @@ label{font-size:13px;font-weight:bold}
 <button onclick="importNew()">Import New File</button>
 <p class="muted">Matching key: PI + Color + Construction</p>
 </div>
+
 <div class="card">
 <h3>Matching Result</h3>
 <p>🟢 Matched &nbsp; 🔴 Unmatched</p>
@@ -126,27 +149,34 @@ label{font-size:13px;font-weight:bold}
 <div class="stat">Unmatched Rows<strong id="unmatchRows">0</strong></div>
 </div>
 </div>
+
 <div class="card">
 <h3>Main File – Matching Status</h3>
 <div class="tablewrap">
-<table><thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
-<tbody id="mainMatchTable"></tbody></table>
+<table>
+<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="mainMatchTable"></tbody>
+</table>
 </div>
 </div>
+
 <div class="card">
 <h3>New File – Matching Status</h3>
 <div class="tablewrap">
-<table><thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
-<tbody id="newMatchTable"></tbody></table>
+<table>
+<thead><tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
+<tbody id="newMatchTable"></tbody>
+</table>
 </div>
 </div>
 </section>
 
+<!-- ORDER UPDATE -->
 <section id="update" class="page">
 <div class="card">
 <h3>Order Update</h3>
 <p>Select an update category.</p>
-<div id="categoryButtons"></div>
+<div id="categoryButtons" class="category-buttons"></div>
 <button class="success" onclick="addCategory()">+ Add Category</button>
 </div>
 
@@ -183,6 +213,7 @@ label{font-size:13px;font-weight:bold}
 </div>
 </section>
 
+<!-- GLOBAL SEARCH -->
 <section id="global" class="page">
 <div class="card">
 <h3>Global Search</h3>
@@ -194,10 +225,12 @@ label{font-size:13px;font-weight:bold}
 <p class="muted">Enter a PI Number or Color to begin searching.</p>
 </div>
 </div>
+
 <div class="card hidden" id="globalStep2">
 <h3>Step 2: Select Color / PI</h3>
 <div id="globalChoices"></div>
 </div>
+
 <div class="card hidden" id="globalStep3">
 <h3>Step 3: Full Update Details</h3>
 <div id="globalDetails"></div>
@@ -213,7 +246,26 @@ const STORE_NAME="workbooks";
 let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
 let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
 let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
-let categories=JSON.parse(localStorage.getItem("nte_categories")||'["Delivery Status","Order Status","WIP"]');
+
+/* তিনটি Default Category সবসময় থাকবে */
+const DEFAULT_CATEGORIES=[
+"Delivery Status",
+"Order Status",
+"WIP"
+];
+
+let savedCategories=[];
+try{
+savedCategories=JSON.parse(localStorage.getItem("nte_categories")||"[]");
+}catch(e){
+savedCategories=[];
+}
+
+let categories=[...new Set([
+...DEFAULT_CATEGORIES,
+...(Array.isArray(savedCategories)?savedCategories:[])
+])];
+
 let selectedCategory="Delivery Status";
 let workbookCache={};
 let updateSheetRows=[];
@@ -237,12 +289,15 @@ if(btn)btn.classList.add("active");
 function norm(v){
 return String(v??"").trim().toLowerCase().replace(/\.0$/,"").replace(/\s+/g," ");
 }
+
 function piNorm(v){
 return norm(v).replace(/^pi[\s:#-]*/,"");
 }
+
 function headerKey(v){
 return norm(v).replace(/[^a-z0-9]/g,"");
 }
+
 function getField(row,names){
 const keys=Object.keys(row||{});
 for(const name of names){
@@ -251,14 +306,34 @@ if(found!==undefined)return row[found];
 }
 return "";
 }
-function getPI(r){return getField(r,["PI","PI Number","P.I","P I","Proforma Invoice"])}
-function getColor(r){return getField(r,["Color","Colour","Color Name","Colour Name"])}
-function getConstruction(r){return getField(r,["Construction","Fabric Construction"])}
-function getQty(r){return getField(r,["Order Qty","Order Quantity","Qty","Quantity"])}
-function escapeHTML(v){
-return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function getPI(r){
+return getField(r,["PI","PI Number","P.I","P I","Proforma Invoice"]);
 }
 
+function getColor(r){
+return getField(r,["Color","Colour","Color Name","Colour Name"]);
+}
+
+function getConstruction(r){
+return getField(r,["Construction","Fabric Construction"]);
+}
+
+function getQty(r){
+return getField(r,["Order Qty","Order Quantity","Qty","Quantity"]);
+}
+
+function escapeHTML(v){
+return String(v??"").replace(/[&<>"']/g,c=>({
+"&":"&amp;",
+"<":"&lt;",
+">":"&gt;",
+'"':"&quot;",
+"'":"&#39;"
+}[c]));
+}
+
+/* ORDER ENTRY */
 function addOrder(){
 const item={
 PI:document.getElementById("piInput").value.trim(),
@@ -266,18 +341,31 @@ Color:document.getElementById("colorInput").value.trim(),
 Construction:document.getElementById("constructionInput").value.trim(),
 "Order Qty":document.getElementById("qtyInput").value
 };
+
 if(!item.PI||!item.Color||!item.Construction){
 alert("PI, Color and Construction are required.");
 return;
 }
-if(editingIndex>=0){orders[editingIndex]=item;editingIndex=-1;}
-else orders.push(item);
-saveAll();resetOrderForm();renderOrders();
+
+if(editingIndex>=0){
+orders[editingIndex]=item;
+editingIndex=-1;
+}else{
+orders.push(item);
 }
+
+saveAll();
+resetOrderForm();
+renderOrders();
+}
+
 function resetOrderForm(){
-["piInput","colorInput","constructionInput","qtyInput"].forEach(id=>document.getElementById(id).value="");
+["piInput","colorInput","constructionInput","qtyInput"].forEach(id=>{
+document.getElementById(id).value="";
+});
 editingIndex=-1;
 }
+
 function editOrder(i){
 const r=orders[i];
 document.getElementById("piInput").value=r.PI;
@@ -288,277 +376,603 @@ editingIndex=i;
 showPage("entry",document.querySelectorAll("nav button")[1]);
 window.scrollTo(0,0);
 }
+
 function deleteOrder(i){
-if(confirm("Delete this order?")){orders.splice(i,1);saveAll();renderOrders();}
+if(confirm("Delete this order?")){
+orders.splice(i,1);
+saveAll();
+renderOrders();
 }
-function clearOrders(){
-if(confirm("Are you sure you want to clear all orders?")){
-orders=[];saveAll();renderOrders();
-}
-}
-function renderOrders(){
-document.getElementById("orderTable").innerHTML=orders.map((r,i)=>`
-<tr><td>${escapeHTML(r.PI)}</td><td>${escapeHTML(r.Color)}</td>
-<td>${escapeHTML(r.Construction)}</td><td>${escapeHTML(r["Order Qty"])}</td>
-<td><button onclick="editOrder(${i})">Edit</button><button class="danger" onclick="deleteOrder(${i})">Delete</button></td></tr>`).join("");
-updateDashboard();
-}
-function updateDashboard(){
-document.getElementById("totalOrders").textContent=orders.length;
-document.getElementById("totalQty").textContent=orders.reduce((s,r)=>s+(Number(r["Order Qty"])||0),0).toLocaleString();
 }
 
+function clearOrders(){
+if(confirm("Are you sure you want to clear all orders?")){
+orders=[];
+saveAll();
+renderOrders();
+}
+}
+
+function renderOrders(){
+document.getElementById("orderTable").innerHTML=orders.map((r,i)=>`
+<tr>
+<td>${escapeHTML(r.PI)}</td>
+<td>${escapeHTML(r.Color)}</td>
+<td>${escapeHTML(r.Construction)}</td>
+<td>${escapeHTML(r["Order Qty"])}</td>
+<td>
+<button onclick="editOrder(${i})">Edit</button>
+<button class="danger" onclick="deleteOrder(${i})">Delete</button>
+</td>
+</tr>
+`).join("");
+
+updateDashboard();
+}
+
+function updateDashboard(){
+document.getElementById("totalOrders").textContent=orders.length;
+
+document.getElementById("totalQty").textContent=
+orders.reduce((s,r)=>s+(Number(r["Order Qty"])||0),0).toLocaleString();
+}
+
+/* EXCEL IMPORT */
 function readExcel(file,callback){
 if(!file)return alert("Please select an Excel file.");
+
 const reader=new FileReader();
+
 reader.onload=e=>{
 try{
 const wb=XLSX.read(e.target.result,{type:"array"});
 callback(wb);
-}catch(err){alert("Excel file could not be read: "+err.message);}
+}catch(err){
+alert("Excel file could not be read: "+err.message);
+}
 };
+
 reader.readAsArrayBuffer(file);
 }
+
 function sheetToRows(wb,sheet){
 return XLSX.utils.sheet_to_json(wb.Sheets[sheet],{defval:""});
 }
+
 function importMain(){
 const f=document.getElementById("mainFile").files[0];
+
 if(!f)return alert("Select Main Excel file.");
+
 readExcel(f,wb=>{
 const all=[];
-wb.SheetNames.forEach(s=>sheetToRows(wb,s).forEach(r=>all.push(r)));
+
+wb.SheetNames.forEach(s=>{
+sheetToRows(wb,s).forEach(r=>all.push(r));
+});
+
 if(!all.length)return alert("No data found.");
-mainData=all;saveAll();renderOrdersFromMain();runMatching();
+
+mainData=all;
+saveAll();
+renderOrdersFromMain();
+runMatching();
+
 alert("Main File Imported Successfully.");
 });
 }
+
 function renderOrdersFromMain(){
 orders=mainData.map(r=>({
-PI:getPI(r),Color:getColor(r),Construction:getConstruction(r),"Order Qty":getQty(r)
+PI:getPI(r),
+Color:getColor(r),
+Construction:getConstruction(r),
+"Order Qty":getQty(r)
 }));
-saveAll();renderOrders();
+
+saveAll();
+renderOrders();
 }
+
 function importNew(){
 const f=document.getElementById("newFile").files[0];
+
 if(!f)return alert("Select New Excel file.");
+
 readExcel(f,wb=>{
 const all=[];
-wb.SheetNames.forEach(s=>sheetToRows(wb,s).forEach(r=>all.push(r)));
-newData=all;saveAll();runMatching();
+
+wb.SheetNames.forEach(s=>{
+sheetToRows(wb,s).forEach(r=>all.push(r));
+});
+
+newData=all;
+saveAll();
+runMatching();
+
 alert("New File Imported Successfully.");
 });
 }
+
+/* MATCHING */
 function matchKey(r){
-return piNorm(getPI(r))+"|"+norm(getColor(r))+"|"+norm(getConstruction(r));
+return piNorm(getPI(r))+"|"+
+norm(getColor(r))+"|"+
+norm(getConstruction(r));
 }
+
 function runMatching(){
 const newKeys=new Set(newData.map(matchKey));
 const mainKeys=new Set(mainData.map(matchKey));
+
 let matched=0,unmatched=0;
-document.getElementById("mainMatchTable").innerHTML=mainData.map(r=>{
-const ok=newKeys.has(matchKey(r));if(ok)matched++;else unmatched++;
-return `<tr class="${ok?"green":"red"}"><td>${ok?"🟢 Matched":"🔴 Unmatched"}</td><td>${escapeHTML(getPI(r))}</td><td>${escapeHTML(getColor(r))}</td><td>${escapeHTML(getConstruction(r))}</td><td>${escapeHTML(getQty(r))}</td></tr>`;
+
+document.getElementById("mainMatchTable").innerHTML=
+mainData.map(r=>{
+const ok=newKeys.has(matchKey(r));
+
+if(ok)matched++;
+else unmatched++;
+
+return `
+<tr class="${ok?"green":"red"}">
+<td>${ok?"🟢 Matched":"🔴 Unmatched"}</td>
+<td>${escapeHTML(getPI(r))}</td>
+<td>${escapeHTML(getColor(r))}</td>
+<td>${escapeHTML(getConstruction(r))}</td>
+<td>${escapeHTML(getQty(r))}</td>
+</tr>`;
 }).join("");
-document.getElementById("newMatchTable").innerHTML=newData.map(r=>{
+
+document.getElementById("newMatchTable").innerHTML=
+newData.map(r=>{
 const ok=mainKeys.has(matchKey(r));
-return `<tr class="${ok?"green":"red"}"><td>${ok?"🟢 Matched":"🔴 Unmatched"}</td><td>${escapeHTML(getPI(r))}</td><td>${escapeHTML(getColor(r))}</td><td>${escapeHTML(getConstruction(r))}</td><td>${escapeHTML(getQty(r))}</td></tr>`;
+
+return `
+<tr class="${ok?"green":"red"}">
+<td>${ok?"🟢 Matched":"🔴 Unmatched"}</td>
+<td>${escapeHTML(getPI(r))}</td>
+<td>${escapeHTML(getColor(r))}</td>
+<td>${escapeHTML(getConstruction(r))}</td>
+<td>${escapeHTML(getQty(r))}</td>
+</tr>`;
 }).join("");
+
 document.getElementById("matchRows").textContent=matched;
 document.getElementById("unmatchRows").textContent=unmatched;
 document.getElementById("matchedCount").textContent=matched;
 document.getElementById("unmatchedCount").textContent=unmatched;
 }
 
+/* INDEXED DB */
 function openDB(){
 return new Promise((resolve,reject)=>{
 const req=indexedDB.open(DB_NAME,1);
-req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(STORE_NAME))db.createObjectStore(STORE_NAME,{keyPath:"category"});};
+
+req.onupgradeneeded=()=>{
+const db=req.result;
+
+if(!db.objectStoreNames.contains(STORE_NAME)){
+db.createObjectStore(STORE_NAME,{keyPath:"category"});
+}
+};
+
 req.onsuccess=()=>resolve(req.result);
 req.onerror=()=>reject(req.error);
 });
 }
+
 async function saveWorkbook(category,data){
 const db=await openDB();
+
 return new Promise((resolve,reject)=>{
 const tx=db.transaction(STORE_NAME,"readwrite");
-tx.objectStore(STORE_NAME).put({category,data,updatedAt:new Date().toISOString()});
-tx.oncomplete=()=>{db.close();resolve();};
-tx.onerror=()=>{db.close();reject(tx.error);};
+
+tx.objectStore(STORE_NAME).put({
+category,
+data,
+updatedAt:new Date().toISOString()
+});
+
+tx.oncomplete=()=>{
+db.close();
+resolve();
+};
+
+tx.onerror=()=>{
+db.close();
+reject(tx.error);
+};
 });
 }
+
 async function loadWorkbook(category){
 const db=await openDB();
+
 return new Promise((resolve,reject)=>{
 const tx=db.transaction(STORE_NAME,"readonly");
 const req=tx.objectStore(STORE_NAME).get(category);
-req.onsuccess=()=>{db.close();resolve(req.result?.data||null);};
-req.onerror=()=>{db.close();reject(req.error);};
+
+req.onsuccess=()=>{
+db.close();
+resolve(req.result?.data||null);
+};
+
+req.onerror=()=>{
+db.close();
+reject(req.error);
+};
 });
 }
+
+/* CATEGORY MANAGEMENT */
 function renderCategories(){
-document.getElementById("categoryButtons").innerHTML=categories.map(c=>
-`<button class="${c===selectedCategory?"success":"secondary"}" onclick="chooseCategory('${escapeHTML(c).replace(/'/g,"&#39;")}')">${escapeHTML(c)}</button>`
-).join("");
+document.getElementById("categoryButtons").innerHTML=
+categories.map(c=>`
+<button
+class="${c===selectedCategory?"success":"secondary"}"
+onclick="chooseCategory('${escapeHTML(c).replace(/'/g,"&#39;")}')">
+${escapeHTML(c)}
+</button>
+`).join("");
+
 document.getElementById("selectedCategoryTitle").textContent=selectedCategory;
 }
+
 function chooseCategory(c){
 selectedCategory=c;
 renderCategories();
 loadCategorySheets();
 }
+
 function addCategory(){
 const name=prompt("Enter new category name:");
+
 if(!name||!name.trim())return;
-if(categories.some(c=>norm(c)===norm(name)))return alert("Category already exists.");
-categories.push(name.trim());selectedCategory=name.trim();saveAll();renderCategories();
+
+if(categories.some(c=>norm(c)===norm(name))){
+return alert("Category already exists.");
+}
+
+categories.push(name.trim());
+selectedCategory=name.trim();
+
+saveAll();
+renderCategories();
 loadCategorySheets();
 }
+
+/* CATEGORY FILE UPLOAD / REPLACE */
 async function uploadCategoryFile(){
 const f=document.getElementById("categoryFile").files[0];
+
 if(!f)return alert("Select Excel file first.");
+
 readExcel(f,async wb=>{
-const data={sheetNames:wb.SheetNames,sheets:{}};
-wb.SheetNames.forEach(s=>data.sheets[s]=sheetToRows(wb,s));
+const data={
+sheetNames:wb.SheetNames,
+sheets:{}
+};
+
+wb.SheetNames.forEach(s=>{
+data.sheets[s]=sheetToRows(wb,s);
+});
+
 try{
 await saveWorkbook(selectedCategory,data);
+
 workbookCache[selectedCategory]=data;
+
 await loadCategorySheets();
-alert(selectedCategory+" uploaded successfully.");
-}catch(e){alert("Save failed: "+e.message);}
+
+document.getElementById("categoryFile").value="";
+
+alert(selectedCategory+" uploaded successfully. Previous file replaced.");
+}catch(e){
+alert("Save failed: "+e.message);
+}
 });
 }
+
 async function loadCategorySheets(){
 let data=workbookCache[selectedCategory];
+
 if(!data){
-try{data=await loadWorkbook(selectedCategory);}catch(e){console.error(e);}
+try{
+data=await loadWorkbook(selectedCategory);
+}catch(e){
+console.error(e);
 }
+}
+
 const sel=document.getElementById("sheetSelect");
+
 if(!data){
 sel.innerHTML='<option value="">Upload an Excel file first</option>';
-updateSheetRows=[];return;
+updateSheetRows=[];
+return;
 }
+
 workbookCache[selectedCategory]=data;
-sel.innerHTML='<option value="">Select Sheet</option>'+data.sheetNames.map(s=>`<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join("");
+
+sel.innerHTML=
+'<option value="">Select Sheet</option>'+
+data.sheetNames.map(s=>
+`<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`
+).join("");
+
+updateSheetRows=[];
 }
+
 async function selectUpdateSheet(){
 const sheet=document.getElementById("sheetSelect").value;
-const data=workbookCache[selectedCategory]||await loadWorkbook(selectedCategory);
+
+const data=workbookCache[selectedCategory]||
+await loadWorkbook(selectedCategory);
+
 updateSheetRows=sheet&&data?data.sheets[sheet]||[]:[];
+
 document.getElementById("updatePISearch").value="";
 document.getElementById("updatePIResults").innerHTML="";
 document.getElementById("updateColorResults").innerHTML="";
 document.getElementById("updateDetails").innerHTML="";
 }
+
 function searchUpdatePI(){
 const q=piNorm(document.getElementById("updatePISearch").value);
 const out=document.getElementById("updatePIResults");
-if(!q){out.innerHTML="";return;}
-const found=updateSheetRows.filter(r=>piNorm(getPI(r)).includes(q));
-out.innerHTML=found.length?found.map(r=>`<button class="secondary" onclick="selectUpdatePI('${escapeHTML(String(getPI(r))).replace(/'/g,"&#39;")}')">${escapeHTML(getPI(r))}</button>`).join(""):"<p>No matching PI found.</p>";
-}
-function selectUpdatePI(pi){
-const rows=updateSheetRows.filter(r=>piNorm(getPI(r))===piNorm(pi));
-const colors=[...new Set(rows.map(r=>String(getColor(r))).filter(Boolean))];
-document.getElementById("updateColorResults").innerHTML=colors.map(c=>`<button onclick="showUpdateDetails('${escapeHTML(c).replace(/'/g,"&#39;")}')">${escapeHTML(c)}</button>`).join("");
-document.getElementById("updateDetails").innerHTML="";
-}
-function showUpdateDetails(color){
-const pi=document.getElementById("updatePISearch").value;
-const rows=updateSheetRows.filter(r=>piNorm(getPI(r))===piNorm(pi)&&norm(getColor(r))===norm(color));
-renderDetailTable("updateDetails",rows);
-}
-function renderDetailTable(target,rows){
-if(!rows.length){document.getElementById(target).innerHTML="<p>No data found.</p>";return;}
-const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];
-document.getElementById(target).innerHTML=`<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th>${escapeHTML(c)}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${escapeHTML(r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+
+if(!q){
+out.innerHTML="";
+return;
 }
 
+const found=updateSheetRows.filter(r=>
+piNorm(getPI(r)).includes(q)
+);
+
+out.innerHTML=found.length?
+found.map(r=>`
+<button class="secondary"
+onclick="selectUpdatePI('${escapeHTML(String(getPI(r))).replace(/'/g,"&#39;")}')">
+${escapeHTML(getPI(r))}
+</button>
+`).join("")
+:"<p>No matching PI found.</p>";
+}
+
+function selectUpdatePI(pi){
+const rows=updateSheetRows.filter(r=>
+piNorm(getPI(r))===piNorm(pi)
+);
+
+const colors=[
+...new Set(rows.map(r=>String(getColor(r))).filter(Boolean))
+];
+
+document.getElementById("updateColorResults").innerHTML=
+colors.map(c=>`
+<button onclick="showUpdateDetails('${escapeHTML(c).replace(/'/g,"&#39;")}')">
+${escapeHTML(c)}
+</button>
+`).join("");
+
+document.getElementById("updateDetails").innerHTML="";
+}
+
+function showUpdateDetails(color){
+const pi=document.getElementById("updatePISearch").value;
+
+const rows=updateSheetRows.filter(r=>
+piNorm(getPI(r))===piNorm(pi)&&
+norm(getColor(r))===norm(color)
+);
+
+renderDetailTable("updateDetails",rows);
+}
+
+/* DETAIL TABLE */
+function renderDetailTable(target,rows){
+if(!rows.length){
+document.getElementById(target).innerHTML="<p>No data found.</p>";
+return;
+}
+
+const cols=[...new Set(rows.flatMap(r=>Object.keys(r)))];
+
+document.getElementById(target).innerHTML=`
+<div class="tablewrap">
+<table>
+<thead>
+<tr>${cols.map(c=>`<th>${escapeHTML(c)}</th>`).join("")}</tr>
+</thead>
+<tbody>
+${rows.map(r=>`
+<tr>
+${cols.map(c=>`<td>${escapeHTML(r[c])}</td>`).join("")}
+</tr>
+`).join("")}
+</tbody>
+</table>
+</div>`;
+}
+
+/* GLOBAL SEARCH */
 async function globalSearch(){
 const q=document.getElementById("globalSearchInput").value.trim();
 const out=document.getElementById("globalResults");
+
 document.getElementById("globalStep2").classList.add("hidden");
 document.getElementById("globalStep3").classList.add("hidden");
-if(!q){out.innerHTML="<p>Enter PI or Color.</p>";return;}
-const isPI=piNorm(q).length>0 && (
-mainData.some(r=>piNorm(getPI(r))===piNorm(q)) ||
+
+if(!q){
+out.innerHTML="<p>Enter PI or Color.</p>";
+return;
+}
+
+const isPI=piNorm(q).length>0&&(
+mainData.some(r=>piNorm(getPI(r))===piNorm(q))||
 orders.some(r=>piNorm(r.PI)===piNorm(q))
 );
+
 globalMatches=[];
+
 if(isPI){
-mainData.forEach(r=>{if(piNorm(getPI(r))===piNorm(q))globalMatches.push({category:"Main Data",sheet:"Main Data",row:r});});
-}else{
-mainData.forEach(r=>{if(norm(getColor(r)).includes(norm(q)))globalMatches.push({category:"Main Data",sheet:"Main Data",row:r});});
+mainData.forEach(r=>{
+if(piNorm(getPI(r))===piNorm(q)){
+globalMatches.push({
+category:"Main Data",
+sheet:"Main Data",
+row:r
+});
 }
+});
+}else{
+mainData.forEach(r=>{
+if(norm(getColor(r)).includes(norm(q))){
+globalMatches.push({
+category:"Main Data",
+sheet:"Main Data",
+row:r
+});
+}
+});
+}
+
 for(const cat of categories){
 let data=workbookCache[cat];
-if(!data){try{data=await loadWorkbook(cat);}catch(e){}}
+
+if(!data){
+try{
+data=await loadWorkbook(cat);
+}catch(e){}
+}
+
 if(!data)continue;
+
 workbookCache[cat]=data;
+
 for(const sheet of data.sheetNames){
 (data.sheets[sheet]||[]).forEach(r=>{
-const hit=isPI?piNorm(getPI(r))===piNorm(q):norm(getColor(r)).includes(norm(q));
-if(hit)globalMatches.push({category:cat,sheet,row:r});
+const hit=isPI?
+piNorm(getPI(r))===piNorm(q):
+norm(getColor(r)).includes(norm(q));
+
+if(hit){
+globalMatches.push({
+category:cat,
+sheet,
+row:r
+});
+}
 });
 }
 }
+
 if(!globalMatches.length){
-out.innerHTML="<p>No matching data found.</p>";return;
+out.innerHTML="<p>No matching data found.</p>";
+return;
 }
+
 const groups={};
+
 globalMatches.forEach((m,i)=>{
 const key=m.category+"|||"+m.sheet;
+
 if(!groups[key])groups[key]=[];
+
 groups[key].push(i);
 });
-out.innerHTML=`<p><b>${globalMatches.length}</b> matching rows found.</p>`+
+
+out.innerHTML=
+`<p><b>${globalMatches.length}</b> matching rows found.</p>`+
 Object.entries(groups).map(([key,ids])=>{
 const [cat,sheet]=key.split("|||");
-return `<div class="result"><b>${escapeHTML(cat)}</b> — ${escapeHTML(sheet)}<br>
+
+return `
+<div class="result">
+<b>${escapeHTML(cat)}</b> — ${escapeHTML(sheet)}<br>
 ${ids.length} matching rows
-<button onclick="showGlobalGroup('${escapeHTML(key).replace(/'/g,"&#39;")}')">Select Sheet</button></div>`;
+<button onclick="showGlobalGroup('${escapeHTML(key).replace(/'/g,"&#39;")}')">
+Select Sheet
+</button>
+</div>`;
 }).join("");
 }
+
 function showGlobalGroup(key){
 const [cat,sheet]=key.split("|||");
-const rows=globalMatches.filter(m=>m.category===cat&&m.sheet===sheet);
+
+const rows=globalMatches.filter(m=>
+m.category===cat&&m.sheet===sheet
+);
+
 const choices=[];
-rows.forEach((m,i)=>{
-const value=isGlobalSearchPI()?String(getColor(m.row)||"(No Color)"):String(getPI(m.row)||"(No PI)");
+
+rows.forEach(m=>{
+const value=isGlobalSearchPI()?
+String(getColor(m.row)||"(No Color)"):
+String(getPI(m.row)||"(No PI)");
+
 if(!choices.includes(value))choices.push(value);
 });
+
 document.getElementById("globalStep2").classList.remove("hidden");
 document.getElementById("globalStep3").classList.add("hidden");
-document.getElementById("globalChoices").innerHTML=choices.map(v=>
-`<button onclick="showGlobalDetails('${escapeHTML(key).replace(/'/g,"&#39;")}','${escapeHTML(v).replace(/'/g,"&#39;")}')">${escapeHTML(v)}</button>`
-).join("");
+
+document.getElementById("globalChoices").innerHTML=
+choices.map(v=>`
+<button onclick="showGlobalDetails('${escapeHTML(key).replace(/'/g,"&#39;")}','${escapeHTML(v).replace(/'/g,"&#39;")}')">
+${escapeHTML(v)}
+</button>
+`).join("");
 }
+
 function isGlobalSearchPI(){
 const q=piNorm(document.getElementById("globalSearchInput").value);
-return globalMatches.some(m=>piNorm(getPI(m.row))===q);
+
+return globalMatches.some(m=>
+piNorm(getPI(m.row))===q
+);
 }
+
 function showGlobalDetails(key,value){
 const [cat,sheet]=key.split("|||");
 const piSearch=isGlobalSearchPI();
+
 const rows=globalMatches.filter(m=>{
 if(m.category!==cat||m.sheet!==sheet)return false;
-return piSearch?norm(getColor(m.row))===norm(value):piNorm(getPI(m.row))===piNorm(value);
+
+return piSearch?
+norm(getColor(m.row))===norm(value):
+piNorm(getPI(m.row))===piNorm(value);
+
 }).map(m=>m.row);
+
 document.getElementById("globalStep3").classList.remove("hidden");
+
 renderDetailTable("globalDetails",rows);
 }
+
 function clearGlobal(){
 document.getElementById("globalSearchInput").value="";
-document.getElementById("globalResults").innerHTML='<p class="muted">Enter a PI Number or Color to begin searching.</p>';
+
+document.getElementById("globalResults").innerHTML=
+'<p class="muted">Enter a PI Number or Color to begin searching.</p>';
+
 document.getElementById("globalStep2").classList.add("hidden");
 document.getElementById("globalStep3").classList.add("hidden");
+
 globalMatches=[];
 }
 
+/* INITIALIZE */
+saveAll();
 renderOrders();
 renderCategories();
 runMatching();
 loadCategorySheets();
+
 </script>
 </body>
 </html>
