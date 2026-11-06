@@ -83,10 +83,9 @@ small{color:#526477}
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p>Manage your textile orders and compare Excel files from one place.</p>
-<p><small>Current version: Global Search 4.0</small></p>
+<p><small>Current version: Global Search 5.0</small></p>
 </div>
 </section>
-
 
 <!-- ORDER ENTRY -->
 <section id="orders" hidden>
@@ -126,7 +125,6 @@ small{color:#526477}
 </div>
 </div>
 </section>
-
 
 <!-- EXCEL MATCHING -->
 <section id="matching" hidden>
@@ -173,14 +171,12 @@ small{color:#526477}
 </div>
 </section>
 
-
 <!-- ORDER UPDATE -->
 <section id="orderUpdate" hidden>
 
 <div class="card">
 <h3>Order Update</h3>
 <p>Select an update category.</p>
-
 <div class="subnav" id="categoryButtons"></div>
 
 <div class="formgrid">
@@ -191,12 +187,9 @@ small{color:#526477}
 
 <div class="card">
 <h3 id="categoryTitle">Delivery Status</h3>
-
 <label><b>Upload Excel File</b></label>
 <input type="file" id="updateFile" accept=".xlsx,.xls,.csv">
-
 <button onclick="uploadUpdateFile()">Upload / Replace File</button>
-
 <p id="uploadInfo"></p>
 
 <div class="warning">
@@ -234,36 +227,35 @@ small{color:#526477}
 
 </section>
 
-
 <!-- GLOBAL SEARCH -->
 <section id="globalSearch" hidden>
 
 <div class="card">
 <h3>Global Search</h3>
-<p>Search across Main Excel Data and all uploaded categories and sheets.</p>
+<p>Enter PI Number to search across Main Data and all uploaded categories and sheets.</p>
 
-<div class="formgrid">
-<select id="globalSearchField">
-<option value="all">Search All: PI / Color / Construction</option>
-<option value="pi">PI</option>
-<option value="color">Color</option>
-<option value="construction">Construction</option>
-</select>
-
-<input id="globalSearchInput" placeholder="Enter PI, Color or Construction"
+<input id="globalSearchInput"
+placeholder="Enter PI Number"
 onkeydown="if(event.key==='Enter')runGlobalSearch()">
-</div>
 
-<button onclick="runGlobalSearch()">Search All Data</button>
+<button onclick="runGlobalSearch()">Search PI</button>
 <button class="secondary" onclick="clearGlobalSearch()">Clear</button>
 
 <p id="globalSearchInfo"></p>
 </div>
 
-<div id="globalSearchResults"></div>
+<div class="card" id="globalSearchResults">
+<p>Enter a PI Number to begin searching.</p>
+</div>
+
+<div class="card" id="globalColorCard" hidden>
+<h3>Step 2: Select Color</h3>
+<p id="globalSelectedSheet"></p>
+<div id="globalColorList"></div>
+</div>
 
 <div class="card" id="globalDetailCard" hidden>
-<h3>Search Details</h3>
+<h3>Step 3: Full Update Details</h3>
 <p id="globalDetailHeading"></p>
 <div id="globalDetailResult"></div>
 </div>
@@ -271,7 +263,6 @@ onkeydown="if(event.key==='Enter')runGlobalSearch()">
 </section>
 
 </main>
-
 
 <script>
 
@@ -314,22 +305,16 @@ wip:"WIP"
 };
 
 function loadSavedCategories(){
-
 try{
 let saved=JSON.parse(localStorage.getItem("nte_categories")||"{}");
-
 if(saved && typeof saved==="object"){
 Object.keys(saved).forEach(key=>{
-if(key && saved[key]){
-categoryNames[key]=saved[key];
-}
+if(key && saved[key])categoryNames[key]=saved[key];
 });
 }
-
 }catch(e){
 console.error("Category loading error",e);
 }
-
 }
 
 function saveCategories(){
@@ -341,87 +326,58 @@ return categoryNames[category]||category;
 }
 
 function categoryKey(name){
-
-return String(name||"")
-.trim()
-.toLowerCase()
-.replace(/[^a-z0-9]+/g,"_")
-.replace(/^_+|_+$/g,"");
-
+return String(name||"").trim().toLowerCase()
+.replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
 }
 
 function openUpdateDB(){
-
 return new Promise((resolve,reject)=>{
-
 if(!window.indexedDB){
 reject(new Error("IndexedDB is not supported in this browser."));
 return;
 }
-
 const request=indexedDB.open(DB_NAME,DB_VERSION);
-
 request.onupgradeneeded=function(e){
 const db=e.target.result;
-
 if(!db.objectStoreNames.contains(STORE_NAME)){
 db.createObjectStore(STORE_NAME,{keyPath:"category"});
 }
 };
-
 request.onsuccess=function(e){
 updateDB=e.target.result;
 resolve(updateDB);
 };
-
 request.onerror=function(){
 reject(request.error||new Error("Database could not be opened."));
 };
-
 });
-
 }
 
 function dbSave(record){
-
 return new Promise((resolve,reject)=>{
-
 const tx=updateDB.transaction(STORE_NAME,"readwrite");
 tx.objectStore(STORE_NAME).put(record);
-
 tx.oncomplete=()=>resolve();
 tx.onerror=()=>reject(tx.error||new Error("Could not save workbook."));
-
 });
-
 }
 
 function dbGet(category){
-
 return new Promise((resolve,reject)=>{
-
 const tx=updateDB.transaction(STORE_NAME,"readonly");
 const request=tx.objectStore(STORE_NAME).get(category);
-
 request.onsuccess=()=>resolve(request.result||null);
 request.onerror=()=>reject(request.error);
-
 });
-
 }
 
 function dbGetAll(){
-
 return new Promise((resolve,reject)=>{
-
 const tx=updateDB.transaction(STORE_NAME,"readonly");
 const request=tx.objectStore(STORE_NAME).getAll();
-
 request.onsuccess=()=>resolve(request.result||[]);
 request.onerror=()=>reject(request.error);
-
 });
-
 }
 
 
@@ -430,11 +386,9 @@ request.onerror=()=>reject(request.error);
 // ===================================
 
 function save(){
-
 localStorage.setItem("nte_orders",JSON.stringify(orders));
 localStorage.setItem("nte_main",JSON.stringify(mainData));
 localStorage.setItem("nte_new",JSON.stringify(newData));
-
 }
 
 
@@ -443,15 +397,10 @@ localStorage.setItem("nte_new",JSON.stringify(newData));
 // ===================================
 
 function show(id){
-
 ["dashboard","orders","matching","orderUpdate","globalSearch"].forEach(x=>{
 document.getElementById(x).hidden=x!==id;
 });
-
-if(id==="orderUpdate"){
-loadCategory();
-}
-
+if(id==="orderUpdate")loadCategory();
 }
 
 
@@ -460,18 +409,9 @@ loadCategory();
 // ===================================
 
 function key(o){
-
-return [
-o.pi,
-o.color,
-o.construction
-].map(x=>
-String(x||"")
-.trim()
-.toLowerCase()
-.replace(/\s+/g," ")
+return [o.pi,o.color,o.construction].map(x=>
+String(x||"").trim().toLowerCase().replace(/\s+/g," ")
 ).join("|");
-
 }
 
 
@@ -493,9 +433,7 @@ alert("Please fill all fields correctly");
 return;
 }
 
-let duplicate=orders.some((x,i)=>
-i!==editingIndex&&key(x)===key(o)
-);
+let duplicate=orders.some((x,i)=>i!==editingIndex&&key(x)===key(o));
 
 if(duplicate){
 alert("This PI + Color + Construction already exists!");
@@ -511,11 +449,9 @@ alert("Order added successfully");
 }
 
 mainData=orders.map(x=>({...x}));
-
 cancelEdit();
 save();
 render();
-
 }
 
 
@@ -524,24 +460,18 @@ render();
 // ===================================
 
 function editOrder(i){
-
 let o=orders[i];
-
 document.getElementById("pi").value=o.pi;
 document.getElementById("color").value=o.color;
 document.getElementById("construction").value=o.construction;
 document.getElementById("quantity").value=o.qty;
-
 editingIndex=i;
-
 document.getElementById("saveOrderBtn").textContent="Update Order";
 document.getElementById("cancelEditBtn").hidden=false;
 document.getElementById("formTitle").textContent="Edit Order";
 document.getElementById("orderFormCard").classList.add("editing");
-
 show("orders");
 window.scrollTo(0,0);
-
 }
 
 
@@ -550,18 +480,14 @@ window.scrollTo(0,0);
 // ===================================
 
 function cancelEdit(){
-
 editingIndex=-1;
-
 ["pi","color","construction","quantity"].forEach(x=>{
 document.getElementById(x).value="";
 });
-
 document.getElementById("saveOrderBtn").textContent="Add Order";
 document.getElementById("cancelEditBtn").hidden=true;
 document.getElementById("formTitle").textContent="Manual Order Entry";
 document.getElementById("orderFormCard").classList.remove("editing");
-
 }
 
 
@@ -570,24 +496,13 @@ document.getElementById("orderFormCard").classList.remove("editing");
 // ===================================
 
 function deleteOrder(i){
-
-if(!confirm("Are you sure you want to delete this order?")){
-return;
-}
-
+if(!confirm("Are you sure you want to delete this order?"))return;
 orders.splice(i,1);
-
-if(editingIndex===i){
-cancelEdit();
-}else if(editingIndex>i){
-editingIndex--;
-}
-
+if(editingIndex===i)cancelEdit();
+else if(editingIndex>i)editingIndex--;
 mainData=orders.map(x=>({...x}));
-
 save();
 render();
-
 }
 
 
@@ -596,18 +511,12 @@ render();
 // ===================================
 
 function clearOrders(){
-
-if(!confirm("WARNING: Delete ALL main orders?")){
-return;
-}
-
+if(!confirm("WARNING: Delete ALL main orders?"))return;
 orders=[];
 mainData=[];
-
 cancelEdit();
 save();
 render();
-
 }
 
 
@@ -635,20 +544,14 @@ if(["construction","fabricconstruction","fabricconst"].includes(h)){
 result.construction=String(row[k]??"").trim();
 }
 
-if([
-"orderqty","orderqtyyds","orderquantity","orderquantityyds",
-"qty","quantity","yds","orderquantityyards"
-].includes(h)){
-
+if(["orderqty","orderqtyyds","orderquantity","orderquantityyds","qty","quantity","yds","orderquantityyards"].includes(h)){
 let v=String(row[k]??"").replace(/,/g,"").trim();
 result.qty=Number(v)||0;
-
 }
 
 });
 
 return result;
-
 }
 
 
@@ -673,21 +576,12 @@ return;
 try{
 
 let data=await file.arrayBuffer();
-
-let workbook=XLSX.read(data,{
-type:"array",
-cellDates:false
-});
-
+let workbook=XLSX.read(data,{type:"array",cellDates:false});
 let sheet=workbook.Sheets[workbook.SheetNames[0]];
 
-let rows=XLSX.utils.sheet_to_json(sheet,{
-defval:""
-});
+let rows=XLSX.utils.sheet_to_json(sheet,{defval:""});
 
-let parsed=rows.map(normalize).filter(x=>
-x.pi&&x.color&&x.construction
-);
+let parsed=rows.map(normalize).filter(x=>x.pi&&x.color&&x.construction);
 
 if(!parsed.length){
 alert("No valid rows found. Check Excel column headings.");
@@ -696,9 +590,7 @@ return;
 
 if(type==="main"){
 
-if(!confirm("Import "+parsed.length+" rows as your new Main Order File? Existing main orders will be replaced.")){
-return;
-}
+if(!confirm("Import "+parsed.length+" rows as your new Main Order File? Existing main orders will be replaced."))return;
 
 orders=parsed.map(x=>({...x}));
 mainData=parsed.map(x=>({...x}));
@@ -708,9 +600,7 @@ parsed.length+" rows imported from "+file.name;
 
 }else{
 
-if(!confirm("Import "+parsed.length+" rows as your New / Updated File? Previous new file will be replaced.")){
-return;
-}
+if(!confirm("Import "+parsed.length+" rows as your New / Updated File? Previous new file will be replaced."))return;
 
 newData=parsed;
 
@@ -722,15 +612,11 @@ parsed.length+" rows imported from "+file.name;
 cancelEdit();
 save();
 render();
-
 alert(parsed.length+" rows imported successfully");
-
 document.getElementById(inputId).value="";
 
 }catch(e){
-
 alert("File reading error: "+e.message);
-
 }
 
 }
@@ -741,14 +627,8 @@ alert("File reading error: "+e.message);
 // ===================================
 
 function matchStatus(data,other){
-
 let keys=new Set(other.map(key));
-
-return data.map(o=>({
-...o,
-matched:keys.has(key(o))
-}));
-
+return data.map(o=>({...o,matched:keys.has(key(o))}));
 }
 
 
@@ -757,15 +637,9 @@ matched:keys.has(key(o))
 // ===================================
 
 function escapeHTML(value){
-
 return String(value??"").replace(/[&<>"']/g,c=>({
-"&":"&amp;",
-"<":"&lt;",
-">":"&gt;",
-'"':"&quot;",
-"'":"&#39;"
+"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
-
 }
 
 
@@ -775,24 +649,16 @@ return String(value??"").replace(/[&<>"']/g,c=>({
 
 function tableRows(data){
 
-if(!data.length){
-return '<tr><td colspan="5">No data available</td></tr>';
-}
+if(!data.length)return '<tr><td colspan="5">No data available</td></tr>';
 
 return data.map(o=>`
-
 <tr class="${o.matched?'matched':'unmatched'}">
-<td>
-<span class="status ${o.matched?'status-match':'status-unmatch'}">
-${o.matched?'MATCHED':'UNMATCHED'}
-</span>
-</td>
+<td><span class="status ${o.matched?'status-match':'status-unmatch'}">${o.matched?'MATCHED':'UNMATCHED'}</span></td>
 <td>${escapeHTML(o.pi)}</td>
 <td>${escapeHTML(o.color)}</td>
 <td>${escapeHTML(o.construction)}</td>
 <td>${Number(o.qty)||0}</td>
 </tr>
-
 `).join("");
 
 }
@@ -805,7 +671,6 @@ ${o.matched?'MATCHED':'UNMATCHED'}
 function renderCategoryButtons(){
 
 let container=document.getElementById("categoryButtons");
-
 if(!container)return;
 
 container.innerHTML="";
@@ -813,13 +678,10 @@ container.innerHTML="";
 Object.keys(categoryNames).forEach(category=>{
 
 let btn=document.createElement("button");
-
 btn.id="cat-"+category;
 btn.textContent=categoryLabel(category);
 btn.className=category===currentCategory?"active":"";
-
 btn.onclick=()=>selectCategory(category);
-
 container.appendChild(btn);
 
 });
@@ -842,9 +704,7 @@ alert("Please enter a valid category name.");
 return;
 }
 
-let existing=Object.keys(categoryNames).some(k=>
-k.toLowerCase()===keyName.toLowerCase()
-);
+let existing=Object.keys(categoryNames).some(k=>k.toLowerCase()===keyName.toLowerCase());
 
 if(existing){
 alert("This category already exists.");
@@ -852,14 +712,11 @@ return;
 }
 
 categoryNames[keyName]=name;
-
 saveCategories();
 renderCategoryButtons();
 
 document.getElementById("newCategoryName").value="";
-
 selectCategory(keyName);
-
 alert("New category created successfully.");
 
 }
@@ -877,9 +734,7 @@ return;
 }
 
 currentCategory=category;
-
 document.getElementById("categoryTitle").textContent=categoryLabel(category);
-
 renderCategoryButtons();
 resetUpdateResults();
 loadCategory();
@@ -891,19 +746,13 @@ function resetUpdateResults(){
 currentSheetRows=[];
 selectedColor="";
 
-document.getElementById("sheetSelect").innerHTML=
-'<option value="">Select Sheet</option>';
-
+document.getElementById("sheetSelect").innerHTML='<option value="">Select Sheet</option>';
 document.getElementById("piSuggestions").innerHTML="";
 document.getElementById("updatePI").value="";
 document.getElementById("piInfo").textContent="";
-
-document.getElementById("sheetInfo").innerHTML=
-"<small>Select a sheet from the uploaded workbook.</small>";
-
+document.getElementById("sheetInfo").innerHTML="<small>Select a sheet from the uploaded workbook.</small>";
 document.getElementById("colorCard").hidden=true;
 document.getElementById("detailCard").hidden=true;
-
 document.getElementById("colorList").innerHTML="";
 document.getElementById("detailResult").innerHTML="";
 
@@ -916,46 +765,32 @@ if(!updateDB)return;
 try{
 
 let record=await dbGet(currentCategory);
-
 currentWorkbook=record;
 
-document.getElementById("categoryTitle").textContent=
-categoryLabel(currentCategory);
-
+document.getElementById("categoryTitle").textContent=categoryLabel(currentCategory);
 renderCategoryButtons();
 resetUpdateResults();
 
 if(!record){
-
-document.getElementById("uploadInfo").innerHTML=
-'<small>No file uploaded for this category yet.</small>';
-
+document.getElementById("uploadInfo").innerHTML='<small>No file uploaded for this category yet.</small>';
 return;
-
 }
 
 document.getElementById("uploadInfo").innerHTML=
-'<span class="success">Saved file: '+escapeHTML(record.fileName)+
-' ('+(record.sheets||[]).length+' sheets)</span>';
+'<span class="success">Saved file: '+escapeHTML(record.fileName)+' ('+(record.sheets||[]).length+' sheets)</span>';
 
 let select=document.getElementById("sheetSelect");
-
 select.innerHTML='<option value="">Select Sheet</option>';
 
 (record.sheets||[]).forEach((sheet,i)=>{
-
 let option=document.createElement("option");
 option.value=String(i);
 option.textContent=sheet.name;
 select.appendChild(option);
-
 });
 
 }catch(e){
-
-document.getElementById("uploadInfo").textContent=
-"Could not load saved file: "+e.message;
-
+document.getElementById("uploadInfo").textContent="Could not load saved file: "+e.message;
 }
 
 }
@@ -984,36 +819,22 @@ alert("Database is not ready. Please refresh the page.");
 return;
 }
 
-if(!confirm("Upload this file as the new "+categoryLabel(currentCategory)+" file? The previous file in this category will be replaced.")){
-return;
-}
+if(!confirm("Upload this file as the new "+categoryLabel(currentCategory)+" file? The previous file in this category will be replaced."))return;
 
 try{
 
 document.getElementById("uploadInfo").textContent="Reading Excel file...";
 
 let buffer=await file.arrayBuffer();
-
-let workbook=XLSX.read(buffer,{
-type:"array",
-cellDates:false
-});
-
+let workbook=XLSX.read(buffer,{type:"array",cellDates:false});
 let sheets=[];
 
 for(let name of workbook.SheetNames){
 
 let worksheet=workbook.Sheets[name];
+let rows=XLSX.utils.sheet_to_json(worksheet,{defval:"",raw:false});
 
-let rows=XLSX.utils.sheet_to_json(worksheet,{
-defval:"",
-raw:false
-});
-
-sheets.push({
-name:name,
-rows:rows
-});
+sheets.push({name:name,rows:rows});
 
 }
 
@@ -1031,22 +852,15 @@ sheets:sheets
 };
 
 await dbSave(record);
-
 currentWorkbook=record;
-
 document.getElementById("updateFile").value="";
-
 await loadCategory();
 
 alert(categoryLabel(currentCategory)+" file uploaded successfully!");
 
 }catch(e){
-
-document.getElementById("uploadInfo").textContent=
-"Upload failed: "+e.message;
-
+document.getElementById("uploadInfo").textContent="Upload failed: "+e.message;
 alert("Upload failed: "+e.message);
-
 }
 
 }
@@ -1057,45 +871,27 @@ alert("Upload failed: "+e.message);
 // ===================================
 
 function cleanHeader(value){
-
-return String(value??"")
-.toLowerCase()
-.replace(/[^a-z0-9]/g,"");
-
+return String(value??"").toLowerCase().replace(/[^a-z0-9]/g,"");
 }
 
 function findColumn(row,type){
 
 let keys=Object.keys(row||{});
 
-let piNames=[
-"pi","pinumber","pino","proformainvoice",
-"proformainvoiceno","proformainvoicenumber"
-];
-
+let piNames=["pi","pinumber","pino","proformainvoice","proformainvoiceno","proformainvoicenumber"];
 let colorNames=["color","colour","colorname","colourname"];
 
 let names=type==="pi"?piNames:colorNames;
 
 for(let k of keys){
-
-if(names.includes(cleanHeader(k))){
-return k;
-}
-
+if(names.includes(cleanHeader(k)))return k;
 }
 
 return null;
-
 }
 
 function normalizePI(value){
-
-return String(value??"")
-.trim()
-.toLowerCase()
-.replace(/\s+/g," ");
-
+return String(value??"").trim().toLowerCase().replace(/\s+/g," ");
 }
 
 
@@ -1110,56 +906,35 @@ resetSheetResults();
 if(!currentWorkbook)return;
 
 let index=document.getElementById("sheetSelect").value;
-
-if(index===""){
-return;
-}
+if(index==="")return;
 
 let sheet=currentWorkbook.sheets[Number(index)];
-
 if(!sheet)return;
 
 currentSheetRows=sheet.rows||[];
 
-document.getElementById("sheetInfo").textContent=
-"Selected Sheet: "+sheet.name+
-" | Total Rows: "+currentSheetRows.length;
-
-let piColumn=currentSheetRows.length?
-findColumn(currentSheetRows[0],"pi"):null;
+let piColumn=currentSheetRows.length?findColumn(currentSheetRows[0],"pi"):null;
 
 if(!piColumn){
-
 document.getElementById("sheetInfo").innerHTML=
-'<span class="error">PI column not found. Check the Excel header. Supported examples: PI, PI Number, PI No.</span>';
-
+'<span class="error">PI column not found. Supported examples: PI, PI Number, PI No.</span>';
 return;
-
 }
 
-let pis=[...new Set(
-currentSheetRows
-.map(row=>String(row[piColumn]??"").trim())
-.filter(Boolean)
-)];
-
+let pis=[...new Set(currentSheetRows.map(row=>String(row[piColumn]??"").trim()).filter(Boolean))];
 pis.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
 
 let list=document.getElementById("piSuggestions");
 list.innerHTML="";
 
 pis.forEach(pi=>{
-
 let option=document.createElement("option");
 option.value=pi;
 list.appendChild(option);
-
 });
 
 document.getElementById("sheetInfo").textContent=
-"Selected Sheet: "+sheet.name+
-" | Total Rows: "+currentSheetRows.length+
-" | Unique PI: "+pis.length;
+"Selected Sheet: "+sheet.name+" | Total Rows: "+currentSheetRows.length+" | Unique PI: "+pis.length;
 
 }
 
@@ -1180,7 +955,7 @@ document.getElementById("detailResult").innerHTML="";
 
 
 // ===================================
-// SEARCH PI
+// SEARCH PI IN ORDER UPDATE
 // ===================================
 
 function searchPI(){
@@ -1215,7 +990,6 @@ document.getElementById("piInfo").innerHTML=
 
 document.getElementById("colorCard").hidden=true;
 document.getElementById("detailCard").hidden=true;
-
 return;
 
 }
@@ -1223,39 +997,25 @@ return;
 let colorColumn=findColumn(currentSheetRows[0],"color");
 
 if(!colorColumn){
-
 document.getElementById("piInfo").innerHTML=
 '<span class="error">PI found, but Color column was not found.</span>';
-
 return;
-
 }
 
-let colors=[...new Set(
-matches
-.map(row=>String(row[colorColumn]??"").trim())
-.filter(Boolean)
-)];
+let colors=[...new Set(matches.map(row=>String(row[colorColumn]??"").trim()).filter(Boolean))];
 
 document.getElementById("piInfo").innerHTML=
-'<span class="success">PI found: '+matches.length+
-' matching rows | '+colors.length+' colors</span>';
+'<span class="success">PI found: '+matches.length+' matching rows | '+colors.length+' colors</span>';
 
 let container=document.getElementById("colorList");
 container.innerHTML="";
 
 colors.forEach(color=>{
-
 let btn=document.createElement("button");
 btn.className="color-btn";
 btn.textContent=color;
-
-btn.onclick=function(){
-selectColor(color,piInput);
-};
-
+btn.onclick=()=>selectColor(color,piInput);
 container.appendChild(btn);
-
 });
 
 document.getElementById("colorCard").hidden=false;
@@ -1265,21 +1025,19 @@ document.getElementById("detailCard").hidden=true;
 
 
 // ===================================
-// SELECT COLOR
+// SELECT COLOR IN ORDER UPDATE
 // ===================================
 
 function selectColor(color,pi){
 
 selectedColor=color;
 
-document.querySelectorAll(".color-btn").forEach(btn=>{
+document.querySelectorAll("#colorList .color-btn").forEach(btn=>{
 btn.classList.toggle("selected",btn.textContent===color);
 });
 
-let firstRow=currentSheetRows[0];
-
-let piColumn=findColumn(firstRow,"pi");
-let colorColumn=findColumn(firstRow,"color");
+let piColumn=findColumn(currentSheetRows[0],"pi");
+let colorColumn=findColumn(currentSheetRows[0],"color");
 
 let matches=currentSheetRows.filter(row=>
 normalizePI(row[piColumn])===normalizePI(pi)&&
@@ -1320,22 +1078,10 @@ html+=`
 `;
 
 Object.keys(row).forEach(header=>{
-
-html+=`
-<tr>
-<th>${escapeHTML(header)}</th>
-<td>${escapeHTML(row[header])}</td>
-</tr>
-`;
-
+html+=`<tr><th>${escapeHTML(header)}</th><td>${escapeHTML(row[header])}</td></tr>`;
 });
 
-html+=`
-</tbody>
-</table>
-</div>
-</div>
-`;
+html+=`</tbody></table></div></div>`;
 
 });
 
@@ -1346,10 +1092,11 @@ document.getElementById("detailCard").hidden=false;
 
 
 // ===================================
-// GLOBAL SEARCH
+// GLOBAL SEARCH - PI FIRST SYSTEM
 // ===================================
 
 let globalSearchGroups=[];
+let globalSelectedGroup=null;
 
 function globalFieldValue(row,field){
 
@@ -1367,52 +1114,45 @@ color:[
 construction:[
 "construction","fabricconstruction",
 "fabricconst","fabricconstructionname"
+],
+
+buyer:[
+"buyer","buyername","customer","customername"
 ]
 
 };
 
 if(!row)return "";
 
-let keys=Object.keys(row);
-
-for(let k of keys){
-
-let normalized=cleanHeader(k);
-
-if(aliases[field].includes(normalized)){
+for(let k of Object.keys(row)){
+if(aliases[field] && aliases[field].includes(cleanHeader(k))){
 return String(row[k]??"").trim();
 }
-
 }
 
 return "";
 
 }
 
-function globalRowMatches(row,query,field){
-
-let fields=field==="all"
-?["pi","color","construction"]
-:[field];
-
-return fields.some(f=>{
-
-let value=globalFieldValue(row,f);
-
-return value.toLowerCase().includes(query.toLowerCase());
-
-});
-
+function globalGetPI(row){
+return globalFieldValue(row,"pi");
 }
+
+function globalGetColor(row){
+return globalFieldValue(row,"color");
+}
+
+
+// ===================================
+// GLOBAL SEARCH BY PI
+// ===================================
 
 async function runGlobalSearch(){
 
 let query=document.getElementById("globalSearchInput").value.trim();
 
-let field=document.getElementById("globalSearchField").value;
-
 if(!query){
-alert("Please enter PI, Color or Construction.");
+alert("Please enter PI Number.");
 return;
 }
 
@@ -1423,60 +1163,58 @@ return;
 
 let results=document.getElementById("globalSearchResults");
 
-results.innerHTML=
-'<div class="card">Searching all data...</div>';
+results.innerHTML="<p>Searching all sheets...</p>";
 
+document.getElementById("globalColorCard").hidden=true;
 document.getElementById("globalDetailCard").hidden=true;
-
 document.getElementById("globalSearchInfo").textContent="";
 
 globalSearchGroups=[];
+globalSelectedGroup=null;
 
 try{
 
 let allGroups=[];
+let normalizedQuery=normalizePI(query);
 
-// SEARCH MAIN EXCEL DATA
+// SEARCH MAIN DATA
+
 let mainMatches=mainData.filter(row=>
-globalRowMatches(row,query,field)
+normalizePI(globalGetPI(row))===normalizedQuery
 );
 
 if(mainMatches.length){
 
 allGroups.push({
-
-category:"Main Excel Matching Data",
+category:"Main Order Data",
+categoryKey:"main",
 sheet:"Main Data",
 rows:mainMatches
-
 });
 
 }
 
-// SEARCH ALL INDEXEDDB CATEGORIES AND SHEETS
+// SEARCH ALL UPLOADED CATEGORIES AND SHEETS
+
 let records=await dbGetAll();
 
 records.forEach(record=>{
 
-let sheets=record.sheets||[];
-
-sheets.forEach(sheet=>{
+(record.sheets||[]).forEach(sheet=>{
 
 let rows=sheet.rows||[];
 
 let matches=rows.filter(row=>
-globalRowMatches(row,query,field)
+normalizePI(globalGetPI(row))===normalizedQuery
 );
 
 if(matches.length){
 
 allGroups.push({
-
 category:record.categoryName||categoryLabel(record.category),
 categoryKey:record.category,
 sheet:sheet.name,
 rows:matches
-
 });
 
 }
@@ -1487,45 +1225,36 @@ rows:matches
 
 globalSearchGroups=allGroups;
 
-let total=allGroups.reduce((sum,group)=>
-sum+group.rows.length,0);
+let total=allGroups.reduce((sum,group)=>sum+group.rows.length,0);
 
 document.getElementById("globalSearchInfo").innerHTML=
-'<div class="search-summary"><b>'+
-total+'</b> matching rows found in <b>'+
-allGroups.length+'</b> result groups.</div>';
+'<div class="search-summary">'+
+'<b>PI: '+escapeHTML(query)+'</b><br>'+
+'Found in <b>'+allGroups.length+'</b> sheets<br>'+
+'Total matching rows: <b>'+total+'</b>'+
+'</div>';
 
 if(!allGroups.length){
-
-results.innerHTML=
-'<div class="card">No matching data found.</div>';
-
+results.innerHTML='<p class="error">No matching PI found in any sheet.</p>';
 return;
-
 }
 
-let html="";
+// SHOW MATCHING SHEETS
+
+let html='<h3>Step 1: Select Matching Sheet</h3>';
 
 allGroups.forEach((group,index)=>{
 
 html+=`
-
 <div class="card result-card">
-
 <h3>${escapeHTML(group.category)}</h3>
-
 <p>
 <b>Sheet:</b> ${escapeHTML(group.sheet)}
 <br>
 <b>Matching Rows:</b> ${group.rows.length}
 </p>
-
-<button onclick="openGlobalGroup(${index})">
-View Full Details
-</button>
-
+<button onclick="openGlobalGroup(${index})">Select This Sheet</button>
 </div>
-
 `;
 
 });
@@ -1534,90 +1263,186 @@ results.innerHTML=html;
 
 }catch(e){
 
-results.innerHTML=
-'<div class="card error">Search failed: '+
-escapeHTML(e.message)+'</div>';
-
+results.innerHTML='<p class="error">Search failed: '+escapeHTML(e.message)+'</p>';
 console.error(e);
 
 }
 
 }
 
+
+// ===================================
+// SELECT SHEET AND SHOW COLORS
+// ===================================
+
 function openGlobalGroup(index){
 
 let group=globalSearchGroups[index];
+if(!group)return;
+
+globalSelectedGroup=group;
+
+document.getElementById("globalDetailCard").hidden=true;
+document.getElementById("globalDetailResult").innerHTML="";
+
+let colors=[...new Set(
+group.rows.map(row=>globalGetColor(row)).filter(Boolean)
+)];
+
+document.getElementById("globalSelectedSheet").innerHTML=
+'<b>Category:</b> '+escapeHTML(group.category)+
+'<br><b>Sheet:</b> '+escapeHTML(group.sheet)+
+'<br><b>PI:</b> '+escapeHTML(document.getElementById("globalSearchInput").value.trim())+
+'<br><b>Total Rows:</b> '+group.rows.length;
+
+let container=document.getElementById("globalColorList");
+container.innerHTML="";
+
+if(!colors.length){
+
+container.innerHTML='<p class="error">No Color column or Color values found in this sheet. Showing all matching rows.</p>';
+
+showGlobalDetails(group.rows,"All Colors");
+
+}else{
+
+colors.forEach(color=>{
+
+let btn=document.createElement("button");
+btn.className="color-btn";
+btn.textContent=color;
+
+btn.onclick=()=>selectGlobalColor(color);
+
+container.appendChild(btn);
+
+});
+
+}
+
+document.getElementById("globalColorCard").hidden=false;
+
+document.getElementById("globalColorCard").scrollIntoView({
+behavior:"smooth",
+block:"start"
+});
+
+}
+
+
+// ===================================
+// SELECT COLOR AND SHOW ALL ROWS
+// ===================================
+
+function selectGlobalColor(color){
+
+if(!globalSelectedGroup)return;
+
+document.querySelectorAll("#globalColorList .color-btn").forEach(btn=>{
+btn.classList.toggle("selected",btn.textContent===color);
+});
+
+let matches=globalSelectedGroup.rows.filter(row=>
+globalGetColor(row)===color
+);
+
+// No duplicate row is removed.
+// Every matching row is displayed.
+
+showGlobalDetails(matches,color);
+
+}
+
+
+// ===================================
+// GLOBAL SEARCH FULL DETAILS
+// ===================================
+
+function showGlobalDetails(rows,color){
+
+let group=globalSelectedGroup;
 
 if(!group)return;
 
+let query=document.getElementById("globalSearchInput").value.trim();
+
+document.getElementById("globalDetailHeading").innerHTML=
+'<b>PI:</b> '+escapeHTML(query)+
+' | <b>Color:</b> '+escapeHTML(color)+
+'<br><b>Category:</b> '+escapeHTML(group.category)+
+' | <b>Sheet:</b> '+escapeHTML(group.sheet)+
+' | <b>Total Matching Rows:</b> '+rows.length;
+
 let html="";
 
-group.rows.forEach((row,rowIndex)=>{
+if(!rows.length){
+html="<p>No matching records found.</p>";
+}else{
+
+rows.forEach((row,index)=>{
 
 html+=`
-
 <div class="card">
-
-<h4>Record ${rowIndex+1}</h4>
-
+<h4>Record ${index+1}</h4>
 <div class="scroll">
-
 <table class="detail-table">
 <tbody>
-
 `;
 
 Object.keys(row).forEach(header=>{
 
 html+=`
-
 <tr>
 <th>${escapeHTML(header)}</th>
 <td>${escapeHTML(row[header])}</td>
 </tr>
-
 `;
 
 });
 
 html+=`
-
 </tbody>
 </table>
-
 </div>
 </div>
-
 `;
 
 });
 
-document.getElementById("globalDetailHeading").textContent=
-"Category: "+group.category+
-" | Sheet: "+group.sheet+
-" | Matching Rows: "+group.rows.length;
+}
 
 document.getElementById("globalDetailResult").innerHTML=html;
-
 document.getElementById("globalDetailCard").hidden=false;
 
 document.getElementById("globalDetailCard").scrollIntoView({
-behavior:"smooth"
+behavior:"smooth",
+block:"start"
 });
 
 }
+
+
+// ===================================
+// CLEAR GLOBAL SEARCH
+// ===================================
 
 function clearGlobalSearch(){
 
 document.getElementById("globalSearchInput").value="";
 document.getElementById("globalSearchInfo").textContent="";
-document.getElementById("globalSearchResults").innerHTML="";
+document.getElementById("globalSearchResults").innerHTML=
+"<p>Enter a PI Number to begin searching.</p>";
+
+document.getElementById("globalColorList").innerHTML="";
+document.getElementById("globalSelectedSheet").textContent="";
 document.getElementById("globalDetailResult").innerHTML="";
 document.getElementById("globalDetailHeading").textContent="";
 
+document.getElementById("globalColorCard").hidden=true;
 document.getElementById("globalDetailCard").hidden=true;
 
 globalSearchGroups=[];
+globalSelectedGroup=null;
 
 }
 
@@ -1665,8 +1490,7 @@ document.getElementById("total").textContent=orders.length;
 
 let totalQty=orders.reduce((s,o)=>s+(Number(o.qty)||0),0);
 
-document.getElementById("qty").textContent=
-totalQty.toLocaleString();
+document.getElementById("qty").textContent=totalQty.toLocaleString();
 
 }
 
@@ -1678,28 +1502,24 @@ totalQty.toLocaleString();
 async function startERP(){
 
 render();
-
 loadSavedCategories();
 
 try{
 
 await openUpdateDB();
 
-// Discover any previously saved categories
 let records=await dbGetAll();
 
 records.forEach(record=>{
 
 if(record.category && !categoryNames[record.category]){
-categoryNames[record.category]=
-record.categoryName||record.category;
+categoryNames[record.category]=record.categoryName||record.category;
 }
 
 });
 
 saveCategories();
 renderCategoryButtons();
-
 selectCategory("delivery");
 
 }catch(e){
