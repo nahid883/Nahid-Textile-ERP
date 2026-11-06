@@ -15,17 +15,19 @@ header h2{margin:0}
 nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
 button{background:#126b91;color:white;border:0;padding:11px 15px;border-radius:7px;cursor:pointer;margin:3px}
 button:hover{opacity:.85}
+button:disabled{opacity:.5;cursor:not-allowed}
 .danger{background:#dc3545}
 .secondary{background:#64748b}
+.active{background:#0b455e;outline:2px solid #fff}
 main{max-width:1200px;margin:auto;padding:15px}
 .card{background:white;padding:16px;border-radius:12px;margin:12px 0;box-shadow:0 2px 8px #0001}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
 .stat{background:#e8f2f8;padding:15px;border-radius:9px}
 .stat b{display:block;font-size:24px;margin-top:8px}
-input{padding:11px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:5px 0}
+input,select{padding:11px;width:100%;border:1px solid #ccd5df;border-radius:7px;margin:5px 0;background:white}
 .formgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px}
 table{width:100%;border-collapse:collapse;min-width:750px}
-th,td{padding:10px;border:1px solid #ddd;text-align:left}
+th,td{padding:10px;border:1px solid #ddd;text-align:left;white-space:normal}
 th{background:#e8f2f8}
 .scroll{overflow-x:auto}
 .matched{background:#d9f7df}
@@ -36,6 +38,15 @@ small{color:#526477}
 .status-match{background:#b7efc2;color:#14532d}
 .status-unmatch{background:#fecaca;color:#991b1b}
 .editing{border:2px solid #e9a23b}
+.subnav{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.color-btn{background:#e8f2f8;color:#123b56;border:1px solid #b8cbd8}
+.color-btn.selected{background:#126b91;color:white}
+.info{background:#e8f2f8;padding:12px;border-radius:8px;margin:10px 0}
+.warning{background:#fff3cd;padding:12px;border-radius:8px;margin:10px 0}
+.success{color:#137333}
+.error{color:#c62828}
+.detail-table{min-width:500px}
+.detail-table th{width:30%}
 </style>
 </head>
 
@@ -43,11 +54,12 @@ small{color:#526477}
 
 <header>
 <h2>NAHID TEXTILE ERP</h2>
-<p>Order Management • Excel Import • Matching System</p>
+<p>Order Management • Excel Import • Matching System • Order Update</p>
 <nav>
 <button onclick="show('dashboard')">Dashboard</button>
 <button onclick="show('orders')">Order Entry</button>
 <button onclick="show('matching')">Excel Matching</button>
+<button onclick="show('orderUpdate')">Order Update</button>
 </nav>
 </header>
 
@@ -55,7 +67,6 @@ small{color:#526477}
 
 <!-- DASHBOARD -->
 <section id="dashboard">
-
 <div class="card">
 <h3>Dashboard</h3>
 <div class="grid">
@@ -69,9 +80,8 @@ small{color:#526477}
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p>Manage your textile orders and compare Excel files from one place.</p>
-<p><small>Current version: Order Management 2.0</small></p>
+<p><small>Current version: Order Management 3.0</small></p>
 </div>
-
 </section>
 
 
@@ -79,55 +89,38 @@ small{color:#526477}
 <section id="orders" hidden>
 
 <div class="card" id="orderFormCard">
-
 <h3 id="formTitle">Manual Order Entry</h3>
-
 <div class="formgrid">
 <input id="pi" placeholder="PI Number">
 <input id="color" placeholder="Color">
 <input id="construction" placeholder="Construction">
 <input id="quantity" type="number" min="0" placeholder="Order Qty (Yds)">
 </div>
-
 <button id="saveOrderBtn" onclick="addOrder()">Add Order</button>
 <button id="cancelEditBtn" class="secondary" onclick="cancelEdit()" hidden>Cancel Edit</button>
-
 </div>
 
 <div class="card">
-
 <h3>Import Main Order Excel</h3>
 <input type="file" id="mainFile" accept=".xlsx,.xls,.csv">
-
 <button onclick="importFile('mainFile','main')">Import Main File</button>
-
 <p><small>Required columns: PI, Color, Construction and Order Qty.</small></p>
 <p id="mainImportInfo"></p>
-
 </div>
 
 <div class="card">
-
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
 <h3>Order List</h3>
 <button class="danger" onclick="clearOrders()">Clear All Orders</button>
 </div>
-
 <div class="scroll">
 <table>
 <thead>
-<tr>
-<th>PI</th>
-<th>Color</th>
-<th>Construction</th>
-<th>Order Qty</th>
-<th>Action</th>
-</tr>
+<tr><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr>
 </thead>
 <tbody id="orderRows"></tbody>
 </table>
 </div>
-
 </div>
 </section>
 
@@ -136,71 +129,101 @@ small{color:#526477}
 <section id="matching" hidden>
 
 <div class="card">
-
 <h3>Upload New / Updated Excel</h3>
-
 <input type="file" id="newFile" accept=".xlsx,.xls,.csv">
-
 <button onclick="importFile('newFile','new')">Import New File</button>
-
 <p><small>Matching key: PI + Color + Construction</small></p>
 <p id="newImportInfo"></p>
-
 </div>
 
 <div class="card">
-
 <h3>Matching Result</h3>
-
 <p>🟢 Matched &nbsp; 🔴 Unmatched</p>
-
 <div class="grid">
 <div class="stat">Matched Rows<b id="mResult">0</b></div>
 <div class="stat">Unmatched Rows<b id="uResult">0</b></div>
 </div>
-
 </div>
 
 <div class="card">
-
 <h3>Main File – Matching Status</h3>
-
 <div class="scroll">
 <table>
 <thead>
-<tr>
-<th>Status</th>
-<th>PI</th>
-<th>Color</th>
-<th>Construction</th>
-<th>Order Qty</th>
-</tr>
+<tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr>
 </thead>
 <tbody id="mainRows"></tbody>
 </table>
 </div>
-
 </div>
 
 <div class="card">
-
 <h3>New File – Matching Status</h3>
-
 <div class="scroll">
 <table>
 <thead>
-<tr>
-<th>Status</th>
-<th>PI</th>
-<th>Color</th>
-<th>Construction</th>
-<th>Order Qty</th>
-</tr>
+<tr><th>Status</th><th>PI</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr>
 </thead>
 <tbody id="newRows"></tbody>
 </table>
 </div>
+</div>
+</section>
 
+
+<!-- ORDER UPDATE -->
+<section id="orderUpdate" hidden>
+
+<div class="card">
+<h3>Order Update</h3>
+<p>Select the update category.</p>
+<div class="subnav">
+<button id="cat-delivery" onclick="selectCategory('delivery')">Delivery Status</button>
+<button id="cat-order" onclick="selectCategory('order')">Order Status</button>
+<button id="cat-wip" onclick="selectCategory('wip')">WIP</button>
+</div>
+</div>
+
+<div class="card">
+<h3 id="categoryTitle">Delivery Status</h3>
+
+<label><b>Upload Excel File</b></label>
+<input type="file" id="updateFile" accept=".xlsx,.xls,.csv">
+
+<button onclick="uploadUpdateFile()">Upload / Replace File</button>
+
+<p id="uploadInfo"></p>
+<div class="warning">
+প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে।
+নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।
+</div>
+</div>
+
+<div class="card">
+<h3>Step 1: Select Sheet</h3>
+<select id="sheetSelect" onchange="onSheetChange()">
+<option value="">Upload an Excel file first</option>
+</select>
+<p id="sheetInfo"><small>Excel-এর Sheet নির্বাচন করো।</small></p>
+</div>
+
+<div class="card">
+<h3>Step 2: Find PI</h3>
+<input id="updatePI" list="piSuggestions" placeholder="Enter or select PI Number">
+<datalist id="piSuggestions"></datalist>
+<button onclick="searchPI()">Search PI</button>
+<p id="piInfo"></p>
+</div>
+
+<div class="card" id="colorCard" hidden>
+<h3>Step 3: Select Color</h3>
+<div id="colorList"></div>
+</div>
+
+<div class="card" id="detailCard" hidden>
+<h3>Step 4: Full Update Details</h3>
+<p id="detailHeading"></p>
+<div id="detailResult"></div>
 </div>
 
 </section>
@@ -225,8 +248,82 @@ return [];
 let orders=loadData("nte_orders");
 let mainData=loadData("nte_main");
 let newData=loadData("nte_new");
-
 let editingIndex=-1;
+
+
+// ===================================
+// INDEXED DB FOR ORDER UPDATE FILES
+// ===================================
+
+const DB_NAME="NahidTextileERP_UpdateDB";
+const DB_VERSION=1;
+const STORE_NAME="workbooks";
+
+let updateDB=null;
+let currentCategory="delivery";
+let currentWorkbook=null;
+let currentSheetRows=[];
+let selectedColor="";
+
+function openUpdateDB(){
+
+return new Promise((resolve,reject)=>{
+
+if(!window.indexedDB){
+reject(new Error("IndexedDB is not supported in this browser."));
+return;
+}
+
+const request=indexedDB.open(DB_NAME,DB_VERSION);
+
+request.onupgradeneeded=function(e){
+const db=e.target.result;
+
+if(!db.objectStoreNames.contains(STORE_NAME)){
+db.createObjectStore(STORE_NAME,{keyPath:"category"});
+}
+};
+
+request.onsuccess=function(e){
+updateDB=e.target.result;
+resolve(updateDB);
+};
+
+request.onerror=function(){
+reject(request.error||new Error("Database could not be opened."));
+};
+
+});
+
+}
+
+function dbSave(record){
+
+return new Promise((resolve,reject)=>{
+
+const tx=updateDB.transaction(STORE_NAME,"readwrite");
+tx.objectStore(STORE_NAME).put(record);
+
+tx.oncomplete=()=>resolve();
+tx.onerror=()=>reject(tx.error||new Error("Could not save workbook."));
+
+});
+
+}
+
+function dbGet(category){
+
+return new Promise((resolve,reject)=>{
+
+const tx=updateDB.transaction(STORE_NAME,"readonly");
+const request=tx.objectStore(STORE_NAME).get(category);
+
+request.onsuccess=()=>resolve(request.result||null);
+request.onerror=()=>reject(request.error);
+
+});
+
+}
 
 
 // ===================================
@@ -245,9 +342,15 @@ localStorage.setItem("nte_new",JSON.stringify(newData));
 // ===================================
 
 function show(id){
-["dashboard","orders","matching"].forEach(x=>{
+
+["dashboard","orders","matching","orderUpdate"].forEach(x=>{
 document.getElementById(x).hidden=x!==id;
 });
+
+if(id==="orderUpdate"){
+loadCategory();
+}
+
 }
 
 
@@ -256,6 +359,7 @@ document.getElementById(x).hidden=x!==id;
 // ===================================
 
 function key(o){
+
 return [
 o.pi,
 o.color,
@@ -266,6 +370,7 @@ String(x||"")
 .toLowerCase()
 .replace(/\s+/g," ")
 ).join("|");
+
 }
 
 
@@ -297,17 +402,11 @@ return;
 }
 
 if(editingIndex>=0){
-
 orders[editingIndex]=o;
-
 alert("Order updated successfully");
-
 }else{
-
 orders.push(o);
-
 alert("Order added successfully");
-
 }
 
 mainData=orders.map(x=>({...x}));
@@ -337,7 +436,6 @@ editingIndex=i;
 document.getElementById("saveOrderBtn").textContent="Update Order";
 document.getElementById("cancelEditBtn").hidden=false;
 document.getElementById("formTitle").textContent="Edit Order";
-
 document.getElementById("orderFormCard").classList.add("editing");
 
 show("orders");
@@ -361,7 +459,6 @@ document.getElementById(x).value="";
 document.getElementById("saveOrderBtn").textContent="Add Order";
 document.getElementById("cancelEditBtn").hidden=true;
 document.getElementById("formTitle").textContent="Manual Order Entry";
-
 document.getElementById("orderFormCard").classList.remove("editing");
 
 }
@@ -425,7 +522,7 @@ Object.keys(row).forEach(k=>{
 
 let h=String(k).toLowerCase().replace(/[^a-z0-9]/g,"");
 
-if(["pi","pinumber","pino","proformainvoice"].includes(h)){
+if(["pi","pinumber","pino","proformainvoice","proformainvoiceno","proformainvoicenumber"].includes(h)){
 result.pi=String(row[k]??"").trim();
 }
 
@@ -438,14 +535,8 @@ result.construction=String(row[k]??"").trim();
 }
 
 if([
-"orderqty",
-"orderqtyyds",
-"orderquantity",
-"orderquantityyds",
-"qty",
-"quantity",
-"yds",
-"orderquantityyards"
+"orderqty","orderqtyyds","orderquantity","orderquantityyds",
+"qty","quantity","yds","orderquantityyards"
 ].includes(h)){
 
 let v=String(row[k]??"").replace(/,/g,"").trim();
@@ -590,24 +681,504 @@ return '<tr><td colspan="5">No data available</td></tr>';
 return data.map(o=>`
 
 <tr class="${o.matched?'matched':'unmatched'}">
-
 <td>
 <span class="status ${o.matched?'status-match':'status-unmatch'}">
 ${o.matched?'MATCHED':'UNMATCHED'}
 </span>
 </td>
-
 <td>${escapeHTML(o.pi)}</td>
-
 <td>${escapeHTML(o.color)}</td>
-
 <td>${escapeHTML(o.construction)}</td>
-
 <td>${Number(o.qty)||0}</td>
-
 </tr>
 
 `).join("");
+
+}
+
+
+// ===================================
+// ORDER UPDATE CATEGORY
+// ===================================
+
+const categoryNames={
+delivery:"Delivery Status",
+order:"Order Status",
+wip:"WIP"
+};
+
+function selectCategory(category){
+
+currentCategory=category;
+
+document.getElementById("categoryTitle").textContent=categoryNames[category];
+
+["delivery","order","wip"].forEach(c=>{
+document.getElementById("cat-"+c).classList.toggle("active",c===category);
+});
+
+resetUpdateResults();
+loadCategory();
+
+}
+
+function resetUpdateResults(){
+
+currentSheetRows=[];
+selectedColor="";
+
+document.getElementById("sheetSelect").innerHTML=
+'<option value="">Select Sheet</option>';
+
+document.getElementById("piSuggestions").innerHTML="";
+document.getElementById("updatePI").value="";
+document.getElementById("piInfo").textContent="";
+
+document.getElementById("sheetInfo").innerHTML=
+"<small>Select a sheet from the uploaded workbook.</small>";
+
+document.getElementById("colorCard").hidden=true;
+document.getElementById("detailCard").hidden=true;
+
+document.getElementById("colorList").innerHTML="";
+document.getElementById("detailResult").innerHTML="";
+
+}
+
+async function loadCategory(){
+
+if(!updateDB)return;
+
+try{
+
+let record=await dbGet(currentCategory);
+
+currentWorkbook=record;
+
+document.getElementById("categoryTitle").textContent=
+categoryNames[currentCategory];
+
+document.getElementById("cat-delivery").classList.toggle("active",currentCategory==="delivery");
+document.getElementById("cat-order").classList.toggle("active",currentCategory==="order");
+document.getElementById("cat-wip").classList.toggle("active",currentCategory==="wip");
+
+resetUpdateResults();
+
+if(!record){
+
+document.getElementById("uploadInfo").innerHTML=
+'<small>No file uploaded for this category yet.</small>';
+
+return;
+
+}
+
+document.getElementById("uploadInfo").innerHTML=
+'<span class="success">Saved file: '+escapeHTML(record.fileName)+
+' ('+record.sheets.length+' sheets)</span>';
+
+let select=document.getElementById("sheetSelect");
+
+select.innerHTML='<option value="">Select Sheet</option>';
+
+record.sheets.forEach((sheet,i)=>{
+
+let option=document.createElement("option");
+option.value=String(i);
+option.textContent=sheet.name;
+select.appendChild(option);
+
+});
+
+}catch(e){
+
+document.getElementById("uploadInfo").textContent=
+"Could not load saved file: "+e.message;
+
+}
+
+}
+
+
+// ===================================
+// ORDER UPDATE EXCEL UPLOAD
+// ===================================
+
+async function uploadUpdateFile(){
+
+let file=document.getElementById("updateFile").files[0];
+
+if(!file){
+alert("Please select an Excel file.");
+return;
+}
+
+if(!window.XLSX){
+alert("Excel reader could not load. Check internet connection.");
+return;
+}
+
+if(!updateDB){
+alert("Database is not ready. Please refresh the page.");
+return;
+}
+
+if(!confirm("Upload this file as the new "+categoryNames[currentCategory]+" file? The previous file in this category will be replaced.")){
+return;
+}
+
+try{
+
+document.getElementById("uploadInfo").textContent="Reading Excel file...";
+
+let buffer=await file.arrayBuffer();
+
+let workbook=XLSX.read(buffer,{
+type:"array",
+cellDates:false
+});
+
+let sheets=[];
+
+for(let name of workbook.SheetNames){
+
+let worksheet=workbook.Sheets[name];
+
+let rows=XLSX.utils.sheet_to_json(worksheet,{
+defval:"",
+raw:false
+});
+
+sheets.push({
+name:name,
+rows:rows
+});
+
+}
+
+if(!sheets.length){
+alert("No sheets found in this workbook.");
+return;
+}
+
+let record={
+category:currentCategory,
+fileName:file.name,
+uploadedAt:new Date().toISOString(),
+sheets:sheets
+};
+
+await dbSave(record);
+
+currentWorkbook=record;
+
+document.getElementById("updateFile").value="";
+
+await loadCategory();
+
+alert(categoryNames[currentCategory]+" file uploaded successfully!");
+
+}catch(e){
+
+document.getElementById("uploadInfo").textContent=
+"Upload failed: "+e.message;
+
+alert("Upload failed: "+e.message);
+
+}
+
+}
+
+
+// ===================================
+// FIND PI AND COLOR COLUMNS
+// ===================================
+
+function cleanHeader(value){
+
+return String(value??"")
+.toLowerCase()
+.replace(/[^a-z0-9]/g,"");
+
+}
+
+function findColumn(row,type){
+
+let keys=Object.keys(row);
+
+let piNames=[
+"pi","pinumber","pino","proformainvoice",
+"proformainvoiceno","proformainvoicenumber"
+];
+
+let colorNames=["color","colour","colorname","colourname"];
+
+let names=type==="pi"?piNames:colorNames;
+
+for(let k of keys){
+
+if(names.includes(cleanHeader(k))){
+return k;
+}
+
+}
+
+return null;
+
+}
+
+function normalizePI(value){
+
+return String(value??"")
+.trim()
+.toLowerCase()
+.replace(/\s+/g," ");
+
+}
+
+
+// ===================================
+// SHEET SELECTION
+// ===================================
+
+function onSheetChange(){
+
+resetSheetResults();
+
+if(!currentWorkbook)return;
+
+let index=document.getElementById("sheetSelect").value;
+
+if(index===""){
+return;
+}
+
+let sheet=currentWorkbook.sheets[Number(index)];
+
+if(!sheet)return;
+
+currentSheetRows=sheet.rows||[];
+
+document.getElementById("sheetInfo").textContent=
+"Selected Sheet: "+sheet.name+
+" | Total Rows: "+currentSheetRows.length;
+
+let piColumn=currentSheetRows.length?
+findColumn(currentSheetRows[0],"pi"):null;
+
+if(!piColumn){
+
+document.getElementById("sheetInfo").innerHTML=
+'<span class="error">PI column not found. Check the Excel header. Supported examples: PI, PI Number, PI No.</span>';
+
+return;
+
+}
+
+let pis=[...new Set(
+currentSheetRows
+.map(row=>String(row[piColumn]??"").trim())
+.filter(Boolean)
+)];
+
+pis.sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+
+let list=document.getElementById("piSuggestions");
+list.innerHTML="";
+
+pis.forEach(pi=>{
+
+let option=document.createElement("option");
+option.value=pi;
+list.appendChild(option);
+
+});
+
+document.getElementById("sheetInfo").textContent=
+"Selected Sheet: "+sheet.name+
+" | Total Rows: "+currentSheetRows.length+
+" | Unique PI: "+pis.length;
+
+}
+
+function resetSheetResults(){
+
+currentSheetRows=[];
+selectedColor="";
+
+document.getElementById("piSuggestions").innerHTML="";
+document.getElementById("updatePI").value="";
+document.getElementById("piInfo").textContent="";
+document.getElementById("colorCard").hidden=true;
+document.getElementById("detailCard").hidden=true;
+document.getElementById("colorList").innerHTML="";
+document.getElementById("detailResult").innerHTML="";
+
+}
+
+
+// ===================================
+// SEARCH PI
+// ===================================
+
+function searchPI(){
+
+if(!currentSheetRows.length){
+alert("Please select a sheet first.");
+return;
+}
+
+let piInput=document.getElementById("updatePI").value.trim();
+
+if(!piInput){
+alert("Please enter a PI number.");
+return;
+}
+
+let piColumn=findColumn(currentSheetRows[0],"pi");
+
+if(!piColumn){
+alert("PI column not found in this sheet.");
+return;
+}
+
+let matches=currentSheetRows.filter(row=>
+normalizePI(row[piColumn])===normalizePI(piInput)
+);
+
+if(!matches.length){
+
+document.getElementById("piInfo").innerHTML=
+'<span class="error">No data found for PI: '+escapeHTML(piInput)+'</span>';
+
+document.getElementById("colorCard").hidden=true;
+document.getElementById("detailCard").hidden=true;
+
+return;
+
+}
+
+let colorColumn=findColumn(currentSheetRows[0],"color");
+
+if(!colorColumn){
+
+document.getElementById("piInfo").innerHTML=
+'<span class="error">PI found, but Color column was not found.</span>';
+
+return;
+
+}
+
+let colors=[...new Set(
+matches
+.map(row=>String(row[colorColumn]??"").trim())
+.filter(Boolean)
+)];
+
+document.getElementById("piInfo").innerHTML=
+'<span class="success">PI found: '+matches.length+
+' matching rows | '+colors.length+' colors</span>';
+
+let container=document.getElementById("colorList");
+container.innerHTML="";
+
+colors.forEach(color=>{
+
+let btn=document.createElement("button");
+btn.className="color-btn";
+btn.textContent=color;
+
+btn.onclick=function(){
+selectColor(color,piInput);
+};
+
+container.appendChild(btn);
+
+});
+
+document.getElementById("colorCard").hidden=false;
+document.getElementById("detailCard").hidden=true;
+
+}
+
+
+// ===================================
+// SELECT COLOR
+// ===================================
+
+function selectColor(color,pi){
+
+selectedColor=color;
+
+document.querySelectorAll(".color-btn").forEach(btn=>{
+btn.classList.toggle("selected",btn.textContent===color);
+});
+
+let firstRow=currentSheetRows[0];
+
+let piColumn=findColumn(firstRow,"pi");
+let colorColumn=findColumn(firstRow,"color");
+
+let matches=currentSheetRows.filter(row=>
+normalizePI(row[piColumn])===normalizePI(pi)&&
+String(row[colorColumn]??"").trim()===color
+);
+
+showDetails(matches,pi,color);
+
+}
+
+
+// ===================================
+// SHOW FULL DETAILS
+// ===================================
+
+function showDetails(rows,pi,color){
+
+let container=document.getElementById("detailResult");
+
+document.getElementById("detailHeading").textContent=
+"PI: "+pi+" | Color: "+color+" | Rows: "+rows.length;
+
+if(!rows.length){
+container.textContent="No details found.";
+return;
+}
+
+let html="";
+
+rows.forEach((row,index)=>{
+
+html+=`
+<div class="card">
+<h4>Record ${index+1}</h4>
+<div class="scroll">
+<table class="detail-table">
+<tbody>
+`;
+
+Object.keys(row).forEach(header=>{
+
+html+=`
+<tr>
+<th>${escapeHTML(header)}</th>
+<td>${escapeHTML(row[header])}</td>
+</tr>
+`;
+
+});
+
+html+=`
+</tbody>
+</table>
+</div>
+</div>
+`;
+
+});
+
+container.innerHTML=html;
+document.getElementById("detailCard").hidden=false;
 
 }
 
@@ -618,34 +1189,23 @@ ${o.matched?'MATCHED':'UNMATCHED'}
 
 function render(){
 
-// Order list
-
 document.getElementById("orderRows").innerHTML=
 orders.length?orders.map((o,i)=>`
 
 <tr>
-
 <td>${escapeHTML(o.pi)}</td>
-
 <td>${escapeHTML(o.color)}</td>
-
 <td>${escapeHTML(o.construction)}</td>
-
 <td>${Number(o.qty)||0}</td>
-
 <td>
 <button onclick="editOrder(${i})">Edit</button>
 <button class="danger" onclick="deleteOrder(${i})">Delete</button>
 </td>
-
 </tr>
 
 `).join(""):
 
 '<tr><td colspan="5">No orders added yet</td></tr>';
-
-
-// Matching data
 
 let a=matchStatus(mainData,newData);
 let b=matchStatus(newData,mainData);
@@ -653,23 +1213,14 @@ let b=matchStatus(newData,mainData);
 let m=a.filter(x=>x.matched).length;
 let u=a.length-m;
 
-
-// Matching tables
-
 document.getElementById("mainRows").innerHTML=tableRows(a);
 document.getElementById("newRows").innerHTML=tableRows(b);
-
-
-// Matching statistics
 
 document.getElementById("mResult").textContent=m;
 document.getElementById("uResult").textContent=u;
 
 document.getElementById("matchedCount").textContent=m;
 document.getElementById("unmatchedCount").textContent=u;
-
-
-// Dashboard statistics
 
 document.getElementById("total").textContent=orders.length;
 
@@ -685,7 +1236,28 @@ totalQty.toLocaleString();
 // START ERP
 // ===================================
 
+async function startERP(){
+
 render();
+
+try{
+
+await openUpdateDB();
+
+selectCategory("delivery");
+
+}catch(e){
+
+document.getElementById("uploadInfo").textContent=
+"Database initialization failed: "+e.message;
+
+console.error(e);
+
+}
+
+}
+
+startERP();
 
 </script>
 
