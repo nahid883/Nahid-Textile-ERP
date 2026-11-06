@@ -33,7 +33,7 @@ th{background:#e8f2f8}
 .matched{background:#d9f7df}
 .unmatched{background:#ffe0e0}
 small{color:#526477}
-.hidden{display:none}
+[hidden]{display:none!important}
 .status{padding:5px 8px;border-radius:5px;font-size:12px;font-weight:bold}
 .status-match{background:#b7efc2;color:#14532d}
 .status-unmatch{background:#fecaca;color:#991b1b}
@@ -47,6 +47,8 @@ small{color:#526477}
 .error{color:#c62828}
 .detail-table{min-width:500px}
 .detail-table th{width:30%}
+.result-card{border-left:4px solid #126b91}
+.search-summary{background:#e8f2f8;padding:12px;border-radius:8px;margin:10px 0}
 </style>
 </head>
 
@@ -54,12 +56,13 @@ small{color:#526477}
 
 <header>
 <h2>NAHID TEXTILE ERP</h2>
-<p>Order Management • Excel Import • Matching System • Order Update</p>
+<p>Order Management • Excel Import • Matching System • Order Update • Global Search</p>
 <nav>
 <button onclick="show('dashboard')">Dashboard</button>
 <button onclick="show('orders')">Order Entry</button>
 <button onclick="show('matching')">Excel Matching</button>
 <button onclick="show('orderUpdate')">Order Update</button>
+<button onclick="show('globalSearch')">Global Search</button>
 </nav>
 </header>
 
@@ -80,7 +83,7 @@ small{color:#526477}
 <div class="card">
 <h3>Welcome to Nahid Textile ERP</h3>
 <p>Manage your textile orders and compare Excel files from one place.</p>
-<p><small>Current version: Order Management 3.0</small></p>
+<p><small>Current version: Global Search 4.0</small></p>
 </div>
 </section>
 
@@ -176,11 +179,13 @@ small{color:#526477}
 
 <div class="card">
 <h3>Order Update</h3>
-<p>Select the update category.</p>
-<div class="subnav">
-<button id="cat-delivery" onclick="selectCategory('delivery')">Delivery Status</button>
-<button id="cat-order" onclick="selectCategory('order')">Order Status</button>
-<button id="cat-wip" onclick="selectCategory('wip')">WIP</button>
+<p>Select an update category.</p>
+
+<div class="subnav" id="categoryButtons"></div>
+
+<div class="formgrid">
+<input id="newCategoryName" placeholder="Enter New Category Name">
+<button onclick="addNewCategory()">+ Add Category</button>
 </div>
 </div>
 
@@ -193,6 +198,7 @@ small{color:#526477}
 <button onclick="uploadUpdateFile()">Upload / Replace File</button>
 
 <p id="uploadInfo"></p>
+
 <div class="warning">
 প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে।
 নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।
@@ -224,6 +230,42 @@ small{color:#526477}
 <h3>Step 4: Full Update Details</h3>
 <p id="detailHeading"></p>
 <div id="detailResult"></div>
+</div>
+
+</section>
+
+
+<!-- GLOBAL SEARCH -->
+<section id="globalSearch" hidden>
+
+<div class="card">
+<h3>Global Search</h3>
+<p>Search across Main Excel Data and all uploaded categories and sheets.</p>
+
+<div class="formgrid">
+<select id="globalSearchField">
+<option value="all">Search All: PI / Color / Construction</option>
+<option value="pi">PI</option>
+<option value="color">Color</option>
+<option value="construction">Construction</option>
+</select>
+
+<input id="globalSearchInput" placeholder="Enter PI, Color or Construction"
+onkeydown="if(event.key==='Enter')runGlobalSearch()">
+</div>
+
+<button onclick="runGlobalSearch()">Search All Data</button>
+<button class="secondary" onclick="clearGlobalSearch()">Clear</button>
+
+<p id="globalSearchInfo"></p>
+</div>
+
+<div id="globalSearchResults"></div>
+
+<div class="card" id="globalDetailCard" hidden>
+<h3>Search Details</h3>
+<p id="globalDetailHeading"></p>
+<div id="globalDetailResult"></div>
 </div>
 
 </section>
@@ -264,6 +306,49 @@ let currentCategory="delivery";
 let currentWorkbook=null;
 let currentSheetRows=[];
 let selectedColor="";
+
+const categoryNames={
+delivery:"Delivery Status",
+order:"Order Status",
+wip:"WIP"
+};
+
+function loadSavedCategories(){
+
+try{
+let saved=JSON.parse(localStorage.getItem("nte_categories")||"{}");
+
+if(saved && typeof saved==="object"){
+Object.keys(saved).forEach(key=>{
+if(key && saved[key]){
+categoryNames[key]=saved[key];
+}
+});
+}
+
+}catch(e){
+console.error("Category loading error",e);
+}
+
+}
+
+function saveCategories(){
+localStorage.setItem("nte_categories",JSON.stringify(categoryNames));
+}
+
+function categoryLabel(category){
+return categoryNames[category]||category;
+}
+
+function categoryKey(name){
+
+return String(name||"")
+.trim()
+.toLowerCase()
+.replace(/[^a-z0-9]+/g,"_")
+.replace(/^_+|_+$/g,"");
+
+}
 
 function openUpdateDB(){
 
@@ -325,15 +410,31 @@ request.onerror=()=>reject(request.error);
 
 }
 
+function dbGetAll(){
+
+return new Promise((resolve,reject)=>{
+
+const tx=updateDB.transaction(STORE_NAME,"readonly");
+const request=tx.objectStore(STORE_NAME).getAll();
+
+request.onsuccess=()=>resolve(request.result||[]);
+request.onerror=()=>reject(request.error);
+
+});
+
+}
+
 
 // ===================================
 // SAVE DATA
 // ===================================
 
 function save(){
+
 localStorage.setItem("nte_orders",JSON.stringify(orders));
 localStorage.setItem("nte_main",JSON.stringify(mainData));
 localStorage.setItem("nte_new",JSON.stringify(newData));
+
 }
 
 
@@ -343,7 +444,7 @@ localStorage.setItem("nte_new",JSON.stringify(newData));
 
 function show(id){
 
-["dashboard","orders","matching","orderUpdate"].forEach(x=>{
+["dashboard","orders","matching","orderUpdate","globalSearch"].forEach(x=>{
 document.getElementById(x).hidden=x!==id;
 });
 
@@ -600,7 +701,7 @@ return;
 }
 
 orders=parsed.map(x=>({...x}));
-mainData=orders.map(x=>({...x}));
+mainData=parsed.map(x=>({...x}));
 
 document.getElementById("mainImportInfo").textContent=
 parsed.length+" rows imported from "+file.name;
@@ -698,25 +799,88 @@ ${o.matched?'MATCHED':'UNMATCHED'}
 
 
 // ===================================
+// DYNAMIC CATEGORY MANAGEMENT
+// ===================================
+
+function renderCategoryButtons(){
+
+let container=document.getElementById("categoryButtons");
+
+if(!container)return;
+
+container.innerHTML="";
+
+Object.keys(categoryNames).forEach(category=>{
+
+let btn=document.createElement("button");
+
+btn.id="cat-"+category;
+btn.textContent=categoryLabel(category);
+btn.className=category===currentCategory?"active":"";
+
+btn.onclick=()=>selectCategory(category);
+
+container.appendChild(btn);
+
+});
+
+}
+
+function addNewCategory(){
+
+let name=document.getElementById("newCategoryName").value.trim();
+
+if(!name){
+alert("Please enter a category name.");
+return;
+}
+
+let keyName=categoryKey(name);
+
+if(!keyName){
+alert("Please enter a valid category name.");
+return;
+}
+
+let existing=Object.keys(categoryNames).some(k=>
+k.toLowerCase()===keyName.toLowerCase()
+);
+
+if(existing){
+alert("This category already exists.");
+return;
+}
+
+categoryNames[keyName]=name;
+
+saveCategories();
+renderCategoryButtons();
+
+document.getElementById("newCategoryName").value="";
+
+selectCategory(keyName);
+
+alert("New category created successfully.");
+
+}
+
+
+// ===================================
 // ORDER UPDATE CATEGORY
 // ===================================
 
-const categoryNames={
-delivery:"Delivery Status",
-order:"Order Status",
-wip:"WIP"
-};
-
 function selectCategory(category){
+
+if(!categoryNames[category]){
+alert("Category not found.");
+return;
+}
 
 currentCategory=category;
 
-document.getElementById("categoryTitle").textContent=categoryNames[category];
+document.getElementById("categoryTitle").textContent=categoryLabel(category);
 
-["delivery","order","wip"].forEach(c=>{
-document.getElementById("cat-"+c).classList.toggle("active",c===category);
-});
-
+renderCategoryButtons();
 resetUpdateResults();
 loadCategory();
 
@@ -756,12 +920,9 @@ let record=await dbGet(currentCategory);
 currentWorkbook=record;
 
 document.getElementById("categoryTitle").textContent=
-categoryNames[currentCategory];
+categoryLabel(currentCategory);
 
-document.getElementById("cat-delivery").classList.toggle("active",currentCategory==="delivery");
-document.getElementById("cat-order").classList.toggle("active",currentCategory==="order");
-document.getElementById("cat-wip").classList.toggle("active",currentCategory==="wip");
-
+renderCategoryButtons();
 resetUpdateResults();
 
 if(!record){
@@ -775,13 +936,13 @@ return;
 
 document.getElementById("uploadInfo").innerHTML=
 '<span class="success">Saved file: '+escapeHTML(record.fileName)+
-' ('+record.sheets.length+' sheets)</span>';
+' ('+(record.sheets||[]).length+' sheets)</span>';
 
 let select=document.getElementById("sheetSelect");
 
 select.innerHTML='<option value="">Select Sheet</option>';
 
-record.sheets.forEach((sheet,i)=>{
+(record.sheets||[]).forEach((sheet,i)=>{
 
 let option=document.createElement("option");
 option.value=String(i);
@@ -823,7 +984,7 @@ alert("Database is not ready. Please refresh the page.");
 return;
 }
 
-if(!confirm("Upload this file as the new "+categoryNames[currentCategory]+" file? The previous file in this category will be replaced.")){
+if(!confirm("Upload this file as the new "+categoryLabel(currentCategory)+" file? The previous file in this category will be replaced.")){
 return;
 }
 
@@ -863,6 +1024,7 @@ return;
 
 let record={
 category:currentCategory,
+categoryName:categoryLabel(currentCategory),
 fileName:file.name,
 uploadedAt:new Date().toISOString(),
 sheets:sheets
@@ -876,7 +1038,7 @@ document.getElementById("updateFile").value="";
 
 await loadCategory();
 
-alert(categoryNames[currentCategory]+" file uploaded successfully!");
+alert(categoryLabel(currentCategory)+" file uploaded successfully!");
 
 }catch(e){
 
@@ -904,7 +1066,7 @@ return String(value??"")
 
 function findColumn(row,type){
 
-let keys=Object.keys(row);
+let keys=Object.keys(row||{});
 
 let piNames=[
 "pi","pinumber","pino","proformainvoice",
@@ -1184,6 +1346,283 @@ document.getElementById("detailCard").hidden=false;
 
 
 // ===================================
+// GLOBAL SEARCH
+// ===================================
+
+let globalSearchGroups=[];
+
+function globalFieldValue(row,field){
+
+let aliases={
+
+pi:[
+"pi","pinumber","pino","proformainvoice",
+"proformainvoiceno","proformainvoicenumber"
+],
+
+color:[
+"color","colour","colorname","colourname"
+],
+
+construction:[
+"construction","fabricconstruction",
+"fabricconst","fabricconstructionname"
+]
+
+};
+
+if(!row)return "";
+
+let keys=Object.keys(row);
+
+for(let k of keys){
+
+let normalized=cleanHeader(k);
+
+if(aliases[field].includes(normalized)){
+return String(row[k]??"").trim();
+}
+
+}
+
+return "";
+
+}
+
+function globalRowMatches(row,query,field){
+
+let fields=field==="all"
+?["pi","color","construction"]
+:[field];
+
+return fields.some(f=>{
+
+let value=globalFieldValue(row,f);
+
+return value.toLowerCase().includes(query.toLowerCase());
+
+});
+
+}
+
+async function runGlobalSearch(){
+
+let query=document.getElementById("globalSearchInput").value.trim();
+
+let field=document.getElementById("globalSearchField").value;
+
+if(!query){
+alert("Please enter PI, Color or Construction.");
+return;
+}
+
+if(!updateDB){
+alert("Database is not ready. Please refresh the page.");
+return;
+}
+
+let results=document.getElementById("globalSearchResults");
+
+results.innerHTML=
+'<div class="card">Searching all data...</div>';
+
+document.getElementById("globalDetailCard").hidden=true;
+
+document.getElementById("globalSearchInfo").textContent="";
+
+globalSearchGroups=[];
+
+try{
+
+let allGroups=[];
+
+// SEARCH MAIN EXCEL DATA
+let mainMatches=mainData.filter(row=>
+globalRowMatches(row,query,field)
+);
+
+if(mainMatches.length){
+
+allGroups.push({
+
+category:"Main Excel Matching Data",
+sheet:"Main Data",
+rows:mainMatches
+
+});
+
+}
+
+// SEARCH ALL INDEXEDDB CATEGORIES AND SHEETS
+let records=await dbGetAll();
+
+records.forEach(record=>{
+
+let sheets=record.sheets||[];
+
+sheets.forEach(sheet=>{
+
+let rows=sheet.rows||[];
+
+let matches=rows.filter(row=>
+globalRowMatches(row,query,field)
+);
+
+if(matches.length){
+
+allGroups.push({
+
+category:record.categoryName||categoryLabel(record.category),
+categoryKey:record.category,
+sheet:sheet.name,
+rows:matches
+
+});
+
+}
+
+});
+
+});
+
+globalSearchGroups=allGroups;
+
+let total=allGroups.reduce((sum,group)=>
+sum+group.rows.length,0);
+
+document.getElementById("globalSearchInfo").innerHTML=
+'<div class="search-summary"><b>'+
+total+'</b> matching rows found in <b>'+
+allGroups.length+'</b> result groups.</div>';
+
+if(!allGroups.length){
+
+results.innerHTML=
+'<div class="card">No matching data found.</div>';
+
+return;
+
+}
+
+let html="";
+
+allGroups.forEach((group,index)=>{
+
+html+=`
+
+<div class="card result-card">
+
+<h3>${escapeHTML(group.category)}</h3>
+
+<p>
+<b>Sheet:</b> ${escapeHTML(group.sheet)}
+<br>
+<b>Matching Rows:</b> ${group.rows.length}
+</p>
+
+<button onclick="openGlobalGroup(${index})">
+View Full Details
+</button>
+
+</div>
+
+`;
+
+});
+
+results.innerHTML=html;
+
+}catch(e){
+
+results.innerHTML=
+'<div class="card error">Search failed: '+
+escapeHTML(e.message)+'</div>';
+
+console.error(e);
+
+}
+
+}
+
+function openGlobalGroup(index){
+
+let group=globalSearchGroups[index];
+
+if(!group)return;
+
+let html="";
+
+group.rows.forEach((row,rowIndex)=>{
+
+html+=`
+
+<div class="card">
+
+<h4>Record ${rowIndex+1}</h4>
+
+<div class="scroll">
+
+<table class="detail-table">
+<tbody>
+
+`;
+
+Object.keys(row).forEach(header=>{
+
+html+=`
+
+<tr>
+<th>${escapeHTML(header)}</th>
+<td>${escapeHTML(row[header])}</td>
+</tr>
+
+`;
+
+});
+
+html+=`
+
+</tbody>
+</table>
+
+</div>
+</div>
+
+`;
+
+});
+
+document.getElementById("globalDetailHeading").textContent=
+"Category: "+group.category+
+" | Sheet: "+group.sheet+
+" | Matching Rows: "+group.rows.length;
+
+document.getElementById("globalDetailResult").innerHTML=html;
+
+document.getElementById("globalDetailCard").hidden=false;
+
+document.getElementById("globalDetailCard").scrollIntoView({
+behavior:"smooth"
+});
+
+}
+
+function clearGlobalSearch(){
+
+document.getElementById("globalSearchInput").value="";
+document.getElementById("globalSearchInfo").textContent="";
+document.getElementById("globalSearchResults").innerHTML="";
+document.getElementById("globalDetailResult").innerHTML="";
+document.getElementById("globalDetailHeading").textContent="";
+
+document.getElementById("globalDetailCard").hidden=true;
+
+globalSearchGroups=[];
+
+}
+
+
+// ===================================
 // MAIN RENDER FUNCTION
 // ===================================
 
@@ -1240,9 +1679,26 @@ async function startERP(){
 
 render();
 
+loadSavedCategories();
+
 try{
 
 await openUpdateDB();
+
+// Discover any previously saved categories
+let records=await dbGetAll();
+
+records.forEach(record=>{
+
+if(record.category && !categoryNames[record.category]){
+categoryNames[record.category]=
+record.categoryName||record.category;
+}
+
+});
+
+saveCategories();
+renderCategoryButtons();
 
 selectCategory("delivery");
 
