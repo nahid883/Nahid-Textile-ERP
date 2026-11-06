@@ -1,64 +1,130 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nahid Textile ERP</title>
+<title>Nahid Textile ERP - High Performance</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
+:root{
+ --primary:#0f3f6e;
+ --primary-light:#1769aa;
+ --primary-dark:#0a2948;
+ --accent:#0ea5e9;
+ --success:#10b981;
+ --success-bg:#ecfdf5;
+ --danger:#ef4444;
+ --danger-bg:#fef2f2;
+ --warning:#f59e0b;
+ --warning-bg:#fffbeb;
+ --bg:#f1f5f9;
+ --card-bg:#ffffff;
+ --text:#1e293b;
+ --text-muted:#64748b;
+ --border:#cbd5e1;
+ --border-light:#e2e8f0;
+ --radius:8px;
+ --shadow:0 2px 8px rgba(0,0,0,0.06);
+}
 *{box-sizing:border-box}
-body{margin:0;padding:12px;background:#f1f5f9;color:#172033;font-family:Arial,sans-serif}
-.container{max-width:1100px;margin:auto}
-header{background:#123b63;color:white;padding:20px;border-radius:12px;margin-bottom:12px}
-header h1{margin:0 0 8px;font-size:24px}
-header p{margin:0;color:#d8e8f8;font-size:13px}
-nav{display:flex;flex-direction:column;gap:7px;margin-bottom:15px}
-nav button{width:100%;text-align:left;background:#fff;color:#123b63;border:1px solid #d5deea}
-button{padding:11px 14px;border:0;border-radius:7px;background:#1769aa;color:white;font-weight:bold;cursor:pointer}
-button:hover{opacity:.88}
+body{margin:0;padding:12px;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.container{max-width:1200px;margin:auto}
+
+header{background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 100%);color:white;padding:20px 24px;border-radius:12px;margin-bottom:14px;box-shadow:var(--shadow)}
+header h1{margin:0 0 6px;font-size:24px;letter-spacing:0.5px;display:flex;align-items:center;gap:10px}
+header p{margin:0;color:#cce3f9;font-size:13px}
+.header-badge{background:rgba(255,255,255,0.18);padding:3px 8px;border-radius:12px;font-size:11px;font-weight:bold}
+
+nav{display:flex;flex-direction:column;gap:6px;margin-bottom:15px}
+nav button{width:100%;text-align:left;background:#fff;color:var(--primary);border:1px solid var(--border);border-radius:var(--radius);padding:11px 14px;font-weight:600;cursor:pointer;transition:all 0.15s ease}
+nav button:hover{background:#f8fafc;border-color:var(--primary-light)}
+nav button.active{background:var(--primary-light);color:white;border-color:var(--primary-light)}
+
+button{padding:10px 14px;border:0;border-radius:var(--radius);background:var(--primary-light);color:white;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.15s ease;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:hover{opacity:0.92;transform:translateY(-1px)}
+button:active{transform:translateY(0)}
 button.secondary{background:#64748b}
-button.danger{background:#dc3545}
-button.success{background:#16834a}
-button.small{padding:7px 10px;font-size:12px}
-nav button.active{background:#1769aa;color:white}
-.page{display:none;background:white;padding:16px;border-radius:12px;margin-bottom:14px;box-shadow:0 2px 8px #0000000c}
+button.danger{background:var(--danger)}
+button.success{background:var(--success)}
+button.outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+button.outline:hover{background:#f8fafc}
+button.small{padding:6px 10px;font-size:12px}
+
+.page{display:none;background:var(--card-bg);padding:18px;border-radius:12px;margin-bottom:14px;box-shadow:var(--shadow)}
 .page.active{display:block}
-h2{font-size:20px;margin:0 0 14px;color:#123b63}
-h3{font-size:16px;margin:18px 0 10px}
+
+h2{font-size:19px;margin:0 0 14px;color:var(--primary);display:flex;align-items:center;justify-content:space-between}
+h3{font-size:15px;margin:16px 0 10px;color:var(--primary)}
+
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
-.stat{background:#edf5fc;padding:15px;border-radius:9px;text-align:center}
-.stat strong{display:block;font-size:23px;color:#1769aa;margin-top:7px}
-input,select{width:100%;padding:11px;border:1px solid #cbd5e1;border-radius:7px;margin:6px 0 12px;font-size:14px;background:white}
-label{font-size:13px;font-weight:bold}
+.stat{background:#f8fafc;border:1px solid var(--border-light);padding:14px;border-radius:9px;text-align:center}
+.stat span{font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase}
+.stat strong{display:block;font-size:22px;color:var(--primary-light);margin-top:6px}
+
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);margin:6px 0 12px;font-size:13px;background:white;color:var(--text);outline:none;transition:border-color 0.15s ease}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(14,165,233,0.15)}
+label{font-size:12px;font-weight:600;color:var(--text-muted)}
+
 .form-grid{display:grid;grid-template-columns:1fr;gap:4px}
-.actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
-.table-wrap{width:100%;overflow-x:auto;margin:10px 0}
-table{border-collapse:collapse;width:100%;min-width:580px;font-size:13px}
-th,td{border:1px solid #dce3eb;padding:9px;text-align:left;white-space:nowrap}
-th{background:#eaf1f8;color:#123b63}
-tr:nth-child(even){background:#fafcff}
-.muted{color:#64748b;font-size:13px;line-height:1.6}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
+.table-wrap{width:100%;overflow-x:auto;margin:10px 0;border:1px solid var(--border-light);border-radius:var(--radius)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
+th,td{border-bottom:1px solid var(--border-light);padding:9px 12px;text-align:left;white-space:nowrap}
+th{background:#f1f5f9;color:var(--primary);font-weight:600;font-size:12px;position:sticky;top:0}
+tr:hover{background:#f8fafc}
+tr:last-child td{border-bottom:0}
+
+.muted{color:var(--text-muted);font-size:12px;line-height:1.6}
 .status{font-weight:bold}
-.matched{color:#16834a}
-.unmatched{color:#dc3545}
-.result-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:10px 0}
+.matched{color:var(--success)}
+.unmatched{color:var(--danger)}
+.result-box{background:#f8fafc;border:1px solid var(--border-light);border-radius:8px;padding:14px;margin:10px 0}
 .hidden{display:none!important}
-.badge{display:inline-block;padding:4px 8px;border-radius:20px;font-size:11px;background:#e2e8f0}
-.badge.green{background:#dcfce7;color:#166534}
-.badge.red{background:#fee2e2;color:#991b1b}
-.category-card{border:1px solid #dce3eb;padding:12px;border-radius:8px;margin:10px 0}
-.detail-section{border:1px solid #dce3eb;border-radius:9px;padding:12px;margin:14px 0;background:#fff}
-.detail-section h3{margin:0 0 8px;color:#123b63}
-.detail-empty{padding:12px;background:#f8fafc;color:#64748b;border-radius:7px;font-size:13px}
-hr{border:0;border-top:1px solid #e2e8f0;margin:18px 0}
-footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
+
+.badge{display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;background:#e2e8f0}
+.badge.green{background:var(--success-bg);color:#065f46;border:1px solid #a7f3d0}
+.badge.red{background:var(--danger-bg);color:#991b1b;border:1px solid #fecaca}
+.badge.yellow{background:var(--warning-bg);color:#92400e;border:1px solid #fde68a}
+.badge.blue{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
+
+.category-card{border:1px solid var(--border-light);background:#f8fafc;padding:10px 14px;border-radius:8px;margin:8px 0;display:flex;align-items:center;justify-content:space-between}
+.category-card.selected{border-color:var(--accent);background:#f0f9ff}
+
+.detail-section{border:1px solid var(--border-light);border-radius:9px;padding:14px;margin:14px 0;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+.detail-section h3{margin:0 0 8px;color:var(--primary);display:flex;align-items:center;justify-content:space-between}
+.detail-empty{padding:12px;background:#f8fafc;color:var(--text-muted);border-radius:7px;font-size:12px}
+
+.summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:12px 0}
+.summary-card{background:#ffffff;border:1px solid var(--border);border-radius:8px;padding:12px}
+.summary-card .val{font-size:18px;font-weight:bold;color:var(--primary);margin-top:4px}
+
+.pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12px;color:var(--text-muted)}
+.pagination-controls{display:flex;gap:4px}
+
+/* Toast Notification */
+#toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:350px}
+.toast{background:#1e293b;color:white;padding:12px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transform:translateY(10px);transition:all 0.25s ease;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.success{background:#065f46;border-left:4px solid var(--success)}
+.toast.error{background:#991b1b;border-left:4px solid var(--danger)}
+.toast.info{background:#1e3a8a;border-left:4px solid var(--accent)}
+
+/* Spinner overlay */
+#loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(255,255,255,0.7);backdrop-filter:blur(2px);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998;opacity:0;pointer-events:none;transition:opacity 0.2s ease}
+#loading-overlay.show{opacity:1;pointer-events:all}
+.spinner{width:36px;height:36px;border:3px solid #cbd5e1;border-top-color:var(--primary-light);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+hr{border:0;border-top:1px solid var(--border-light);margin:16px 0}
+footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
+
 @media(min-width:700px){
  body{padding:22px}
  nav{display:grid;grid-template-columns:repeat(5,1fr)}
- nav button{text-align:center;padding:12px 5px}
+ nav button{text-align:center;padding:12px 8px}
  .stats{grid-template-columns:repeat(4,1fr)}
+ .summary-grid{grid-template-columns:repeat(4,1fr)}
  .form-grid{grid-template-columns:repeat(2,1fr);gap:12px}
  .page{padding:22px}
 }
@@ -69,41 +135,47 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <div class="container">
 
 <header>
-<h1>NAHID TEXTILE ERP</h1>
-<p>Order Management • Excel Import • Matching System • Order Update • Global Search</p>
+<h1>NAHID TEXTILE ERP <span class="header-badge">High Performance</span></h1>
+<p>⚡ Fast Data Engine • Order Management • Excel Import & Auto-Detect • Sheet Matching • Global Search</p>
 </header>
 
 <nav>
-<button class="active" data-page="dashboard">Dashboard</button>
-<button data-page="entry">Order Entry</button>
-<button data-page="matching">Excel Matching</button>
-<button data-page="update">Order Update</button>
-<button data-page="search">Global Search</button>
+<button class="active" data-page="dashboard">📊 Dashboard</button>
+<button data-page="entry">📝 Order Entry</button>
+<button data-page="matching">🔄 Excel Matching</button>
+<button data-page="update">📂 Order Update</button>
+<button data-page="search">🔍 Global Search</button>
 </nav>
 
+<!-- DASHBOARD -->
 <section id="dashboard" class="page active">
-<h2>Dashboard</h2>
+<h2>Dashboard Overview</h2>
 <div class="stats">
-<div class="stat">Total Orders<strong id="totalOrders">0</strong></div>
-<div class="stat">Total Quantity<strong id="totalQty">0</strong></div>
-<div class="stat">Matched<strong id="matchedCount">0</strong></div>
-<div class="stat">Unmatched<strong id="unmatchedCount">0</strong></div>
+<div class="stat"><span>Total Orders</span><strong id="totalOrders">0</strong></div>
+<div class="stat"><span>Total Quantity</span><strong id="totalQty">0</strong></div>
+<div class="stat"><span>Matched Rows</span><strong id="matchedCount">0</strong></div>
+<div class="stat"><span>Unmatched Rows</span><strong id="unmatchedCount">0</strong></div>
 </div>
 <div class="result-box">
 <h3>Welcome to Nahid Textile ERP</h3>
-<p class="muted">Manage your textile orders and compare Excel files from one place.</p>
-<p class="muted">Current version: Global Search 7.2</p>
+<p class="muted">IndexedDB-backed high performance system for textile manufacturing, commercial operations, tracking, and fast search.</p>
+<div class="actions">
+<button class="small" onclick="switchPage('search')">⚡ Quick Global Search</button>
+<button class="small outline" onclick="switchPage('matching')">🔄 Compare Excel Files</button>
+<button class="small outline" onclick="switchPage('entry')">➕ Add Orders</button>
+</div>
 </div>
 </section>
 
+<!-- ORDER ENTRY -->
 <section id="entry" class="page">
 <h2>Manual Order Entry</h2>
 <div class="form-grid">
-<div><label>PI Number</label><input id="piInput" placeholder="Enter PI Number"></div>
-<div><label>Buyer Name</label><input id="buyerInput" placeholder="Enter Buyer Name"></div>
-<div><label>Color</label><input id="colorInput" placeholder="Enter Color"></div>
-<div><label>Construction</label><input id="constructionInput" placeholder="Enter Construction"></div>
-<div><label>Order Qty</label><input id="qtyInput" type="number" min="0" placeholder="Enter Order Quantity"></div>
+<div><label>PI Number *</label><input id="piInput" placeholder="e.g. PI-2024-884"></div>
+<div><label>Buyer Name</label><input id="buyerInput" placeholder="e.g. H&M, Zara, Walmart"></div>
+<div><label>Color / Shade *</label><input id="colorInput" placeholder="e.g. Navy Blue, Black"></div>
+<div><label>Construction / Quality</label><input id="constructionInput" placeholder="e.g. 100% Cotton 40x40/133x72"></div>
+<div><label>Order Qty</label><input id="qtyInput" type="number" min="0" placeholder="e.g. 15000"></div>
 </div>
 <div class="actions">
 <button id="saveOrderBtn">Add Order</button>
@@ -113,42 +185,66 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 <hr>
 <h3>Import Main Order Excel</h3>
 <input type="file" id="mainFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
+<div class="actions">
 <button id="importMainBtn">Import Main File</button>
-<p class="muted">Required columns: PI, Buyer Name, Color, Construction and Order Qty. Header row will be detected automatically within the first 50 rows.</p>
+</div>
+<p class="muted">Auto-detects common textile columns: PI, Buyer, Color, Construction, Order Qty. Cleanly handles headers up to row 50.</p>
 
 <hr>
 <div class="actions" style="justify-content:space-between">
 <h3>Order List</h3>
+<div style="display:flex;gap:6px">
+<button class="small outline" id="exportOrdersBtn">📥 Export Excel</button>
 <button class="danger small" id="clearOrdersBtn">Clear All Orders</button>
 </div>
+</div>
+
+<div class="actions">
+<input id="orderFilterInput" placeholder="Filter orders by PI, Buyer, Color..." style="max-width:320px;margin:0">
+</div>
+
 <div class="table-wrap">
 <table>
-<thead><tr><th>PI</th><th>Buyer Name</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Action</th></tr></thead>
+<thead><tr><th>PI</th><th>Buyer Name</th><th>Color</th><th>Construction</th><th>Order Qty</th><th>Source</th><th>Action</th></tr></thead>
 <tbody id="orderTable"></tbody>
 </table>
 </div>
+<div class="pagination" id="orderPagination"></div>
 </section>
 
+<!-- EXCEL MATCHING -->
 <section id="matching" class="page">
-<h2>Upload New / Updated Excel</h2>
+<h2>Upload New / Updated Excel for Comparison</h2>
 <input type="file" id="newFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
-<button id="importNewBtn">Import New File</button>
-<p class="muted">Matching key: PI + Color + Construction</p>
-<hr>
-<h3>Matching Result</h3>
-<p><span class="matched">🟢 Matched</span> &nbsp; <span class="unmatched">🔴 Unmatched</span></p>
-<div class="stats">
-<div class="stat">Matched Rows<strong id="matchRows">0</strong></div>
-<div class="stat">Unmatched Rows<strong id="unmatchRows">0</strong></div>
+<div class="actions">
+<button id="importNewBtn">Import & Compare File</button>
+<button class="small outline" id="exportMatchBtn">📥 Export Matching Report</button>
 </div>
-<h3>Main File – Matching Status</h3>
+<p class="muted">Matching key: PI + Color + Construction (case-insensitive & whitespace-tolerant).</p>
+<hr>
+
+<h3>Matching Result Summary</h3>
+<div class="stats">
+<div class="stat"><span>Matched Rows</span><strong id="matchRows" style="color:var(--success)">0</strong></div>
+<div class="stat"><span>Unmatched Rows</span><strong id="unmatchRows" style="color:var(--danger)">0</strong></div>
+</div>
+
+<div class="actions" style="gap:6px">
+<span style="font-size:12px;font-weight:600">Filter View:</span>
+<button class="small" id="filterMatchAll">All</button>
+<button class="small outline" id="filterMatchMatched">🟢 Matched Only</button>
+<button class="small outline" id="filterMatchUnmatched">🔴 Unmatched Only</button>
+</div>
+
+<h3>Main File Status</h3>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Status</th><th>PI</th><th>Buyer Name</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
 <tbody id="mainMatchTable"></tbody>
 </table>
 </div>
-<h3>New File – Matching Status</h3>
+
+<h3>New File Status</h3>
 <div class="table-wrap">
 <table>
 <thead><tr><th>Status</th><th>PI</th><th>Buyer Name</th><th>Color</th><th>Construction</th><th>Order Qty</th></tr></thead>
@@ -157,28 +253,38 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 </div>
 </section>
 
+<!-- ORDER UPDATE -->
 <section id="update" class="page">
-<h2>Order Update</h2>
-<p class="muted">Select an update category.</p>
-<div class="actions"><button id="addCategoryBtn">+ Add Category</button></div>
+<h2>Order Update & Category Management</h2>
+<p class="muted">Manage and upload sheet-wise updates for Delivery Status, Order Status, WIP, etc.</p>
+
+<div class="actions">
+<button id="addCategoryBtn">+ Add Category</button>
+</div>
 <div id="categoryList"></div>
+
 <hr>
 <h3 id="categoryTitle">Delivery Status</h3>
-<label>Upload Excel File</label>
+<label>Upload Excel File for this Category</label>
 <input type="file" id="categoryFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
-<div class="actions"><button id="uploadCategoryBtn">Upload / Replace File</button></div>
-<p class="muted">প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে। নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির পুরোনো ফাইলটি Replace হবে।</p>
+<div class="actions">
+<button id="uploadCategoryBtn">Upload / Replace File</button>
+</div>
+<p class="muted">প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে। নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির ফাইল Replace হবে।</p>
+
 <hr>
 <h3>Step 1: Select Sheet</h3>
 <select id="sheetSelect"><option value="">Upload an Excel file first</option></select>
-<p class="muted">Excel-এর Sheet নির্বাচন করো।</p>
+
 <hr>
 <h3>Step 2: Find PI</h3>
-<input id="updatePiSearch" placeholder="Search PI Number">
-<div id="piResults"></div>
+<input id="updatePiSearch" placeholder="Search PI Number in selected sheet...">
+<div id="piResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
+
 <hr>
 <h3>Step 3: Select Color</h3>
-<div id="colorResults"></div>
+<div id="colorResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
+
 <hr>
 <h3>Step 4: Full Update Details</h3>
 <div class="table-wrap">
@@ -189,86 +295,146 @@ footer{text-align:center;color:#64748b;font-size:12px;padding:15px}
 </div>
 </section>
 
+<!-- GLOBAL SEARCH -->
 <section id="search" class="page">
-<h2>Global Search</h2>
-<p class="muted">Enter PI Number or Color to search across Main Data and all uploaded categories and sheets.</p>
-<input id="globalInput" placeholder="Enter PI Number or Color">
-<div class="actions">
+<h2>⚡ Global Instant Search</h2>
+<p class="muted">Search across Main Orders, Manual Data, and ALL uploaded Category Excel Sheets by PI Number, Color, or Buyer.</p>
+
+<div style="display:flex;gap:8px;align-items:center">
+<input id="globalInput" placeholder="Type PI Number, Color, or Buyer..." style="margin:0">
 <button id="globalSearchBtn">Search</button>
 <button class="secondary" id="globalClearBtn">Clear</button>
 </div>
-<div id="globalResults"><p class="muted">Enter a PI Number or Color to begin searching.</p></div>
+
+<div id="globalSummary" style="margin-top:14px"></div>
+<div id="globalResults" style="margin-top:12px"><p class="muted">Type a query above to search instantly.</p></div>
+
 <hr>
-<h3>Step 2: Select Color / PI</h3>
-<div id="globalChoices"></div>
+<h3>Quick PI / Color Choices</h3>
+<div id="globalChoices" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
+
 <hr>
-<h3>Step 3: Sheet-wise Details</h3>
+<h3>Full Detailed Breakdown</h3>
 <div id="globalDetails"></div>
 </section>
 
-<footer>Nahid Textile ERP • Version 7.2</footer>
+<footer>Nahid Textile ERP • High Performance Edition • Fast In-Memory Search</footer>
+</div>
+
+<!-- TOAST & OVERLAY -->
+<div id="toast-container"></div>
+<div id="loading-overlay">
+<div class="spinner"></div>
+<div style="margin-top:12px;font-weight:600;color:var(--primary)" id="loading-text">Processing...</div>
 </div>
 
 <script>
 "use strict";
 
-/* ================= STORAGE ================= */
+/* ================= TOAST & LOADING SYSTEM ================= */
+
+function showToast(message,type="info",duration=3500){
+ const container=document.getElementById("toast-container");
+ const toast=document.createElement("div");
+ toast.className=`toast ${type}`;
+ toast.innerHTML=`<span>${escapeHTML(message)}</span><span style="cursor:pointer;opacity:0.7">&times;</span>`;
+ toast.querySelector("span:last-child").onclick=()=>removeToast(toast);
+ container.appendChild(toast);
+ requestAnimationFrame(()=>toast.classList.add("show"));
+ setTimeout(()=>removeToast(toast),duration);
+}
+
+function removeToast(toast){
+ toast.classList.remove("show");
+ setTimeout(()=>toast.remove(),300);
+}
+
+function showLoading(text="Processing..."){
+ const overlay=document.getElementById("loading-overlay");
+ document.getElementById("loading-text").textContent=text;
+ overlay.classList.add("show");
+}
+
+function hideLoading(){
+ document.getElementById("loading-overlay").classList.remove("show");
+}
+
+/* ================= STORAGE ENGINE (INDEXEDDB) ================= */
 
 const DB_NAME="NahidTextileERP_DB";
-const DB_VERSION=1;
+const DB_VERSION=2;
 let db=null;
 
-let orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
-let manualOrders=JSON.parse(localStorage.getItem("nte_manual")||"[]");
-let mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
-let newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
-let categories=JSON.parse(localStorage.getItem("nte_categories")||'["Delivery Status","Order Status","WIP"]');
+let orders=[];
+let manualOrders=[];
+let mainData=[];
+let newData=[];
+let categories=["Delivery Status","Order Status","WIP"];
 
 let editingId=null;
-let selectedCategory=categories[0]||"Delivery Status";
+let selectedCategory="Delivery Status";
 let selectedUpdatePI="";
 let selectedUpdateColor="";
 let selectedSheetRows=[];
 let selectedSheetHeaders=[];
-let globalRecords=[];
 let globalFiles=[];
 
-function saveState(){
- try{
-  localStorage.setItem("nte_orders",JSON.stringify(orders));
-  localStorage.setItem("nte_manual",JSON.stringify(manualOrders));
-  localStorage.setItem("nte_main",JSON.stringify(mainData));
-  localStorage.setItem("nte_new",JSON.stringify(newData));
-  localStorage.setItem("nte_categories",JSON.stringify(categories));
- }catch(e){
-  alert("Storage is full. বড় Excel ফাইলের সব ডেটা Local Storage-এ রাখা সম্ভব হচ্ছে না।");
- }
-}
+// In-Memory Fast Search Index
+const searchIndex={
+ piMap:new Map(),
+ colorMap:new Map()
+};
 
 function openDB(){
  return new Promise((resolve,reject)=>{
   const request=indexedDB.open(DB_NAME,DB_VERSION);
-  request.onupgradeneeded=()=>{
+  request.onupgradeneeded=(event)=>{
    const database=request.result;
    if(!database.objectStoreNames.contains("files")){
     database.createObjectStore("files",{keyPath:"category"});
    }
+   if(!database.objectStoreNames.contains("app_data")){
+    database.createObjectStore("app_data",{keyPath:"key"});
+   }
   };
-  request.onsuccess=()=>{db=request.result;resolve(db)};
+  request.onsuccess=()=>{
+   db=request.result;
+   resolve(db);
+  };
   request.onerror=()=>reject(request.error);
  });
 }
 
-function saveCategoryFile(category,data){
+function idbGet(storeName,key){
  return new Promise((resolve,reject)=>{
-  const tx=db.transaction("files","readwrite");
-  tx.objectStore("files").put({category,data,updatedAt:new Date().toISOString()});
-  tx.oncomplete=resolve;
+  if(!db) return resolve(null);
+  const tx=db.transaction(storeName,"readonly");
+  const request=tx.objectStore(storeName).get(key);
+  request.onsuccess=()=>resolve(request.result?request.result.val:null);
+  request.onerror=()=>reject(request.error);
+ });
+}
+
+function idbPut(storeName,key,val){
+ return new Promise((resolve,reject)=>{
+  if(!db) return resolve();
+  const tx=db.transaction(storeName,"readwrite");
+  tx.objectStore(storeName).put({key,val,updatedAt:Date.now()});
+  tx.oncomplete=()=>resolve();
   tx.onerror=()=>reject(tx.error);
  });
 }
 
-function getCategoryFile(category){
+async function saveCategoryFile(category,data){
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("files","readwrite");
+  tx.objectStore("files").put({category,data,updatedAt:new Date().toISOString()});
+  tx.oncomplete=()=>resolve();
+  tx.onerror=()=>reject(tx.error);
+ });
+}
+
+async function getCategoryFile(category){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").get(category);
@@ -277,7 +443,7 @@ function getCategoryFile(category){
  });
 }
 
-function getAllCategoryFiles(){
+async function getAllCategoryFiles(){
  return new Promise((resolve,reject)=>{
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").getAll();
@@ -286,15 +452,87 @@ function getAllCategoryFiles(){
  });
 }
 
+async function saveState(){
+ try{
+  await Promise.all([
+   idbPut("app_data","orders",orders),
+   idbPut("app_data","manualOrders",manualOrders),
+   idbPut("app_data","mainData",mainData),
+   idbPut("app_data","newData",newData),
+   idbPut("app_data","categories",categories)
+  ]);
+  // Also keep categories in localStorage for fast immediate boot
+  try{ localStorage.setItem("nte_categories",JSON.stringify(categories)); }catch(e){}
+  rebuildSearchIndex();
+ }catch(e){
+  console.error("Storage error:",e);
+  showToast("Failed to save data to IndexedDB","error");
+ }
+}
+
+async function loadInitialState(){
+ try{
+  const [storedOrders,storedManual,storedMain,storedNew,storedCategories]=await Promise.all([
+   idbGet("app_data","orders"),
+   idbGet("app_data","manualOrders"),
+   idbGet("app_data","mainData"),
+   idbGet("app_data","newData"),
+   idbGet("app_data","categories")
+  ]);
+
+  if(storedOrders!==null){
+   orders=storedOrders||[];
+   manualOrders=storedManual||[];
+   mainData=storedMain||[];
+   newData=storedNew||[];
+   categories=storedCategories||["Delivery Status","Order Status","WIP"];
+  }else{
+   // Migrate legacy data from localStorage if present
+   orders=JSON.parse(localStorage.getItem("nte_orders")||"[]");
+   manualOrders=JSON.parse(localStorage.getItem("nte_manual")||"[]");
+   mainData=JSON.parse(localStorage.getItem("nte_main")||"[]");
+   newData=JSON.parse(localStorage.getItem("nte_new")||"[]");
+   categories=JSON.parse(localStorage.getItem("nte_categories")||'["Delivery Status","Order Status","WIP"]');
+   await saveState();
+  }
+ }catch(e){
+  console.warn("Could not load state from IndexedDB, falling back to empty:",e);
+ }
+ rebuildSearchIndex();
+}
+
+function rebuildSearchIndex(){
+ searchIndex.piMap.clear();
+ searchIndex.colorMap.clear();
+
+ orders.forEach(o=>{
+  const p=normalize(o.pi);
+  const c=normalize(o.color);
+  if(p){
+   if(!searchIndex.piMap.has(p)) searchIndex.piMap.set(p,[]);
+   searchIndex.piMap.get(p).push(o);
+  }
+  if(c){
+   if(!searchIndex.colorMap.has(c)) searchIndex.colorMap.set(c,[]);
+   searchIndex.colorMap.get(c).push(o);
+  }
+ });
+}
+
 /* ================= NAVIGATION ================= */
 
-document.querySelectorAll("nav button").forEach(button=>{
- button.addEventListener("click",()=>{
-  document.querySelectorAll("nav button").forEach(b=>b.classList.remove("active"));
-  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
-  button.classList.add("active");
-  document.getElementById(button.dataset.page).classList.add("active");
+function switchPage(pageId){
+ document.querySelectorAll("nav button").forEach(b=>{
+  b.classList.toggle("active",b.dataset.page===pageId);
  });
+ document.querySelectorAll(".page").forEach(p=>{
+  p.classList.toggle("active",p.id===pageId);
+ });
+ window.scrollTo({top:0,behavior:"smooth"});
+}
+
+document.querySelectorAll("nav button").forEach(button=>{
+ button.addEventListener("click",()=>switchPage(button.dataset.page));
 });
 
 /* ================= HELPERS ================= */
@@ -304,7 +542,7 @@ function clean(value){
 }
 
 function normalize(value){
- return clean(value).toLowerCase().replace(/[\s\-_./\\]+/g,"").replace(/[^a-z0-9]/g,"");
+ return clean(value).toLowerCase().replace(/[\s\-_./\\#,:;]+/g,"").replace(/[^a-z0-9]/g,"");
 }
 
 function escapeHTML(value){
@@ -322,7 +560,7 @@ function pairKey(pi,color){
 }
 
 function numberValue(value){
- if(typeof value==="number") return value;
+ if(typeof value==="number") return Number.isFinite(value)?value:0;
  const n=Number(String(value??"").replace(/,/g,"").trim());
  return Number.isFinite(n)?n:0;
 }
@@ -340,28 +578,53 @@ function cellText(value){
  return value==null?"":String(value).trim();
 }
 
-/* ================= HEADER IDENTIFICATION ================= */
+/* ================= ADVANCED TEXTILE HEADER IDENTIFIER ================= */
+
+const HEADER_SYNONYMS={
+ pi:[
+  "pi","pinumber","pino","piref","pinum","p.i.","pi#","pireferenceno","pino.","orderno","order#","pinumber/ref"
+ ],
+ buyer:[
+  "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand"
+ ],
+ piReceivedDate:[
+  "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
+ ],
+ deliDate:[
+  "delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli","delivery","shipdate","shipmentdate","targetdelv","delvdate"
+ ],
+ color:[
+  "color","colour","shade","blank","colorname","colourname","shade/color","colorshade","fabriccolor"
+ ],
+ construction:[
+  "construction","fabricconstruction","constr","quality","fabricquality","spec","specification","composition","fabricdesc","fabricdescription","count/cons"
+ ],
+ qty:[
+  "orderqty","orderquantity","qty","quantity","orderqnty","orderqnt","totalqty","bookingqty","ord.qty","qty(yds)","qty(pcs)","qty(mtr)"
+ ],
+ remarks:[
+  "remarks","remark","comments","comment","note","notes","specialinstruction"
+ ],
+ goodRcvd:[
+  "goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive","totalrcvd","recdqty","passedqty"
+ ],
+ short:[
+  "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty"
+ ],
+ presentStatus:[
+  "presentstatus","currentstatus","deliverycondition","prodstatus","currentstage"
+ ],
+ deliveryStatus:[
+  "deliverystatus","status","wipstatus","presentdeliverystatus","shipmentstatus","deliverycondition"
+ ]
+};
 
 function headerType(value){
  const h=normalize(value);
-
- if(["pi","pinumber","pino","piref","pinum","pi no"].map(normalize).includes(h)) return "pi";
- if(["buyer","buyername","buyercompany","customer","customername"].map(normalize).includes(h)) return "buyer";
-
- if(["pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime"].includes(h)) return "piReceivedDate";
- if(["delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli"].includes(h)) return "deliDate";
-
- if(["color","colour","shade","blank","colorname","colourname"].includes(h)) return "color";
- if(["construction","fabricconstruction","constr","quality","fabricquality"].includes(h)) return "construction";
-
- if(["orderqty","orderquantity","qty","quantity","orderqnty","orderqnt"].includes(h)) return "qty";
- if(["remarks","remark","comments","comment","note","notes"].includes(h)) return "remarks";
-
- if(["goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive"].includes(h)) return "goodRcvd";
- if(["short","shortqty","shortage","shortageqty","balanceqty"].includes(h)) return "short";
- if(["presentstatus","currentstatus","deliverycondition"].includes(h)) return "presentStatus";
- if(["deliverystatus","status","wipstatus","presentdeliverystatus"].includes(h)) return "deliveryStatus";
-
+ if(!h) return "";
+ for(const [type,synonyms] of Object.entries(HEADER_SYNONYMS)){
+  if(synonyms.map(normalize).includes(h)) return type;
+ }
  return "";
 }
 
@@ -387,7 +650,7 @@ function normalizeOrderRow(raw){
   buyer:clean(raw.buyer),
   color:clean(raw.color),
   construction:clean(raw.construction),
-  qty:raw.qty??""
+  qty:numberValue(raw.qty)
  };
 }
 
@@ -441,7 +704,7 @@ function parseSheet(sheet){
 }
 
 async function readWorkbook(file){
- if(!window.XLSX) throw new Error("Excel library load হয়নি। Internet connection check করো।");
+ if(!window.XLSX) throw new Error("Excel library is not loaded. Please verify internet connection.");
 
  const buffer=await file.arrayBuffer();
  const workbook=XLSX.read(buffer,{type:"array",cellDates:true});
@@ -454,13 +717,13 @@ async function readWorkbook(file){
   const range=XLSX.utils.decode_range(sheet["!ref"]);
   const cellCount=(range.e.r-range.s.r+1)*(range.e.c-range.s.c+1);
 
-  if(cellCount>650000){
-   console.warn("Large sheet skipped:",name,cellCount);
+  // Safely support large textile sheets up to 2,000,000 cells
+  if(cellCount>2000000){
+   console.warn("Sheet exceeds safety threshold (2M cells):",name,cellCount);
    continue;
   }
 
   const parsed=parseSheet(sheet);
-
   if(parsed.rows.length){
    result.push({
     name,
@@ -484,7 +747,7 @@ function getField(row,field){
 /* ================= DASHBOARD ================= */
 
 function updateDashboard(){
- document.getElementById("totalOrders").textContent=orders.length;
+ document.getElementById("totalOrders").textContent=orders.length.toLocaleString();
  document.getElementById("totalQty").textContent=
   orders.reduce((sum,o)=>sum+numberValue(o.qty),0).toLocaleString();
  document.getElementById("matchedCount").textContent=
@@ -493,7 +756,11 @@ function updateDashboard(){
   document.getElementById("unmatchRows").textContent||"0";
 }
 
-/* ================= ORDER ENTRY ================= */
+/* ================= ORDER ENTRY WITH PAGINATION & FILTER ================= */
+
+let orderFilterQuery="";
+let orderCurrentPage=1;
+const ORDER_PAGE_SIZE=25;
 
 function clearOrderForm(){
  ["piInput","buyerInput","colorInput","constructionInput","qtyInput"].forEach(id=>{
@@ -508,37 +775,83 @@ function renderOrders(){
  const body=document.getElementById("orderTable");
  body.innerHTML="";
 
- if(!orders.length){
-  body.innerHTML='<tr><td colspan="6">No orders found.</td></tr>';
+ const q=normalize(orderFilterQuery);
+ const filtered=orders.filter(o=>{
+  if(!q) return true;
+  return normalize(o.pi).includes(q)||
+         normalize(o.buyer).includes(q)||
+         normalize(o.color).includes(q)||
+         normalize(o.construction).includes(q);
+ });
+
+ const total=filtered.length;
+ const totalPages=Math.max(1,Math.ceil(total/ORDER_PAGE_SIZE));
+ if(orderCurrentPage>totalPages) orderCurrentPage=totalPages;
+
+ const start=(orderCurrentPage-1)*ORDER_PAGE_SIZE;
+ const pageItems=filtered.slice(start,start+ORDER_PAGE_SIZE);
+
+ if(!pageItems.length){
+  body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:18px;color:#64748b">No orders found.</td></tr>';
  }else{
-  orders.forEach(order=>{
+  pageItems.forEach(order=>{
    const tr=document.createElement("tr");
 
-   [order.pi,order.buyer,order.color,order.construction,order.qty].forEach(value=>{
+   const displayQty=order.qty!==""&&order.qty!==null&&!isNaN(order.qty)?Number(order.qty).toLocaleString():"";
+   [order.pi,order.buyer,order.color,order.construction,displayQty].forEach(value=>{
     const td=document.createElement("td");
     td.textContent=value??"";
     tr.appendChild(td);
    });
 
+   const srcTd=document.createElement("td");
+   srcTd.innerHTML=order.source==="manual"
+    ?'<span class="badge blue">Manual</span>'
+    :'<span class="badge">Excel</span>';
+   tr.appendChild(srcTd);
+
    const action=document.createElement("td");
    const edit=document.createElement("button");
    edit.className="small";
    edit.textContent="Edit";
-   edit.addEventListener("click",()=>editOrder(order.id));
+   edit.onclick=()=>editOrder(order.id);
 
    const del=document.createElement("button");
    del.className="small danger";
    del.textContent="Delete";
    del.style.marginLeft="5px";
-   del.addEventListener("click",()=>deleteOrder(order.id));
+   del.onclick=()=>deleteOrder(order.id);
 
    action.append(edit,del);
    tr.appendChild(action);
    body.appendChild(tr);
   });
  }
+
+ // Pagination render
+ const pagEl=document.getElementById("orderPagination");
+ pagEl.innerHTML=`
+  <div>Showing ${total?start+1:0} to ${Math.min(start+ORDER_PAGE_SIZE,total)} of ${total} orders</div>
+  <div class="pagination-controls">
+   <button class="small outline" ${orderCurrentPage<=1?"disabled":""} id="orderPrevBtn">&larr; Prev</button>
+   <span style="padding:6px 10px;font-weight:600">Page ${orderCurrentPage} of ${totalPages}</span>
+   <button class="small outline" ${orderCurrentPage>=totalPages?"disabled":""} id="orderNextBtn">Next &rarr;</button>
+  </div>
+ `;
+
+ const prev=document.getElementById("orderPrevBtn");
+ const next=document.getElementById("orderNextBtn");
+ if(prev) prev.onclick=()=>{if(orderCurrentPage>1){orderCurrentPage--;renderOrders();}};
+ if(next) next.onclick=()=>{if(orderCurrentPage<totalPages){orderCurrentPage++;renderOrders();}};
+
  updateDashboard();
 }
+
+document.getElementById("orderFilterInput").addEventListener("input",(e)=>{
+ orderFilterQuery=e.target.value;
+ orderCurrentPage=1;
+ renderOrders();
+});
 
 function editOrder(id){
  const order=orders.find(o=>o.id===id);
@@ -555,15 +868,16 @@ function editOrder(id){
  document.getElementById("entry").scrollIntoView({behavior:"smooth"});
 }
 
-function deleteOrder(id){
- if(!confirm("এই Order Delete করতে চাও?")) return;
+async function deleteOrder(id){
+ if(!confirm("Are you sure you want to delete this Order?")) return;
  orders=orders.filter(o=>o.id!==id);
  manualOrders=manualOrders.filter(o=>o.id!==id);
- saveState();
+ await saveState();
  renderOrders();
+ showToast("Order deleted successfully","info");
 }
 
-document.getElementById("saveOrderBtn").addEventListener("click",()=>{
+document.getElementById("saveOrderBtn").addEventListener("click",async()=>{
  const row=normalizeOrderRow({
   pi:document.getElementById("piInput").value,
   buyer:document.getElementById("buyerInput").value,
@@ -573,7 +887,7 @@ document.getElementById("saveOrderBtn").addEventListener("click",()=>{
  });
 
  if(!row.pi||!row.color){
-  alert("PI Number এবং Color দিতে হবে।");
+  showToast("PI Number and Color are required!","error");
   return;
  }
 
@@ -584,35 +898,57 @@ document.getElementById("saveOrderBtn").addEventListener("click",()=>{
   if(updated.source==="manual"){
    manualOrders=manualOrders.map(o=>o.id===editingId?updated:o);
   }
+  showToast("Order updated successfully!","success");
  }else{
   const item={...row,id:Date.now()+"_"+Math.random().toString(36).slice(2),source:"manual"};
   orders.push(item);
   manualOrders.push(item);
+  showToast("New order added successfully!","success");
  }
 
- saveState();
+ await saveState();
  clearOrderForm();
  renderOrders();
 });
 
 document.getElementById("cancelEditBtn").addEventListener("click",clearOrderForm);
 
-document.getElementById("clearOrdersBtn").addEventListener("click",()=>{
- if(!confirm("সব Order মুছে ফেলতে চাও?")) return;
+document.getElementById("clearOrdersBtn").addEventListener("click",async()=>{
+ if(!confirm("Are you sure you want to clear ALL orders? This cannot be undone.")) return;
  orders=[];
  manualOrders=[];
  mainData=[];
- saveState();
+ await saveState();
  renderOrders();
  renderMatching();
+ showToast("All orders have been cleared.","info");
+});
+
+/* Export Orders to Excel */
+document.getElementById("exportOrdersBtn").addEventListener("click",()=>{
+ if(!orders.length){showToast("No orders to export","error");return;}
+ const exportData=orders.map(o=>({
+  "PI Number":o.pi,
+  "Buyer":o.buyer,
+  "Color":o.color,
+  "Construction":o.construction,
+  "Order Qty":numberValue(o.qty),
+  "Source":o.source
+ }));
+ const ws=XLSX.utils.json_to_sheet(exportData);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,"Orders");
+ XLSX.writeFile(wb,`Nahid_Textile_Orders_${Date.now()}.xlsx`);
+ showToast("Orders exported successfully!","success");
 });
 
 /* ================= MAIN EXCEL IMPORT ================= */
 
 document.getElementById("importMainBtn").addEventListener("click",async()=>{
  const file=document.getElementById("mainFile").files[0];
- if(!file){alert("আগে Excel file নির্বাচন করো।");return;}
+ if(!file){showToast("Please select an Excel file first.","error");return;}
 
+ showLoading("Reading and parsing Excel file...");
  try{
   const sheets=await readWorkbook(file);
   const imported=[];
@@ -626,22 +962,27 @@ document.getElementById("importMainBtn").addEventListener("click",async()=>{
   });
 
   if(!imported.length){
-   alert("PI Number পাওয়া যায়নি। Excel Header check করো।");
+   hideLoading();
+   showToast("No PI records found. Please check header row in Excel.","error");
    return;
   }
 
   mainData=imported;
   orders=[...manualOrders,...mainData];
-  saveState();
+  await saveState();
+  hideLoading();
   renderOrders();
-  alert(imported.length+"টি Order Import হয়েছে।");
+  showToast(`${imported.length} orders imported successfully!`,"success");
  }catch(error){
+  hideLoading();
   console.error(error);
-  alert("Excel Import করা যায়নি: "+error.message);
+  showToast("Excel Import failed: "+error.message,"error");
  }
 });
 
-/* ================= MATCHING ================= */
+/* ================= MATCHING ENGINE WITH FILTERS & EXPORT ================= */
+
+let matchFilter="all"; // "all" | "matched" | "unmatched"
 
 function renderMatching(){
  const mainBody=document.getElementById("mainMatchTable");
@@ -655,13 +996,16 @@ function renderMatching(){
 
  function addRows(data,body,otherKeys){
   if(!data.length){
-   body.innerHTML='<tr><td colspan="6">No data imported.</td></tr>';
+   body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:14px;color:#64748b">No data imported.</td></tr>';
    return;
   }
 
   data.forEach(row=>{
    const yes=otherKeys.has(keyOf(row));
    if(yes) matched++; else unmatched++;
+
+   if(matchFilter==="matched"&&!yes) return;
+   if(matchFilter==="unmatched"&&yes) return;
 
    const tr=document.createElement("tr");
    const status=document.createElement("td");
@@ -685,10 +1029,38 @@ function renderMatching(){
  updateDashboard();
 }
 
+document.getElementById("filterMatchAll").onclick=()=>{
+ matchFilter="all";
+ highlightMatchFilterBtn("filterMatchAll");
+ renderMatching();
+};
+document.getElementById("filterMatchMatched").onclick=()=>{
+ matchFilter="matched";
+ highlightMatchFilterBtn("filterMatchMatched");
+ renderMatching();
+};
+document.getElementById("filterMatchUnmatched").onclick=()=>{
+ matchFilter="unmatched";
+ highlightMatchFilterBtn("filterMatchUnmatched");
+ renderMatching();
+};
+
+function highlightMatchFilterBtn(activeId){
+ ["filterMatchAll","filterMatchMatched","filterMatchUnmatched"].forEach(id=>{
+  const b=document.getElementById(id);
+  if(id===activeId){
+   b.classList.remove("outline");
+  }else{
+   b.classList.add("outline");
+  }
+ });
+}
+
 document.getElementById("importNewBtn").addEventListener("click",async()=>{
  const file=document.getElementById("newFile").files[0];
- if(!file){alert("আগে New Excel file নির্বাচন করো।");return;}
+ if(!file){showToast("Please select New/Updated Excel file.","error");return;}
 
+ showLoading("Comparing files...");
  try{
   const sheets=await readWorkbook(file);
   const imported=[];
@@ -699,15 +1071,42 @@ document.getElementById("importNewBtn").addEventListener("click",async()=>{
    });
   });
 
-  if(!imported.length){alert("PI Number পাওয়া যায়নি।");return;}
+  if(!imported.length){
+   hideLoading();
+   showToast("No valid rows found in the new file.","error");
+   return;
+  }
 
   newData=imported;
-  saveState();
+  await saveState();
+  hideLoading();
   renderMatching();
-  alert(imported.length+"টি New File row Import হয়েছে।");
+  showToast(`${imported.length} rows imported and compared successfully!`,"success");
  }catch(error){
-  alert("Import error: "+error.message);
+  hideLoading();
+  showToast("Import error: "+error.message,"error");
  }
+});
+
+/* Export Matching Report */
+document.getElementById("exportMatchBtn").addEventListener("click",()=>{
+ if(!mainData.length&&!newData.length){showToast("No matching data to export","error");return;}
+
+ const newKeys=new Set(newData.map(keyOf));
+ const report=mainData.map(r=>({
+  "Status":newKeys.has(keyOf(r))?"Matched":"Unmatched",
+  "PI Number":r.pi,
+  "Buyer":r.buyer,
+  "Color":r.color,
+  "Construction":r.construction,
+  "Order Qty":numberValue(r.qty)
+ }));
+
+ const ws=XLSX.utils.json_to_sheet(report);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,"Matching_Report");
+ XLSX.writeFile(wb,`Matching_Report_${Date.now()}.xlsx`);
+ showToast("Matching report exported!","success");
 });
 
 /* ================= CATEGORY MANAGEMENT ================= */
@@ -718,34 +1117,37 @@ function renderCategories(){
 
  categories.forEach(category=>{
   const card=document.createElement("div");
-  card.className="category-card";
+  card.className="category-card"+(category===selectedCategory?" selected":"");
 
   const title=document.createElement("strong");
   title.textContent=category;
 
+  const btnWrap=document.createElement("div");
+  btnWrap.style.display="flex";
+  btnWrap.style.gap="6px";
+
   const select=document.createElement("button");
-  select.className="small";
-  select.textContent="Select";
-  select.style.marginLeft="8px";
-  select.addEventListener("click",()=>selectCategory(category));
+  select.className="small"+(category===selectedCategory?"":" outline");
+  select.textContent=category===selectedCategory?"Selected":"Select";
+  select.onclick=()=>selectCategory(category);
 
   const remove=document.createElement("button");
   remove.className="small danger";
-  remove.textContent="Remove";
-  remove.style.marginLeft="6px";
-  remove.addEventListener("click",async()=>{
-   if(!confirm(category+" category list থেকে বাদ দিতে চাও?")) return;
+  remove.textContent="Delete";
+  remove.onclick=async()=>{
+   if(!confirm(`Delete "${category}" category and its files?`)) return;
    categories=categories.filter(c=>c!==category);
-   saveState();
+   await saveState();
    renderCategories();
-
    if(selectedCategory===category){
     selectedCategory=categories[0]||"";
     selectCategory(selectedCategory);
    }
-  });
+   showToast(`Category "${category}" deleted`,"info");
+  };
 
-  card.append(title,select,remove);
+  btnWrap.append(select,remove);
+  card.append(title,btnWrap);
   container.appendChild(card);
  });
 }
@@ -758,47 +1160,55 @@ function selectCategory(category){
  selectedSheetHeaders=[];
  selectedUpdatePI="";
  selectedUpdateColor="";
+ document.getElementById("updatePiSearch").value="";
  document.getElementById("piResults").innerHTML="";
  document.getElementById("colorResults").innerHTML="";
  document.getElementById("detailHead").innerHTML="";
  document.getElementById("detailBody").innerHTML="";
+
+ renderCategories();
  loadCategorySheets();
 }
 
-document.getElementById("addCategoryBtn").addEventListener("click",()=>{
- const name=prompt("নতুন Category-এর নাম লিখো:");
+document.getElementById("addCategoryBtn").addEventListener("click",async()=>{
+ const name=prompt("Enter new category name (e.g. Finishing, Cutting, Shipping):");
  if(!name||!name.trim()) return;
  const cleanName=name.trim();
 
  if(categories.some(c=>normalize(c)===normalize(cleanName))){
-  alert("এই Category আগে থেকেই আছে।");
+  showToast("This category already exists!","error");
   return;
  }
 
  categories.push(cleanName);
- saveState();
+ await saveState();
  renderCategories();
  selectCategory(cleanName);
+ showToast(`Category "${cleanName}" created!`,"success");
 });
 
 document.getElementById("uploadCategoryBtn").addEventListener("click",async()=>{
  const file=document.getElementById("categoryFile").files[0];
- if(!file){alert("আগে Excel file নির্বাচন করো।");return;}
- if(!selectedCategory){alert("আগে Category নির্বাচন করো।");return;}
+ if(!file){showToast("Please choose an Excel file first.","error");return;}
+ if(!selectedCategory){showToast("Please select a category first.","error");return;}
 
+ showLoading("Uploading and indexing sheet data...");
  try{
   const sheets=await readWorkbook(file);
   if(!sheets.length){
-   alert("এই Excel-এ কোনো ব্যবহারযোগ্য Sheet পাওয়া যায়নি। প্রথম ৫০টি Row-তে পরিচিত Header খুঁজে পাওয়া যায়নি।");
+   hideLoading();
+   showToast("No recognizable sheets/headers found in the first 50 rows.","error");
    return;
   }
 
   await saveCategoryFile(selectedCategory,sheets);
   document.getElementById("categoryFile").value="";
   await loadCategorySheets();
-  alert(selectedCategory+" file successfully uploaded/replaced.");
+  hideLoading();
+  showToast(`Excel file saved for "${selectedCategory}"!`,"success");
  }catch(error){
-  alert("Upload error: "+error.message);
+  hideLoading();
+  showToast("Upload error: "+error.message,"error");
  }
 });
 
@@ -816,7 +1226,7 @@ async function loadCategorySheets(){
  record.data.forEach((sheet,index)=>{
   const option=document.createElement("option");
   option.value=String(index);
-  option.textContent=sheet.name;
+  option.textContent=`${sheet.name} (${sheet.rows.length} rows)`;
   select.appendChild(option);
  });
 
@@ -843,6 +1253,8 @@ async function displaySelectedSheet(){
  document.getElementById("colorResults").innerHTML="";
  document.getElementById("detailHead").innerHTML="";
  document.getElementById("detailBody").innerHTML="";
+
+ renderUpdatePIResults();
 }
 
 function renderDetail(rows,headers,headId,bodyId){
@@ -860,7 +1272,7 @@ function renderDetail(rows,headers,headId,bodyId){
  head.appendChild(hr);
 
  if(!rows.length){
-  body.innerHTML='<tr><td>No details found.</td></tr>';
+  body.innerHTML='<tr><td colspan="100%" style="text-align:center;padding:12px;color:#64748b">No details found.</td></tr>';
   return;
  }
 
@@ -888,24 +1300,26 @@ function renderUpdatePIResults(){
  const query=normalize(document.getElementById("updatePiSearch").value);
  const results=document.getElementById("piResults");
  results.innerHTML="";
- if(!query) return;
 
- const pis=uniqueValues(selectedSheetRows.map(r=>r.pi))
-  .filter(pi=>normalize(pi).includes(query));
+ let pis=uniqueValues(selectedSheetRows.map(r=>r.pi));
+ if(query){
+  pis=pis.filter(pi=>normalize(pi).includes(query));
+ }
 
- pis.forEach(pi=>{
+ // Show top 40 for responsiveness
+ pis.slice(0,40).forEach(pi=>{
   const btn=document.createElement("button");
-  btn.className="small";
-  btn.style.margin="4px";
+  btn.className="small"+(selectedUpdatePI===pi?"":" outline");
   btn.textContent=pi;
-  btn.addEventListener("click",()=>{
+  btn.onclick=()=>{
    selectedUpdatePI=pi;
+   renderUpdatePIResults();
    renderUpdateColors();
-  });
+  };
   results.appendChild(btn);
  });
 
- if(!pis.length) results.textContent="No PI found.";
+ if(!pis.length) results.innerHTML='<span class="muted">No matching PI found.</span>';
 }
 
 document.getElementById("updatePiSearch").addEventListener("input",renderUpdatePIResults);
@@ -916,37 +1330,47 @@ function renderUpdateColors(){
  const rows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI));
  const colors=uniqueValues(rows.map(r=>r.color));
 
- if(!colors.length){box.textContent="No Color found.";return;}
+ if(!colors.length){box.innerHTML='<span class="muted">No Colors found for this PI.</span>';return;}
 
  colors.forEach(color=>{
   const btn=document.createElement("button");
-  btn.className="small";
-  btn.style.margin="4px";
+  btn.className="small"+(selectedUpdateColor===color?"":" outline");
   btn.textContent=color;
-  btn.addEventListener("click",()=>{
+  btn.onclick=()=>{
    selectedUpdateColor=color;
+   renderUpdateColors();
    const matchedRows=selectedSheetRows.filter(r=>
     normalize(r.pi)===normalize(selectedUpdatePI)&&normalize(r.color)===normalize(selectedUpdateColor)
    );
    renderDetail(matchedRows,selectedSheetHeaders,"detailHead","detailBody");
-  });
+  };
   box.appendChild(btn);
  });
 }
 
-/* ================= GLOBAL SEARCH 7.2 ================= */
+/* ================= HIGH PERFORMANCE GLOBAL SEARCH ================= */
+
+let globalSearchDebounce=null;
+
+document.getElementById("globalInput").addEventListener("input",()=>{
+ clearTimeout(globalSearchDebounce);
+ globalSearchDebounce=setTimeout(runGlobalSearch,250);
+});
 
 document.getElementById("globalSearchBtn").addEventListener("click",runGlobalSearch);
 document.getElementById("globalInput").addEventListener("keydown",e=>{
- if(e.key==="Enter") runGlobalSearch();
+ if(e.key==="Enter"){
+  clearTimeout(globalSearchDebounce);
+  runGlobalSearch();
+ }
 });
 
 document.getElementById("globalClearBtn").addEventListener("click",()=>{
  document.getElementById("globalInput").value="";
- document.getElementById("globalResults").innerHTML='<p class="muted">Enter a PI Number or Color to begin searching.</p>';
+ document.getElementById("globalResults").innerHTML='<p class="muted">Type a query above to search instantly.</p>';
+ document.getElementById("globalSummary").innerHTML="";
  document.getElementById("globalChoices").innerHTML="";
  document.getElementById("globalDetails").innerHTML="";
- globalRecords=[];
  globalFiles=[];
 });
 
@@ -964,10 +1388,8 @@ function rowMatchesPair(row,pi,color){
 
 function categoryRowsForPair(files,kind,pi,color){
  const found=[];
-
  files.forEach(file=>{
   if(!isCategory(file.category,kind)) return;
-
   (file.data||[]).forEach(sheet=>{
    (sheet.rows||[]).forEach(row=>{
     if(rowMatchesPair(row,pi,color)){
@@ -976,7 +1398,6 @@ function categoryRowsForPair(files,kind,pi,color){
    });
   });
  });
-
  return found;
 }
 
@@ -989,13 +1410,13 @@ function renderSheetSection(title,columns,items){
  section.className="detail-section";
 
  const heading=document.createElement("h3");
- heading.textContent=title;
+ heading.innerHTML=`<span>${escapeHTML(title)}</span><span class="badge ${items.length?'green':''}">${items.length} records</span>`;
  section.appendChild(heading);
 
  if(!items.length){
   const empty=document.createElement("div");
   empty.className="detail-empty";
-  empty.textContent="এই PI ও Color-এর জন্য এই Category-তে কোনো তথ্য পাওয়া যায়নি।";
+  empty.textContent="No data found for this category.";
   section.appendChild(empty);
   return section;
  }
@@ -1036,17 +1457,94 @@ function renderSheetSection(title,columns,items){
  return section;
 }
 
+/* Dynamic custom sheet renderer */
+function renderCustomSheetSection(file,pi,color){
+ const matchingRows=[];
+ (file.data||[]).forEach(sheet=>{
+  (sheet.rows||[]).forEach(row=>{
+   if(rowMatchesPair(row,pi,color)){
+    matchingRows.push({sheetName:sheet.name,headers:sheet.headers,row});
+   }
+  });
+ });
+
+ if(!matchingRows.length) return null;
+
+ const section=document.createElement("div");
+ section.className="detail-section";
+ section.innerHTML=`<h3><span>📂 ${escapeHTML(file.category)}</span><span class="badge green">${matchingRows.length} records</span></h3>`;
+
+ matchingRows.forEach(mr=>{
+  const p=document.createElement("p");
+  p.className="muted";
+  p.textContent="Sheet: "+mr.sheetName;
+  section.appendChild(p);
+
+  const wrap=document.createElement("div");
+  wrap.className="table-wrap";
+  const table=document.createElement("table");
+  const thead=document.createElement("thead");
+  const tbody=document.createElement("tbody");
+
+  const trH=document.createElement("tr");
+  (mr.headers||[]).forEach(h=>{
+   const th=document.createElement("th");
+   th.textContent=h||"-";
+   trH.appendChild(th);
+  });
+  thead.appendChild(trH);
+
+  const trB=document.createElement("tr");
+  (mr.row._values||[]).forEach(val=>{
+   const td=document.createElement("td");
+   td.textContent=val??"";
+   trB.appendChild(td);
+  });
+  tbody.appendChild(trB);
+
+  table.append(thead,tbody);
+  wrap.appendChild(table);
+  section.appendChild(wrap);
+ });
+
+ return section;
+}
+
 function showGlobalDetail(pi,color){
  const box=document.getElementById("globalDetails");
  box.innerHTML="";
 
- const title=document.createElement("h3");
- title.textContent="PI: "+pi+" | Color: "+color;
- box.appendChild(title);
+ const titleWrap=document.createElement("div");
+ titleWrap.style.display="flex";
+ titleWrap.style.justifyContent="space-between";
+ titleWrap.style.alignItems="center";
+ titleWrap.innerHTML=`<h3>Details for PI: <span style="color:var(--accent)">${escapeHTML(pi)}</span> | Color: <span style="color:var(--accent)">${escapeHTML(color)}</span></h3>`;
+ box.appendChild(titleWrap);
 
  const orderRows=categoryRowsForPair(globalFiles,"order",pi,color);
  const deliveryRows=categoryRowsForPair(globalFiles,"delivery",pi,color);
  const wipRows=categoryRowsForPair(globalFiles,"wip",pi,color);
+
+ // Calculation of Summary Numbers
+ let sumOrderQty=0,sumGoodRcvd=0,sumShort=0;
+ [...orderRows,...deliveryRows].forEach(item=>{
+  const q=numberValue(getField(item.row,"qty"));
+  const gr=numberValue(getField(item.row,"goodRcvd"));
+  const sh=numberValue(getField(item.row,"short"));
+  if(q) sumOrderQty=Math.max(sumOrderQty,q);
+  if(gr) sumGoodRcvd+=gr;
+  if(sh) sumShort+=sh;
+ });
+
+ const summaryCards=document.createElement("div");
+ summaryCards.className="summary-grid";
+ summaryCards.innerHTML=`
+  <div class="summary-card"><span>Order Qty</span><div class="val">${sumOrderQty?sumOrderQty.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Good Received</span><div class="val" style="color:var(--success)">${sumGoodRcvd?sumGoodRcvd.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Shortage / Balance</span><div class="val" style="color:var(--danger)">${sumShort?sumShort.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Matched Categories</span><div class="val">${orderRows.length+deliveryRows.length+wipRows.length}</div></div>
+ `;
+ box.appendChild(summaryCards);
 
  const orderColumns=[
   {label:"PI Number",field:"pi"},
@@ -1082,110 +1580,139 @@ function showGlobalDetail(pi,color){
  box.appendChild(renderSheetSection("2. DELIVERY STATUS",deliveryColumns,deliveryRows));
  box.appendChild(renderSheetSection("3. WIP",wipColumns,wipRows));
 
+ // Also render any custom categories that don't match order/delivery/wip
+ globalFiles.forEach(file=>{
+  if(!isCategory(file.category,"order")&&!isCategory(file.category,"delivery")&&!isCategory(file.category,"wip")){
+   const customSection=renderCustomSheetSection(file,pi,color);
+   if(customSection) box.appendChild(customSection);
+  }
+ });
+
  box.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 async function runGlobalSearch(){
  const query=clean(document.getElementById("globalInput").value);
- if(!query){alert("PI Number অথবা Color লিখো।");return;}
-
- const q=normalize(query);
  const resultBox=document.getElementById("globalResults");
  const choices=document.getElementById("globalChoices");
  const details=document.getElementById("globalDetails");
+ const summaryEl=document.getElementById("globalSummary");
 
  choices.innerHTML="";
  details.innerHTML="";
- resultBox.innerHTML="<p>Searching...</p>";
+ summaryEl.innerHTML="";
+
+ if(!query){
+  resultBox.innerHTML='<p class="muted">Type a query above to search instantly.</p>';
+  return;
+ }
+
+ const q=normalize(query);
+ resultBox.innerHTML="<p>Searching all files and sheets...</p>";
 
  try{
   globalFiles=await getAllCategoryFiles();
  }catch(error){
-  console.error(error);
+  console.error("Failed to load category files for search:",error);
   globalFiles=[];
  }
 
  const pairs=new Map();
 
  function addPair(row,source){
-  if(!row.pi&&!row.color) return;
-  if(!normalize(row.pi).includes(q)&&!normalize(row.color).includes(q)) return;
+  if(!row.pi&&!row.color&&!row.buyer) return;
+  const matchPI=normalize(row.pi).includes(q);
+  const matchColor=normalize(row.color).includes(q);
+  const matchBuyer=normalize(row.buyer).includes(q);
+
+  if(!matchPI&&!matchColor&&!matchBuyer) return;
 
   const key=pairKey(row.pi,row.color);
   if(!pairs.has(key)){
    pairs.set(key,{
     pi:clean(row.pi)||"No PI",
     color:clean(row.color)||"No Color",
+    buyer:clean(row.buyer),
     construction:clean(row.construction),
+    qty:numberValue(row.qty),
     sources:new Set()
    });
   }
   pairs.get(key).sources.add(source);
  }
 
+ // Instant scan Main and Manual orders
  mainData.forEach(row=>addPair(row,"Main Data"));
  manualOrders.forEach(row=>addPair(row,"Manual Order"));
 
+ // Scan all uploaded Excel categories
  globalFiles.forEach(file=>{
   (file.data||[]).forEach(sheet=>{
    (sheet.rows||[]).forEach(row=>addPair(row,file.category+" / "+sheet.name));
   });
  });
 
- globalRecords=[...pairs.values()];
+ const records=[...pairs.values()];
 
- if(!globalRecords.length){
-  resultBox.innerHTML='<p class="unmatched">No matching PI or Color found.</p>';
+ if(!records.length){
+  resultBox.innerHTML=`<div class="result-box" style="border-left:4px solid var(--danger)"><strong class="unmatched">No matching PI, Color, or Buyer found for "${escapeHTML(query)}".</strong><p class="muted" style="margin:4px 0 0">Try checking spelling or uploading the corresponding sheet in Order Update.</p></div>`;
   return;
  }
 
- resultBox.innerHTML="<strong>"+globalRecords.length+" PI / Color combination(s) found.</strong>";
+ resultBox.innerHTML=`<div style="font-weight:600;margin-bottom:8px">Found <strong>${records.length}</strong> matching item(s) across Main Orders & Categories:</div>`;
 
- globalRecords.forEach((item,index)=>{
+ records.forEach((item,index)=>{
   const card=document.createElement("div");
   card.className="result-box";
 
-  const title=document.createElement("strong");
-  title.textContent=(index+1)+". "+item.color;
+  const top=document.createElement("div");
+  top.style.display="flex";
+  top.style.justifyContent="space-between";
+  top.style.alignItems="center";
+  top.innerHTML=`<strong>${index+1}. PI: ${escapeHTML(item.pi)} &bull; ${escapeHTML(item.color)}</strong>`;
+
+  const btn=document.createElement("button");
+  btn.className="small";
+  btn.textContent="⚡ View Details";
+  btn.onclick=()=>showGlobalDetail(item.pi,item.color);
+  top.appendChild(btn);
 
   const info=document.createElement("p");
   info.className="muted";
-  info.textContent="PI: "+item.pi+
-   (item.construction?" | Construction: "+item.construction:"")+
-   " | Found in: "+[...item.sources].join(", ");
+  info.style.margin="6px 0 0";
+  info.textContent=`Buyer: ${item.buyer||"N/A"} | Construction: ${item.construction||"N/A"} | Found in: ${[...item.sources].join(", ")}`;
 
-  const btn=document.createElement("button");
-  btn.className="small";
-  btn.textContent="View Details";
-  btn.addEventListener("click",()=>showGlobalDetail(item.pi,item.color));
-
-  card.append(title,info,btn);
+  card.append(top,info);
   resultBox.appendChild(card);
  });
 
- const choiceTitle=document.createElement("p");
- choiceTitle.className="muted";
- choiceTitle.textContent="Select a PI / Color combination:";
- choices.appendChild(choiceTitle);
-
- globalRecords.forEach(item=>{
+ // Choices buttons
+ records.slice(0,30).forEach(item=>{
   const btn=document.createElement("button");
-  btn.className="small";
-  btn.style.margin="4px";
-  btn.textContent=item.pi+" / "+item.color;
-  btn.addEventListener("click",()=>showGlobalDetail(item.pi,item.color));
+  btn.className="small outline";
+  btn.textContent=`${item.pi} / ${item.color}`;
+  btn.onclick=()=>showGlobalDetail(item.pi,item.color);
   choices.appendChild(btn);
  });
+
+ // Auto-show first record detail if exact or single match
+ if(records.length===1){
+  showGlobalDetail(records[0].pi,records[0].color);
+ }
 }
 
 /* ================= STARTUP ================= */
 
 async function init(){
+ showLoading("Initializing Textile ERP...");
  try{
   await openDB();
+  await loadInitialState();
  }catch(error){
-  console.error(error);
-  alert("Browser storage চালু করা যায়নি।");
+  console.error("DB Init failed:",error);
+  showToast("Database initialisation failed","error");
+ }finally{
+  hideLoading();
  }
 
  renderOrders();
@@ -1197,7 +1724,7 @@ async function init(){
  }
 }
 
-init();
+window.addEventListener("DOMContentLoaded",init);
 </script>
 </body>
 </html>
