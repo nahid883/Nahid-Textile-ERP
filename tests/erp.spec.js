@@ -7,6 +7,7 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
   const mainFilePath = path.join(__dirname, 'fixtures_main.xlsx');
   const newFilePath = path.join(__dirname, 'fixtures_new.xlsx');
   const catFilePath = path.join(__dirname, 'fixtures_delivery.xlsx');
+  const wipFilePath = path.join(__dirname, 'fixtures_wip.xlsx');
 
   test.beforeAll(async () => {
     // Generate test Excel files
@@ -38,12 +39,22 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     ]);
     XLSX.utils.book_append_sheet(wbCat, wsCat, 'DeliveryReport');
     XLSX.writeFile(wbCat, catFilePath);
+
+    const wbWip = XLSX.utils.book_new();
+    const wsWip = XLSX.utils.aoa_to_sheet([
+      ['Running WIP Report'],
+      ['PI Number', 'Color', 'Construction', 'Order Qty (Yds)', 'Delivery Status'],
+      ['PI-1001', 'Black', '100% Cotton 40x40', 10000, 'In Dyeing / Printing']
+    ]);
+    XLSX.utils.book_append_sheet(wbWip, wsWip, 'WIP_Status');
+    XLSX.writeFile(wbWip, wipFilePath);
   });
 
   test.afterAll(async () => {
     if (fs.existsSync(mainFilePath)) fs.unlinkSync(mainFilePath);
     if (fs.existsSync(newFilePath)) fs.unlinkSync(newFilePath);
     if (fs.existsSync(catFilePath)) fs.unlinkSync(catFilePath);
+    if (fs.existsSync(wipFilePath)) fs.unlinkSync(wipFilePath);
   });
 
   test('Manual Order Entry and Persistence', async ({ page }) => {
@@ -122,5 +133,39 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     await expect(page.locator('#globalDetails')).toContainText('9,500');
     await expect(page.locator('#globalDetails')).toContainText('500');
     await expect(page.locator('#globalDetails')).toContainText('Partial Delivered');
+  });
+
+  test('WIP Upload and Order Qty / Delivery Status Rendering', async ({ page }) => {
+    await page.goto('http://localhost:8080');
+
+    // Switch to Order Update page
+    await page.click('button[data-page="update"]');
+
+    // Select WIP category
+    const wipCard = page.locator('#categoryList .category-card', { hasText: 'WIP' });
+    await wipCard.locator('button', { hasText: /Select/ }).click();
+    await expect(page.locator('#categoryTitle')).toHaveText('WIP');
+
+    // Upload WIP file
+    await page.setInputFiles('#categoryFile', wipFilePath);
+    await page.click('#uploadCategoryBtn');
+    await page.waitForTimeout(800);
+
+    // Verify sheet loaded in update section
+    await expect(page.locator('#sheetSelect')).toContainText('WIP_Status');
+
+    // Go to Global Search
+    await page.click('button[data-page="search"]');
+    await page.fill('#globalInput', 'PI-1001');
+    await page.waitForTimeout(500);
+
+    // Click View Details
+    await page.click('text=⚡ View Details');
+
+    // Verify 3. WIP section has correct Order Qty and Delivery Status
+    const wipSection = page.locator('.detail-section', { hasText: '3. WIP' });
+    await expect(wipSection).toBeVisible();
+    await expect(wipSection).toContainText('10000');
+    await expect(wipSection).toContainText('In Dyeing / Printing');
   });
 });
