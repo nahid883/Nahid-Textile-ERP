@@ -585,7 +585,7 @@ const HEADER_SYNONYMS={
   "pi","pinumber","pino","piref","pinum","p.i.","pi#","pireferenceno","pino.","orderno","order#","pinumber/ref"
  ],
  buyer:[
-  "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand"
+  "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand","party","partyname"
  ],
  piReceivedDate:[
   "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
@@ -597,25 +597,25 @@ const HEADER_SYNONYMS={
   "color","colour","shade","blank","colorname","colourname","shade/color","colorshade","fabriccolor"
  ],
  construction:[
-  "construction","fabricconstruction","constr","quality","fabricquality","spec","specification","composition","fabricdesc","fabricdescription","count/cons"
+  "construction","fabricconstruction","constr","quality","fabricquality","spec","specification","composition","fabricdesc","fabricdescription","count/cons","countcons","cons","construction/quality"
  ],
  qty:[
-  "orderqty","orderquantity","qty","quantity","orderqnty","orderqnt","totalqty","bookingqty","ord.qty","qty(yds)","qty(pcs)","qty(mtr)"
+  "orderqty","orderquantity","qty","quantity","orderqnty","orderqnt","totalqty","bookingqty","ord.qty","ordqty","ord_qty","poqty","lotqty","bookingquantity","orderyds","orderpcs","qty(yds)","qty(pcs)","qty(mtr)","orderqty(yds)","orderqty(pcs)","orderqty(mtr)","orderqty(yds.)","orderqtyyds","orderqtypcs","reqqty","reqquantity","totalorderqty"
  ],
  remarks:[
-  "remarks","remark","comments","comment","note","notes","specialinstruction"
+  "remarks","remark","comments","comment","note","notes","specialinstruction","specialnotes"
  ],
  goodRcvd:[
-  "goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive","totalrcvd","recdqty","passedqty"
+  "goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive","totalrcvd","recdqty","passedqty","rcvdqty","delvqty","deliveredqty","totaldelivered"
  ],
  short:[
-  "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty"
+  "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty","remainingqty"
  ],
  presentStatus:[
-  "presentstatus","currentstatus","deliverycondition","prodstatus","currentstage"
+  "presentstatus","currentstatus","deliverycondition","prodstatus","productionstatus","currentstage","stage","status","presentcondition"
  ],
  deliveryStatus:[
-  "deliverystatus","status","wipstatus","presentdeliverystatus","shipmentstatus","deliverycondition"
+  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage"
  ]
 };
 
@@ -740,7 +740,20 @@ async function readWorkbook(file){
 function getField(row,field){
  if(!row) return "";
  if(row[field]!==undefined&&row[field]!==null&&row[field]!=="") return row[field];
- if(row._fields&&row._fields[field]!==undefined) return row._fields[field];
+ if(row._fields&&row._fields[field]!==undefined&&row._fields[field]!=="") return row._fields[field];
+
+ // If field is presentStatus or deliveryStatus, cross-check them as they are interchangeable in textile WIP/delivery sheets
+ if(field==="deliveryStatus"&&row.presentStatus) return row.presentStatus;
+ if(field==="presentStatus"&&row.deliveryStatus) return row.deliveryStatus;
+
+ // Fallback check against raw _fields or direct properties using synonyms
+ const synonyms=HEADER_SYNONYMS[field]||[];
+ for(const syn of synonyms){
+  const cleanSyn=normalize(syn);
+  if(row[syn]!==undefined&&row[syn]!==null&&row[syn]!=="") return row[syn];
+  if(row._fields&&row._fields[syn]!==undefined&&row._fields[syn]!=="") return row._fields[syn];
+ }
+
  return "";
 }
 
@@ -1376,9 +1389,9 @@ document.getElementById("globalClearBtn").addEventListener("click",()=>{
 
 function isCategory(category,kind){
  const c=normalize(category);
- if(kind==="order") return c.includes("orderstatus");
- if(kind==="delivery") return c.includes("deliverystatus");
- if(kind==="wip") return c==="wip"||c.includes("wipstatus")||c.includes("workinprogress");
+ if(kind==="order") return c==="orderstatus"||c.includes("orderstatus")||c==="order"||c.includes("orderreport");
+ if(kind==="delivery") return c==="deliverystatus"||c.includes("deliverystatus")||c==="delivery"||c.includes("deliveryreport");
+ if(kind==="wip") return c==="wip"||c.includes("wip")||c.includes("wipstatus")||c.includes("workinprogress");
  return false;
 }
 
@@ -1527,7 +1540,7 @@ function showGlobalDetail(pi,color){
 
  // Calculation of Summary Numbers
  let sumOrderQty=0,sumGoodRcvd=0,sumShort=0;
- [...orderRows,...deliveryRows].forEach(item=>{
+ [...orderRows,...deliveryRows,...wipRows].forEach(item=>{
   const q=numberValue(getField(item.row,"qty"));
   const gr=numberValue(getField(item.row,"goodRcvd"));
   const sh=numberValue(getField(item.row,"short"));
