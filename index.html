@@ -44,6 +44,7 @@ nav button.active{background:var(--primary-light);color:white;border-color:var(-
 button{padding:10px 14px;border:0;border-radius:var(--radius);background:var(--primary-light);color:white;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.15s ease;display:inline-flex;align-items:center;justify-content:center;gap:6px}
 button:hover{opacity:0.92;transform:translateY(-1px)}
 button:active{transform:translateY(0)}
+button:disabled{opacity:0.5;cursor:not-allowed;transform:none}
 button.secondary{background:#64748b}
 button.danger{background:var(--danger)}
 button.success{background:var(--success)}
@@ -68,6 +69,7 @@ label{font-size:12px;font-weight:600;color:var(--text-muted)}
 
 .form-grid{display:grid;grid-template-columns:1fr;gap:4px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0;align-items:center}
+.actions.between{justify-content:space-between}
 .table-wrap{width:100%;overflow-x:auto;margin:10px 0;border:1px solid var(--border-light);border-radius:var(--radius)}
 table{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}
 th,td{border-bottom:1px solid var(--border-light);padding:9px 12px;text-align:left;white-space:nowrap}
@@ -191,8 +193,8 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <p class="muted">Auto-detects common textile columns: PI, Buyer, Color, Construction, Order Qty. Cleanly handles headers up to row 50.</p>
 
 <hr>
-<div class="actions" style="justify-space-between">
-<h3>Order List</h3>
+<div class="actions between">
+<h3 style="margin:0">Order List</h3>
 <div style="display:flex;gap:6px">
 <button class="small outline" id="exportOrdersBtn">📥 Export Excel</button>
 <button class="danger small" id="clearOrdersBtn">Clear All Orders</button>
@@ -228,6 +230,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <div class="stat"><span>Matched Rows</span><strong id="matchRows" style="color:var(--success)">0</strong></div>
 <div class="stat"><span>Unmatched Rows</span><strong id="unmatchRows" style="color:var(--danger)">0</strong></div>
 </div>
+<p class="muted">Matched = Main file rows found in the New file. Unmatched = Main rows missing in New file + New rows missing in Main file.</p>
 
 <div class="actions" style="gap:6px">
 <span style="font-size:12px;font-weight:600">Filter View:</span>
@@ -256,7 +259,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <!-- ORDER UPDATE -->
 <section id="update" class="page">
 <h2>Order Update Management</h2>
-<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently.</p>
+<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently. Uploaded sheets stay saved in this browser until you delete them.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0" id="threeSheetsUploadContainer">
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
@@ -848,55 +851,43 @@ function getField(row,field){
 /* ================= DASHBOARD METRICS ================= */
 
 async function updateDashboard(){
- let orderCount=0;
- let totalQtySum=0;
+ /* Unique PI+Color items across Manual/Main orders AND all uploaded sheets.
+    Quantity is counted once per item (highest qty found), so the same order
+    appearing in several sheets is not added up multiple times. */
+ const itemQty=new Map();
+
+ function addItem(pi,color,qty){
+  const p=clean(pi);
+  if(!p) return;
+  const colors=clean(color).split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
+  const list=colors.length?colors:["default"];
+  list.forEach((c,idx)=>{
+   const k=pairKey(p,c);
+   const q=idx===0?numberValue(qty):0;
+   if(!itemQty.has(k)) itemQty.set(k,q);
+   else if(q>itemQty.get(k)) itemQty.set(k,q);
+  });
+ }
 
  try{
-  const allFiles=await getAllCategoryFiles();
-  let countSet=new Set();
+  orders.forEach(o=>addItem(o.pi,o.color,o.qty));
 
-  if(allFiles && allFiles.length){
-   allFiles.forEach(file=>{
-    (file.data||[]).forEach(sheet=>{
-     (sheet.rows||[]).forEach(r=>{
-      const pi=clean(r.pi);
-      const color=clean(r.color);
-      if(pi){
-       if(color){
-        const colors=color.split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
-        colors.forEach(c=>countSet.add(pairKey(pi,c)));
-       }else{
-        countSet.add(pairKey(pi,"default"));
-       }
-       totalQtySum += numberValue(getField(r,"qty"));
-      }
-     });
+  const allFiles=await getAllCategoryFiles();
+  (allFiles||[]).forEach(file=>{
+   (file.data||[]).forEach(sheet=>{
+    (sheet.rows||[]).forEach(r=>{
+     addItem(r.pi,r.color,getField(r,"qty"));
     });
    });
-   orderCount = countSet.size;
-  }
-
-  if(!orderCount && orders.length){
-   orders.forEach(o=>{
-    const pi=clean(o.pi);
-    const color=clean(o.color);
-    if(pi){
-     const colors=color.split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
-     if(colors.length){
-      colors.forEach(c=>countSet.add(pairKey(pi,c)));
-     }else{
-      countSet.add(pairKey(pi,"default"));
-     }
-     totalQtySum += numberValue(o.qty);
-    }
-   });
-   orderCount = countSet.size;
-  }
+  });
  }catch(e){
   console.warn("Could not calculate dashboard metrics:",e);
  }
 
- document.getElementById("totalOrders").textContent=orderCount.toLocaleString();
+ let totalQtySum=0;
+ itemQty.forEach(q=>{totalQtySum+=q;});
+
+ document.getElementById("totalOrders").textContent=itemQty.size.toLocaleString();
  document.getElementById("totalQty").textContent=totalQtySum.toLocaleString();
  document.getElementById("matchedCount").textContent=
   document.getElementById("matchRows").textContent||"0";
@@ -1019,8 +1010,10 @@ async function deleteOrder(id){
  if(!confirm("Are you sure you want to delete this Order?")) return;
  orders=orders.filter(o=>o.id!==id);
  manualOrders=manualOrders.filter(o=>o.id!==id);
+ mainData=mainData.filter(o=>o.id!==id);
  await saveState();
  renderOrders();
+ renderMatching();
  showToast("Order deleted successfully","info");
 }
 
@@ -1044,6 +1037,8 @@ document.getElementById("saveOrderBtn").addEventListener("click",async()=>{
   orders=orders.map(o=>o.id===editingId?updated:o);
   if(updated.source==="manual"){
    manualOrders=manualOrders.map(o=>o.id===editingId?updated:o);
+  }else{
+   mainData=mainData.map(o=>o.id===editingId?updated:o);
   }
   showToast("Order updated successfully!","success");
  }else{
@@ -1056,6 +1051,7 @@ document.getElementById("saveOrderBtn").addEventListener("click",async()=>{
  await saveState();
  clearOrderForm();
  renderOrders();
+ renderMatching();
 });
 
 document.getElementById("cancelEditBtn").addEventListener("click",clearOrderForm);
@@ -1118,6 +1114,7 @@ document.getElementById("importMainBtn").addEventListener("click",async()=>{
   await saveState();
   hideLoading();
   renderOrders();
+  renderMatching();
   showToast(`${imported.length} orders imported successfully!`,"success");
  }catch(error){
   hideLoading();
@@ -1138,7 +1135,13 @@ function renderMatching(){
 
  const mainKeys=new Set(mainData.map(keyOf));
  const newKeys=new Set(newData.map(keyOf));
+
+ /* Counts are independent of the view filter:
+    Matched   = Main rows that exist in the New file
+    Unmatched = Main rows missing in New + New rows missing in Main */
  let matched=0,unmatched=0;
+ mainData.forEach(r=>{ if(newKeys.has(keyOf(r))) matched++; else unmatched++; });
+ newData.forEach(r=>{ if(!mainKeys.has(keyOf(r))) unmatched++; });
 
  function addRows(data,body,otherKeys){
   if(!data.length){
@@ -1146,13 +1149,14 @@ function renderMatching(){
    return;
   }
 
+  let shown=0;
   data.forEach(row=>{
    const yes=otherKeys.has(keyOf(row));
-   if(yes) matched++; else unmatched++;
 
    if(matchFilter==="matched"&&!yes) return;
    if(matchFilter==="unmatched"&&yes) return;
 
+   shown++;
    const tr=document.createElement("tr");
    const status=document.createElement("td");
    status.innerHTML=yes?'<span class="badge green">Matched</span>':'<span class="badge red">Unmatched</span>';
@@ -1165,6 +1169,10 @@ function renderMatching(){
    });
    body.appendChild(tr);
   });
+
+  if(!shown){
+   body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:14px;color:#64748b">No rows for this filter.</td></tr>';
+  }
  }
 
  addRows(mainData,mainBody,newKeys);
@@ -1898,6 +1906,10 @@ async function runGlobalSearch(){
   return;
  }
 
+ const allSources=new Set();
+ records.forEach(r=>r.sources.forEach(s=>allSources.add(s.split(" / ")[0])));
+ summaryEl.innerHTML=`<span class="badge blue">${records.length} item(s)</span> <span class="badge green">${allSources.size} source(s): ${escapeHTML([...allSources].join(", "))}</span>`;
+
  resultBox.innerHTML=`<div style="font-weight:600;margin-bottom:8px">Found <strong>${records.length}</strong> matching item(s) across Main Orders & Categories:</div>`;
 
  records.forEach((item,index)=>{
@@ -1944,10 +1956,8 @@ async function init(){
  showLoading("Initializing Textile ERP...");
  try{
   await openDB();
-  if(!sessionStorage.getItem("nte_session_initialized")){
-   await clearAllCategoryFiles();
-   sessionStorage.setItem("nte_session_initialized","1");
-  }
+  /* Uploaded Delivery / Order Status / WIP sheets are kept saved between
+     sessions. Use the Delete button on each slot to remove them. */
   await loadInitialState();
  }catch(error){
   console.error("DB Init failed:",error);
