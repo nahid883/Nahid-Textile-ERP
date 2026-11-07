@@ -240,4 +240,69 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     await expect(wipSection).toContainText('25000');
     await expect(wipSection).toContainText('Ready for Shipment');
   });
+
+  test('3 Dedicated Slots, Header Mapping, Tab View Switching and Sheet Deletion', async ({ page }) => {
+    await page.goto('http://localhost:8080');
+    await page.click('button[data-page="update"]');
+
+    // 1. Upload Delivery Status
+    await page.setInputFiles('#deliveryFileInput', catFilePath);
+    await page.click('#uploadDeliveryBtn');
+    await page.waitForTimeout(600);
+    await expect(page.locator('#badgeDeliveryFile')).toContainText('Active');
+
+    // 2. Upload Order Status
+    const wbOrder = XLSX.utils.book_new();
+    const wsOrder = XLSX.utils.aoa_to_sheet([
+      ['Orders'],
+      ['PI Number', 'PI Received Date', 'Greige Date', 'Deli Date', 'Buyer', 'Construction', 'Color', 'Order Qty', 'Remarks'],
+      ['PI-1001', '01/10/2026', '05/10/2026', '25/10/2026', 'H&M', '100% Cotton 40x40', 'Black', 10000, 'Urgent']
+    ]);
+    XLSX.utils.book_append_sheet(wbOrder, wsOrder, 'Order Status');
+    const orderTestPath = path.join(__dirname, 'fixtures_order_custom.xlsx');
+    XLSX.writeFile(wbOrder, orderTestPath);
+
+    await page.setInputFiles('#orderStatusFileInput', orderTestPath);
+    await page.click('#uploadOrderStatusBtn');
+    await page.waitForTimeout(600);
+    await expect(page.locator('#badgeOrderStatusFile')).toContainText('Active');
+
+    // 3. Verify Dashboard counts (1 order, 10,000 qty)
+    await page.click('button[data-page="dashboard"]');
+    await expect(page.locator('#totalOrders')).toHaveText('1');
+    await expect(page.locator('#totalQty')).toHaveText('10,000');
+
+    // 4. Return to Order Update tab
+    await page.click('button[data-page="update"]');
+    await page.fill('#updatePiSearch', 'PI-1001');
+    const piBtn = page.locator('#piResults button', { hasText: 'PI-1001' });
+    await expect(piBtn).toBeVisible();
+    await piBtn.click();
+
+    const colorBtn = page.locator('#colorResults button', { hasText: 'Black' });
+    await expect(colorBtn).toBeVisible();
+    await colorBtn.click();
+
+    // 5. Check Delivery View
+    await expect(page.locator('#detailHead')).toContainText('P.I');
+    await expect(page.locator('#detailHead')).toContainText('Buyer Name');
+    await expect(page.locator('#detailHead')).toContainText('Good Rcvd');
+    await expect(page.locator('#detailHead')).toContainText('Present Status');
+
+    // 6. Switch to Order Status View
+    await page.click('#tabOrderStatusView');
+    await expect(page.locator('#detailHead')).toContainText('Greige Date');
+    await expect(page.locator('#detailHead')).toContainText('Remarks');
+    await expect(page.locator('#detailBody')).toContainText('05/10/2026');
+    await expect(page.locator('#detailBody')).toContainText('Urgent');
+
+    // 7. Delete Delivery sheet independently
+    page.on('dialog', async dialog => await dialog.accept());
+    await page.click('#deleteDeliveryBtn');
+    await page.waitForTimeout(600);
+    await expect(page.locator('#badgeDeliveryFile')).toContainText('Not Uploaded');
+    await expect(page.locator('#badgeOrderStatusFile')).toContainText('Active');
+
+    if (fs.existsSync(orderTestPath)) fs.unlinkSync(orderTestPath);
+  });
 });

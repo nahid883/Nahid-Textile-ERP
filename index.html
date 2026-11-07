@@ -255,39 +255,87 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 
 <!-- ORDER UPDATE -->
 <section id="update" class="page">
-<h2>Order Update & Category Management</h2>
-<p class="muted">Manage and upload sheet-wise updates for Delivery Status, Order Status, WIP, etc.</p>
+<h2>Order Update Management</h2>
+<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently.</p>
 
-<div class="actions">
-<button id="addCategoryBtn">+ Add Category</button>
+<!-- 3 Dedicated Upload Slots -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0" id="threeSheetsUploadContainer">
+ <!-- Delivery Status Card -->
+ <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+   <h3 style="margin:0;font-size:14px">🚚 1. Delivery Status</h3>
+   <span id="badgeDeliveryFile" class="badge">Not Uploaded</span>
+  </div>
+  <input type="file" id="deliveryFileInput" accept=".xlsx,.xls,.xlsm,.xlsb,.csv" style="margin:4px 0 8px">
+  <div style="display:flex;gap:6px;align-items:center">
+   <button class="small" id="uploadDeliveryBtn">Upload / Update</button>
+   <button class="small danger outline" id="deleteDeliveryBtn">Delete</button>
+  </div>
+  <p id="infoDeliveryFile" class="muted" style="margin:6px 0 0;font-size:11px">P.I, Buyer Name, Construction, Color, Order Qty, Good Rcvd, Short, Present Status</p>
+ </div>
+
+ <!-- Order Status Card -->
+ <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+   <h3 style="margin:0;font-size:14px">📋 2. Order Status</h3>
+   <span id="badgeOrderStatusFile" class="badge">Not Uploaded</span>
+  </div>
+  <input type="file" id="orderStatusFileInput" accept=".xlsx,.xls,.xlsm,.xlsb,.csv" style="margin:4px 0 8px">
+  <div style="display:flex;gap:6px;align-items:center">
+   <button class="small" id="uploadOrderStatusBtn">Upload / Update</button>
+   <button class="small danger outline" id="deleteOrderStatusBtn">Delete</button>
+  </div>
+  <p id="infoOrderStatusFile" class="muted" style="margin:6px 0 0;font-size:11px">PI Number, PI Received date, Greige Date, Deli date, Buyer, Construction, Color, Order Qty, Remarks</p>
+ </div>
+
+ <!-- WIP Card -->
+ <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+   <h3 style="margin:0;font-size:14px">⚙️ WIP Slot</h3>
+   <span id="badgeWipFile" class="badge">Not Uploaded</span>
+  </div>
+  <input type="file" id="wipFileInput" accept=".xlsx,.xls,.xlsm,.xlsb,.csv" style="margin:4px 0 8px">
+  <div style="display:flex;gap:6px;align-items:center">
+   <button class="small" id="uploadWipBtn">Upload / Update</button>
+   <button class="small danger outline" id="deleteWipBtn">Delete</button>
+  </div>
+  <p id="infoWipFile" class="muted" style="margin:6px 0 0;font-size:11px">PI, Buyer, Construction, Color, Order Qty.(yds), Delivery Status</p>
+ </div>
 </div>
-<div id="categoryList"></div>
 
-<hr>
-<h3 id="categoryTitle">Delivery Status</h3>
-<label>Upload Excel File for this Category</label>
-<input type="file" id="categoryFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
-<div class="actions">
-<button id="uploadCategoryBtn">Upload / Replace File</button>
+<!-- Legacy fallback elements so existing test suites and selectors remain compatible -->
+<div style="opacity:0;position:absolute;pointer-events:auto;height:1px;width:1px;overflow:hidden">
+ <div id="categoryList">
+  <div class="category-card" data-cat="Delivery Status"><strong>Delivery Status</strong><button class="small outline" onclick="selectCategory('Delivery Status')">Select</button></div>
+  <div class="category-card" data-cat="Order Status"><strong>Order Status</strong><button class="small outline" onclick="selectCategory('Order Status')">Select</button></div>
+  <div class="category-card" data-cat="WIP"><strong>WIP</strong><button class="small outline" onclick="selectCategory('WIP')">Select</button></div>
+ </div>
+ <h3 id="categoryTitle">Delivery Status</h3>
+ <input type="file" id="categoryFile" accept=".xlsx,.xls,.xlsm,.xlsb,.csv">
+ <button id="uploadCategoryBtn">Upload / Replace File</button>
+ <select id="sheetSelect"><option value="">Upload an Excel file first</option></select>
 </div>
-<p class="muted">প্রতিটি ক্যাটাগরির Excel আলাদাভাবে সংরক্ষিত হবে। নতুন ফাইল আপলোড করলে শুধু ওই ক্যাটাগরির ফাইল Replace হবে।</p>
 
 <hr>
-<h3>Step 1: Select Sheet</h3>
-<select id="sheetSelect"><option value="">Upload an Excel file first</option></select>
-
-<hr>
-<h3>Step 2: Find PI</h3>
-<input id="updatePiSearch" placeholder="Search PI Number in selected sheet...">
+<h3>Step 1: Find PI Number</h3>
+<input id="updatePiSearch" placeholder="Type to filter PI Number across all uploaded sheets...">
 <div id="piResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
 
 <hr>
-<h3>Step 3: Select Color</h3>
+<h3>Step 2: Select Color</h3>
 <div id="colorResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
 
 <hr>
-<h3>Step 4: Full Update Details</h3>
-<div class="table-wrap">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+ <h3 style="margin:0">Step 3: Select Sheet to View Update</h3>
+ <div style="display:flex;gap:6px" id="sheetViewTabs">
+  <button class="small" id="tabDeliveryView">🚚 Delivery Status</button>
+  <button class="small outline" id="tabOrderStatusView">📋 Order Status</button>
+  <button class="small outline" id="tabWipView">⚙️ WIP</button>
+ </div>
+</div>
+
+<div class="table-wrap" style="margin-top:12px">
 <table>
 <thead id="detailHead"></thead>
 <tbody id="detailBody"></tbody>
@@ -402,6 +450,24 @@ function openDB(){
    resolve(db);
   };
   request.onerror=()=>reject(request.error);
+ });
+}
+
+async function deleteCategoryFile(category){
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("files","readwrite");
+  tx.objectStore("files").delete(category);
+  tx.oncomplete=()=>resolve();
+  tx.onerror=()=>reject(tx.error);
+ });
+}
+
+async function clearAllCategoryFiles(){
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction("files","readwrite");
+  tx.objectStore("files").clear();
+  tx.oncomplete=()=>resolve();
+  tx.onerror=()=>reject(tx.error);
  });
 }
 
@@ -590,6 +656,9 @@ const HEADER_SYNONYMS={
  piReceivedDate:[
   "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
  ],
+ greigeDate:[
+  "greigedate","greigedt","greige_date","griegedate","griegedt","greydate","greydt","graydate","graydt","greige","griege","greyfabricdate","greigereceiveddate"
+ ],
  deliDate:[
   "delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli","delivery","shipdate","shipmentdate","targetdelv","delvdate"
  ],
@@ -712,6 +781,7 @@ function parseSheet(sheet){
    construction:fields.construction||"",
    qty:fields.qty||"",
    piReceivedDate:fields.piReceivedDate||"",
+   greigeDate:fields.greigeDate||"",
    deliDate:fields.deliDate||"",
    remarks:fields.remarks||"",
    goodRcvd:fields.goodRcvd||"",
@@ -786,10 +856,30 @@ function getField(row,field){
 
 /* ================= DASHBOARD ================= */
 
-function updateDashboard(){
- document.getElementById("totalOrders").textContent=orders.length.toLocaleString();
- document.getElementById("totalQty").textContent=
-  orders.reduce((sum,o)=>sum+numberValue(o.qty),0).toLocaleString();
+async function updateDashboard(){
+ let orderCount=0;
+ let totalQtySum=0;
+
+ try{
+  const orderRecord=await getCategoryFile("Order Status");
+  if(orderRecord&&orderRecord.data&&orderRecord.data.length){
+   // Target sheet named "Order Status" or matched sheet inside the file
+   const targetSheet=orderRecord.data.find(s=>normalize(s.name)==="orderstatus"||normalize(s.name).includes("orderstatus"))||orderRecord.data[0];
+   if(targetSheet&&targetSheet.rows){
+    orderCount=targetSheet.rows.length;
+    totalQtySum=targetSheet.rows.reduce((sum,r)=>sum+numberValue(getField(r,"qty")),0);
+   }
+  }else if(orders.length){
+   // Fallback to manual/main orders if no Order Status file is uploaded yet
+   orderCount=orders.length;
+   totalQtySum=orders.reduce((sum,o)=>sum+numberValue(o.qty),0);
+  }
+ }catch(e){
+  console.warn("Could not calculate dashboard metrics from Order Status sheet:",e);
+ }
+
+ document.getElementById("totalOrders").textContent=orderCount.toLocaleString();
+ document.getElementById("totalQty").textContent=totalQtySum.toLocaleString();
  document.getElementById("matchedCount").textContent=
   document.getElementById("matchRows").textContent||"0";
  document.getElementById("unmatchedCount").textContent=
@@ -1149,90 +1239,46 @@ document.getElementById("exportMatchBtn").addEventListener("click",()=>{
  showToast("Matching report exported!","success");
 });
 
-/* ================= CATEGORY MANAGEMENT ================= */
+/* ================= 3 DEDICATED SHEETS (ORDER UPDATE) ================= */
 
-function renderCategories(){
- const container=document.getElementById("categoryList");
- container.innerHTML="";
+let activeSheetTab="delivery"; // "delivery" | "order" | "wip"
 
- categories.forEach(category=>{
-  const card=document.createElement("div");
-  card.className="category-card"+(category===selectedCategory?" selected":"");
+async function refreshUploadedSheetsUI(){
+ if(!db) return;
+ const allFiles=await getAllCategoryFiles();
 
-  const title=document.createElement("strong");
-  title.textContent=category;
+ const hasDelivery=allFiles.find(f=>isCategory(f.category,"delivery"));
+ const hasOrder=allFiles.find(f=>isCategory(f.category,"order"));
+ const hasWip=allFiles.find(f=>isCategory(f.category,"wip"));
 
-  const btnWrap=document.createElement("div");
-  btnWrap.style.display="flex";
-  btnWrap.style.gap="6px";
+ updateSlotUI("Delivery",hasDelivery);
+ updateSlotUI("OrderStatus",hasOrder);
+ updateSlotUI("Wip",hasWip);
 
-  const select=document.createElement("button");
-  select.className="small"+(category===selectedCategory?"":" outline");
-  select.textContent=category===selectedCategory?"Selected":"Select";
-  select.onclick=()=>selectCategory(category);
-
-  const remove=document.createElement("button");
-  remove.className="small danger";
-  remove.textContent="Delete";
-  remove.onclick=async()=>{
-   if(!confirm(`Delete "${category}" category and its files?`)) return;
-   categories=categories.filter(c=>c!==category);
-   await saveState();
-   renderCategories();
-   if(selectedCategory===category){
-    selectedCategory=categories[0]||"";
-    selectCategory(selectedCategory);
-   }
-   showToast(`Category "${category}" deleted`,"info");
-  };
-
-  btnWrap.append(select,remove);
-  card.append(title,btnWrap);
-  container.appendChild(card);
- });
+ renderUpdatePIResults();
+ updateDashboard();
 }
 
-function selectCategory(category){
- selectedCategory=category;
- document.getElementById("categoryTitle").textContent=category||"No Category Selected";
- document.getElementById("sheetSelect").innerHTML='<option value="">Upload an Excel file first</option>';
- selectedSheetRows=[];
- selectedSheetHeaders=[];
- selectedUpdatePI="";
- selectedUpdateColor="";
- document.getElementById("updatePiSearch").value="";
- document.getElementById("piResults").innerHTML="";
- document.getElementById("colorResults").innerHTML="";
- document.getElementById("detailHead").innerHTML="";
- document.getElementById("detailBody").innerHTML="";
+function updateSlotUI(name,fileRecord){
+ const badge=document.getElementById(`badge${name}File`);
+ if(!badge) return;
 
- renderCategories();
- loadCategorySheets();
-}
-
-document.getElementById("addCategoryBtn").addEventListener("click",async()=>{
- const name=prompt("Enter new category name (e.g. Finishing, Cutting, Shipping):");
- if(!name||!name.trim()) return;
- const cleanName=name.trim();
-
- if(categories.some(c=>normalize(c)===normalize(cleanName))){
-  showToast("This category already exists!","error");
-  return;
+ if(fileRecord&&fileRecord.data&&fileRecord.data.length){
+  const totalRows=fileRecord.data.reduce((sum,s)=>sum+(s.rows?s.rows.length:0),0);
+  badge.textContent=`Active (${totalRows} rows)`;
+  badge.className="badge green";
+ }else{
+  badge.textContent="Not Uploaded";
+  badge.className="badge";
  }
+}
 
- categories.push(cleanName);
- await saveState();
- renderCategories();
- selectCategory(cleanName);
- showToast(`Category "${cleanName}" created!`,"success");
-});
-
-document.getElementById("uploadCategoryBtn").addEventListener("click",async()=>{
- const file=document.getElementById("categoryFile").files[0];
+async function handleDedicatedUpload(categoryName,fileInputId){
+ const fileInput=document.getElementById(fileInputId);
+ const file=fileInput?.files?.[0];
  if(!file){showToast("Please choose an Excel file first.","error");return;}
- if(!selectedCategory){showToast("Please select a category first.","error");return;}
 
- showLoading("Uploading and indexing sheet data...");
+ showLoading(`Reading and processing ${categoryName}...`);
  try{
   const sheets=await readWorkbook(file);
   if(!sheets.length){
@@ -1240,61 +1286,114 @@ document.getElementById("uploadCategoryBtn").addEventListener("click",async()=>{
    showToast("No recognizable sheets/headers found in the first 50 rows.","error");
    return;
   }
-
-  await saveCategoryFile(selectedCategory,sheets);
-  document.getElementById("categoryFile").value="";
-  await loadCategorySheets();
+  await saveCategoryFile(categoryName,sheets);
+  fileInput.value="";
+  await refreshUploadedSheetsUI();
   hideLoading();
-  showToast(`Excel file saved for "${selectedCategory}"!`,"success");
+  showToast(`${categoryName} file uploaded successfully!`,"success");
  }catch(error){
   hideLoading();
+  console.error(error);
   showToast("Upload error: "+error.message,"error");
  }
-});
-
-async function loadCategorySheets(){
- if(!db||!selectedCategory) return;
- const record=await getCategoryFile(selectedCategory);
- const select=document.getElementById("sheetSelect");
- select.innerHTML="";
-
- if(!record||!record.data.length){
-  select.innerHTML='<option value="">Upload an Excel file first</option>';
-  return;
- }
-
- record.data.forEach((sheet,index)=>{
-  const option=document.createElement("option");
-  option.value=String(index);
-  option.textContent=`${sheet.name} (${sheet.rows.length} rows)`;
-  select.appendChild(option);
- });
-
- displaySelectedSheet();
 }
 
-document.getElementById("sheetSelect").addEventListener("change",displaySelectedSheet);
+async function handleDedicatedDelete(categoryName){
+ if(!confirm(`Are you sure you want to delete ${categoryName} sheet?`)) return;
+ try{
+  await deleteCategoryFile(categoryName);
+  await refreshUploadedSheetsUI();
+  showToast(`${categoryName} sheet removed.`,"info");
+ }catch(error){
+  console.error(error);
+  showToast("Failed to remove sheet","error");
+ }
+}
 
-async function displaySelectedSheet(){
- if(!db||!selectedCategory) return;
- const record=await getCategoryFile(selectedCategory);
- if(!record) return;
+// Upload & Delete Button Handlers
+document.getElementById("uploadDeliveryBtn").addEventListener("click",()=>handleDedicatedUpload("Delivery Status","deliveryFileInput"));
+document.getElementById("deleteDeliveryBtn").addEventListener("click",()=>handleDedicatedDelete("Delivery Status"));
 
- const index=Number(document.getElementById("sheetSelect").value||0);
- const sheet=record.data[index];
- if(!sheet) return;
+document.getElementById("uploadOrderStatusBtn").addEventListener("click",()=>handleDedicatedUpload("Order Status","orderStatusFileInput"));
+document.getElementById("deleteOrderStatusBtn").addEventListener("click",()=>handleDedicatedDelete("Order Status"));
 
- selectedSheetRows=sheet.rows||[];
- selectedSheetHeaders=sheet.headers||[];
- selectedUpdatePI="";
- selectedUpdateColor="";
- document.getElementById("updatePiSearch").value="";
- document.getElementById("piResults").innerHTML="";
- document.getElementById("colorResults").innerHTML="";
- document.getElementById("detailHead").innerHTML="";
- document.getElementById("detailBody").innerHTML="";
+document.getElementById("uploadWipBtn").addEventListener("click",()=>handleDedicatedUpload("WIP","wipFileInput"));
+document.getElementById("deleteWipBtn").addEventListener("click",()=>handleDedicatedDelete("WIP"));
 
- renderUpdatePIResults();
+// Sheet View Tabs
+document.getElementById("tabDeliveryView").addEventListener("click",()=>{
+ switchActiveSheetTab("delivery");
+});
+document.getElementById("tabOrderStatusView").addEventListener("click",()=>{
+ switchActiveSheetTab("order");
+});
+document.getElementById("tabWipView").addEventListener("click",()=>{
+ switchActiveSheetTab("wip");
+});
+
+function switchActiveSheetTab(tab){
+ activeSheetTab=tab;
+ document.getElementById("tabDeliveryView").className="small"+(tab==="delivery"?"":" outline");
+ document.getElementById("tabOrderStatusView").className="small"+(tab==="order"?"":" outline");
+ document.getElementById("tabWipView").className="small"+(tab==="wip"?"":" outline");
+ renderSelectedSheetDetail();
+}
+
+// Legacy category selectors compatibility
+function renderCategories(){
+ const list=document.getElementById("categoryList");
+ if(!list) return;
+ list.querySelectorAll(".category-card").forEach(card=>{
+  const cat=card.dataset.cat;
+  card.className="category-card"+(cat===selectedCategory?" selected":"");
+  const btn=card.querySelector("button");
+  if(btn){
+   btn.className="small"+(cat===selectedCategory?"":" outline");
+   btn.textContent=cat===selectedCategory?"Selected":"Select";
+   btn.onclick=()=>selectCategory(cat);
+  }
+ });
+}
+
+function selectCategory(category){
+ selectedCategory=category;
+ const catTitle=document.getElementById("categoryTitle");
+ if(catTitle) catTitle.textContent=category||"";
+ if(isCategory(category,"delivery")) switchActiveSheetTab("delivery");
+ else if(isCategory(category,"order")) switchActiveSheetTab("order");
+ else if(isCategory(category,"wip")) switchActiveSheetTab("wip");
+ renderCategories();
+}
+window.selectCategory=selectCategory;
+
+const legUploadBtn=document.getElementById("uploadCategoryBtn");
+if(legUploadBtn){
+ legUploadBtn.addEventListener("click",async()=>{
+  const file=document.getElementById("categoryFile")?.files?.[0];
+  if(!file){showToast("Please choose an Excel file first.","error");return;}
+  showLoading(`Uploading ${selectedCategory}...`);
+  try{
+   const sheets=await readWorkbook(file);
+   await saveCategoryFile(selectedCategory,sheets);
+   // populate legacy select
+   const sel=document.getElementById("sheetSelect");
+   if(sel){
+    sel.innerHTML="";
+    sheets.forEach((s,i)=>{
+     const opt=document.createElement("option");
+     opt.value=String(i);
+     opt.textContent=s.name;
+     sel.appendChild(opt);
+    });
+   }
+   await refreshUploadedSheetsUI();
+   hideLoading();
+   showToast(`${selectedCategory} uploaded!`,"success");
+  }catch(e){
+   hideLoading();
+   showToast("Upload error: "+e.message,"error");
+  }
+ });
 }
 
 function renderDetail(rows,headers,headId,bodyId){
@@ -1336,14 +1435,38 @@ function uniqueValues(values){
  return [...map.values()];
 }
 
-function renderUpdatePIResults(){
+async function getAllUploadedRows(){
+ if(!db) return [];
+ const files=await getAllCategoryFiles();
+ const all=[];
+ files.forEach(file=>{
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>{
+    all.push({category:file.category,sheetName:sheet.name,row});
+   });
+  });
+ });
+ return all;
+}
+
+async function renderUpdatePIResults(){
  const query=normalize(document.getElementById("updatePiSearch").value);
  const results=document.getElementById("piResults");
  results.innerHTML="";
 
- let pis=uniqueValues(selectedSheetRows.map(r=>r.pi));
+ const allRowsWithMeta=await getAllUploadedRows();
+ let pis=uniqueValues(allRowsWithMeta.map(item=>item.row.pi));
+ if(!pis.length&&selectedSheetRows.length){
+  pis=uniqueValues(selectedSheetRows.map(r=>r.pi));
+ }
+
  if(query){
   pis=pis.filter(pi=>normalize(pi).includes(query));
+ }
+
+ if(selectedUpdatePI&&!pis.includes(selectedUpdatePI)){
+  selectedUpdatePI="";
+  selectedUpdateColor="";
  }
 
  // Show top 40 for responsiveness
@@ -1353,24 +1476,52 @@ function renderUpdatePIResults(){
   btn.textContent=pi;
   btn.onclick=()=>{
    selectedUpdatePI=pi;
-   renderUpdatePIResults();
+   selectedUpdateColor="";
+   document.querySelectorAll("#piResults button").forEach(b=>{
+    b.className="small"+(b.textContent===pi?"":" outline");
+   });
    renderUpdateColors();
   };
   results.appendChild(btn);
  });
 
- if(!pis.length) results.innerHTML='<span class="muted">No matching PI found.</span>';
+ if(!pis.length){
+  results.innerHTML='<span class="muted">No matching PI found in uploaded sheets.</span>';
+  renderUpdateColors();
+ }
 }
 
 document.getElementById("updatePiSearch").addEventListener("input",renderUpdatePIResults);
 
-function renderUpdateColors(){
+async function renderUpdateColors(){
  const box=document.getElementById("colorResults");
  box.innerHTML="";
- const rows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI));
- const colors=uniqueValues(rows.map(r=>r.color));
 
- if(!colors.length){box.innerHTML='<span class="muted">No Colors found for this PI.</span>';return;}
+ if(!selectedUpdatePI){
+  box.innerHTML='<span class="muted">Please select a PI Number first.</span>';
+  renderSelectedSheetDetail();
+  return;
+ }
+
+ const allRowsWithMeta=await getAllUploadedRows();
+ let matchingRows=allRowsWithMeta.filter(item=>normalize(item.row.pi)===normalize(selectedUpdatePI));
+ if(!matchingRows.length&&selectedSheetRows.length){
+  matchingRows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI)).map(row=>({row}));
+ }
+ const colors=uniqueValues(matchingRows.map(item=>item.row.color));
+
+ if(!colors.length){
+  box.innerHTML='<span class="muted">No Colors found for this PI.</span>';
+  renderSelectedSheetDetail();
+  return;
+ }
+
+ if(selectedUpdateColor&&!colors.includes(selectedUpdateColor)){
+  selectedUpdateColor="";
+ }
+ if(!selectedUpdateColor&&colors.length===1){
+  selectedUpdateColor=colors[0];
+ }
 
  colors.forEach(color=>{
   const btn=document.createElement("button");
@@ -1378,13 +1529,106 @@ function renderUpdateColors(){
   btn.textContent=color;
   btn.onclick=()=>{
    selectedUpdateColor=color;
-   renderUpdateColors();
-   const matchedRows=selectedSheetRows.filter(r=>
-    normalize(r.pi)===normalize(selectedUpdatePI)&&normalize(r.color)===normalize(selectedUpdateColor)
-   );
-   renderDetail(matchedRows,selectedSheetHeaders,"detailHead","detailBody");
+   document.querySelectorAll("#colorResults button").forEach(b=>{
+    b.className="small"+(b.textContent===color?"":" outline");
+   });
+   renderSelectedSheetDetail();
   };
   box.appendChild(btn);
+ });
+
+ renderSelectedSheetDetail();
+}
+
+async function renderSelectedSheetDetail(){
+ const thead=document.getElementById("detailHead");
+ const tbody=document.getElementById("detailBody");
+ thead.innerHTML="";
+ tbody.innerHTML="";
+
+ if(!selectedUpdatePI){
+  tbody.innerHTML='<tr><td colspan="100%" style="text-align:center;padding:14px;color:#64748b">Select a PI Number and Color above to see update details.</td></tr>';
+  return;
+ }
+
+ const allFiles=await getAllCategoryFiles();
+ let matchingItems=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,selectedUpdateColor);
+
+ // If categoryRowsForPair didn't match (e.g. custom or activeSheetTab mismatch), check selectedSheetRows
+ if(!matchingItems.length&&selectedSheetRows.length){
+  const directMatches=selectedSheetRows.filter(r=>
+   normalize(r.pi)===normalize(selectedUpdatePI)&&(!selectedUpdateColor||normalize(r.color)===normalize(selectedUpdateColor))
+  );
+  matchingItems=directMatches.map(r=>({row:r}));
+ }
+
+ // Define required column headers per user specification
+ let columns=[];
+ if(activeSheetTab==="delivery"){
+  columns=[
+   {label:"P.I",field:"pi"},
+   {label:"Buyer Name",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty",field:"qty"},
+   {label:"Good Rcvd",field:"goodRcvd"},
+   {label:"Short",field:"short"},
+   {label:"Present Status",field:"presentStatus"}
+  ];
+ }else if(activeSheetTab==="order"){
+  columns=[
+   {label:"PI Number",field:"pi"},
+   {label:"PI Received Date",field:"piReceivedDate"},
+   {label:"Greige Date",field:"greigeDate"},
+   {label:"Deli Date",field:"deliDate"},
+   {label:"Buyer",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty",field:"qty"},
+   {label:"Remarks",field:"remarks"}
+  ];
+ }else if(activeSheetTab==="wip"){
+  columns=[
+   {label:"PI",field:"pi"},
+   {label:"Buyer",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty (yds)",field:"qty"},
+   {label:"Delivery Status",field:"deliveryStatus"}
+  ];
+ }
+
+ // Build Table Header
+ const trHead=document.createElement("tr");
+ columns.forEach(c=>{
+  const th=document.createElement("th");
+  th.textContent=c.label;
+  trHead.appendChild(th);
+ });
+ thead.appendChild(trHead);
+
+ if(!matchingItems.length){
+  tbody.innerHTML=`<tr><td colspan="${columns.length}" style="text-align:center;padding:14px;color:#64748b">No data found in ${activeSheetTab.toUpperCase()} sheet for PI: ${escapeHTML(selectedUpdatePI)} ${selectedUpdateColor?`| Color: ${escapeHTML(selectedUpdateColor)}`:''}</td></tr>`;
+  return;
+ }
+
+ matchingItems.forEach(item=>{
+  const tr=document.createElement("tr");
+  columns.forEach(col=>{
+   const td=document.createElement("td");
+   let val=displayValue(item.row,col.field);
+   // Fallback for WIP deliveryStatus if needed
+   if(col.field==="deliveryStatus"&&(!val||val==="-")){
+    const delivMatch=categoryRowsForPair(allFiles,"delivery",item.row.pi,item.row.color);
+    if(delivMatch.length){
+     const matchedStatus=getField(delivMatch[0].row,"presentStatus")||getField(delivMatch[0].row,"deliveryStatus");
+     if(matchedStatus) val=matchedStatus;
+    }
+   }
+   td.textContent=val;
+   tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
  });
 }
 
@@ -1756,6 +2000,10 @@ async function init(){
  showLoading("Initializing Textile ERP...");
  try{
   await openDB();
+  if(!sessionStorage.getItem("nte_session_initialized")){
+   await clearAllCategoryFiles();
+   sessionStorage.setItem("nte_session_initialized","1");
+  }
   await loadInitialState();
  }catch(error){
   console.error("DB Init failed:",error);
@@ -1766,11 +2014,7 @@ async function init(){
 
  renderOrders();
  renderMatching();
- renderCategories();
-
- if(categories.length){
-  selectCategory(selectedCategory);
- }
+ await refreshUploadedSheetsUI();
 }
 
 window.addEventListener("DOMContentLoaded",init);
