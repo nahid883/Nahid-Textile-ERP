@@ -615,7 +615,7 @@ const HEADER_SYNONYMS={
   "presentstatus","currentstatus","deliverycondition","prodstatus","productionstatus","currentstage","stage","status","presentcondition"
  ],
  deliveryStatus:[
-  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage"
+  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","del_status","deliv_status","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage","deliverystate","delivery_state","delivstate","delstatusupdate","deliverystatusupdate"
  ]
 };
 
@@ -654,6 +654,26 @@ function normalizeOrderRow(raw){
  };
 }
 
+function getRawCell(sheet,r,c){
+ if(!sheet) return null;
+ const addr=XLSX.utils.encode_cell({r,c});
+ return sheet[addr]||null;
+}
+
+function resolveCellVal(sheet,r,c,valFromMatrix){
+ const cell=getRawCell(sheet,r,c);
+ if(cell){
+  // Check formatted text first, then calculated/raw value
+  if(cell.w!==undefined&&cell.w!==null&&String(cell.w).trim()!=="") return String(cell.w).trim();
+  if(cell.v!==undefined&&cell.v!==null&&String(cell.v).trim()!=="") return cellText(cell.v);
+  if(cell.f&&String(cell.f).trim()!==""){
+   // If formula text is present without cached value
+   return cellText(valFromMatrix);
+  }
+ }
+ return cellText(valFromMatrix);
+}
+
 function parseSheet(sheet){
  const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true});
  const found=findHeaderRow(matrix);
@@ -672,10 +692,17 @@ function parseSheet(sheet){
 
  for(let r=found.row+1;r<matrix.length;r++){
   const line=matrix[r]||[];
-  const fields={};
+  const resolvedValues=[];
+  const colCount=Math.max(headers.length,line.length);
 
+  for(let c=0;c<colCount;c++){
+   resolvedValues.push(resolveCellVal(sheet,r,c,line[c]));
+  }
+
+  const fields={};
   Object.keys(typeIndexes).forEach(type=>{
-   fields[type]=cellText(line[typeIndexes[type]]);
+   const cIdx=typeIndexes[type];
+   fields[type]=resolvedValues[cIdx]||"";
   });
 
   const obj={
@@ -692,7 +719,7 @@ function parseSheet(sheet){
    presentStatus:fields.presentStatus||"",
    deliveryStatus:fields.deliveryStatus||"",
    _fields:fields,
-   _values:line.map(cellText)
+   _values:resolvedValues
   };
 
   if(obj.pi||obj.color||obj.construction){
@@ -707,7 +734,7 @@ async function readWorkbook(file){
  if(!window.XLSX) throw new Error("Excel library is not loaded. Please verify internet connection.");
 
  const buffer=await file.arrayBuffer();
- const workbook=XLSX.read(buffer,{type:"array",cellDates:true});
+ const workbook=XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellNF:true,cellStyles:true});
  const result=[];
 
  for(const name of workbook.SheetNames){
@@ -1458,7 +1485,16 @@ function renderSheetSection(title,columns,items){
   const tr=document.createElement("tr");
   columns.forEach(col=>{
    const td=document.createElement("td");
-   td.textContent=displayValue(item.row,col.field);
+   let val=displayValue(item.row,col.field);
+   // If WIP section deliveryStatus is missing or "-", attempt intelligent fallback to uploaded Delivery Status
+   if(col.field==="deliveryStatus"&&(!val||val==="-")){
+    const delivMatch=categoryRowsForPair(globalFiles,"delivery",item.row.pi,item.row.color);
+    if(delivMatch.length){
+     const matchedStatus=getField(delivMatch[0].row,"presentStatus")||getField(delivMatch[0].row,"deliveryStatus");
+     if(matchedStatus) val=matchedStatus;
+    }
+   }
+   td.textContent=val;
    tr.appendChild(td);
   });
   tbody.appendChild(tr);
