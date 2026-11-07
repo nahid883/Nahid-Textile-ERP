@@ -8,6 +8,7 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
   const newFilePath = path.join(__dirname, 'fixtures_new.xlsx');
   const catFilePath = path.join(__dirname, 'fixtures_delivery.xlsx');
   const wipFilePath = path.join(__dirname, 'fixtures_wip.xlsx');
+  const wipFormulaFilePath = path.join(__dirname, 'fixtures_wip_formula.xlsx');
 
   test.beforeAll(async () => {
     // Generate test Excel files
@@ -48,6 +49,30 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     ]);
     XLSX.utils.book_append_sheet(wbWip, wsWip, 'WIP_Status');
     XLSX.writeFile(wbWip, wipFilePath);
+
+    const wbWipFormula = XLSX.utils.book_new();
+    const wsWipFormula = {};
+    wsWipFormula['!ref'] = 'A1:E3';
+    wsWipFormula['A1'] = { t: 's', v: 'Running WIP With Formulas' };
+    wsWipFormula['A2'] = { t: 's', v: 'PI Number' };
+    wsWipFormula['B2'] = { t: 's', v: 'Color' };
+    wsWipFormula['C2'] = { t: 's', v: 'Construction' };
+    wsWipFormula['D2'] = { t: 's', v: 'Order Qty' };
+    wsWipFormula['E2'] = { t: 's', v: 'Delivery status' };
+
+    wsWipFormula['A3'] = { t: 's', v: 'PI-FORMULA-99' };
+    wsWipFormula['B3'] = { t: 's', v: 'Olive Green' };
+    wsWipFormula['C3'] = { t: 's', v: 'Cotton Twill' };
+    wsWipFormula['D3'] = { t: 'n', v: 25000 };
+    // Formula cell with evaluated value and formatted text
+    wsWipFormula['E3'] = {
+      t: 's',
+      f: '=VLOOKUP(A3, Delivery!A:E, 5, FALSE)',
+      v: 'Ready for Shipment',
+      w: 'Ready for Shipment'
+    };
+    XLSX.utils.book_append_sheet(wbWipFormula, wsWipFormula, 'WIP_Formula_Sheet');
+    XLSX.writeFile(wbWipFormula, wipFormulaFilePath);
   });
 
   test.afterAll(async () => {
@@ -55,6 +80,7 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     if (fs.existsSync(newFilePath)) fs.unlinkSync(newFilePath);
     if (fs.existsSync(catFilePath)) fs.unlinkSync(catFilePath);
     if (fs.existsSync(wipFilePath)) fs.unlinkSync(wipFilePath);
+    if (fs.existsSync(wipFormulaFilePath)) fs.unlinkSync(wipFormulaFilePath);
   });
 
   test('Manual Order Entry and Persistence', async ({ page }) => {
@@ -167,5 +193,51 @@ test.describe('Nahid Textile ERP E2E Tests', () => {
     await expect(wipSection).toBeVisible();
     await expect(wipSection).toContainText('10000');
     await expect(wipSection).toContainText('In Dyeing / Printing');
+  });
+
+  test('WIP Upload with formula in Delivery status renders update correctly', async ({ page }) => {
+    await page.goto('http://localhost:8080');
+
+    // Switch to Order Update page
+    await page.click('button[data-page="update"]');
+
+    // Select WIP category
+    const wipCard = page.locator('#categoryList .category-card', { hasText: 'WIP' });
+    await wipCard.locator('button', { hasText: /Select/ }).click();
+    await expect(page.locator('#categoryTitle')).toHaveText('WIP');
+
+    // Upload WIP file containing formula in Delivery status column
+    await page.setInputFiles('#categoryFile', wipFormulaFilePath);
+    await page.click('#uploadCategoryBtn');
+    await page.waitForTimeout(800);
+
+    // Verify sheet loaded in update section
+    await expect(page.locator('#sheetSelect')).toContainText('WIP_Formula_Sheet');
+
+    // Verify Step 2 & 3 in Order Update
+    const piButton = page.locator('#piResults button', { hasText: 'PI-FORMULA-99' });
+    await expect(piButton).toBeVisible();
+    await piButton.click();
+
+    const colorButton = page.locator('#colorResults button', { hasText: 'Olive Green' });
+    await expect(colorButton).toBeVisible();
+    await colorButton.click();
+
+    // Verify detail table shows formula-evaluated Delivery status
+    await expect(page.locator('#detailBody')).toContainText('Ready for Shipment');
+
+    // Go to Global Search
+    await page.click('button[data-page="search"]');
+    await page.fill('#globalInput', 'PI-FORMULA-99');
+    await page.waitForTimeout(500);
+
+    // Click View Details
+    await page.click('text=⚡ View Details');
+
+    // Verify 3. WIP section has correct Order Qty and Delivery Status
+    const wipSection = page.locator('.detail-section', { hasText: '3. WIP' });
+    await expect(wipSection).toBeVisible();
+    await expect(wipSection).toContainText('25000');
+    await expect(wipSection).toContainText('Ready for Shipment');
   });
 });
