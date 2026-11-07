@@ -681,4 +681,1321 @@ const HEADER_SYNONYMS={
  short:[
   "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty","remainingqty"
  ],
- presentStatus
+ presentStatus:[
+  "presentstatus","currentstatus","deliverycondition","prodstatus","productionstatus","currentstage","stage","status","presentcondition"
+ ],
+ deliveryStatus:[
+  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","del_status","deliv_status","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage","deliverystate","delivery_state","delivstate","delstatusupdate","deliverystatusupdate"
+ ]
+};
+
+function headerType(value){
+ const h=normalize(value);
+ if(!h) return "";
+ for(const [type,synonyms] of Object.entries(HEADER_SYNONYMS)){
+  if(synonyms.map(normalize).includes(h)) return type;
+ }
+ return "";
+}
+
+function findHeaderRow(matrix){
+ let best={row:-1,score:0,headers:[]};
+ const limit=Math.min(matrix.length,50);
+
+ for(let r=0;r<limit;r++){
+  const row=matrix[r]||[];
+  const types=row.map(headerType);
+  const score=new Set(types.filter(Boolean)).size;
+
+  if(score>best.score){
+   best={row:r,score,headers:row.map(v=>clean(v))};
+  }
+ }
+ return best.score>=2?best:null;
+}
+
+function normalizeOrderRow(raw){
+ return {
+  pi:clean(raw.pi),
+  buyer:clean(raw.buyer),
+  color:clean(raw.color),
+  construction:clean(raw.construction),
+  qty:numberValue(raw.qty)
+ };
+}
+
+function getRawCell(sheet,r,c){
+ if(!sheet) return null;
+ const addr=XLSX.utils.encode_cell({r,c});
+ return sheet[addr]||null;
+}
+
+function resolveCellVal(sheet,r,c,valFromMatrix){
+ const cell=getRawCell(sheet,r,c);
+ if(cell){
+  if(cell.w!==undefined&&cell.w!==null&&String(cell.w).trim()!=="") return String(cell.w).trim();
+  if(cell.v!==undefined&&cell.v!==null&&String(cell.v).trim()!=="") return cellText(cell.v);
+  if(cell.f&&String(cell.f).trim()!==""){
+   return cellText(valFromMatrix);
+  }
+ }
+ return cellText(valFromMatrix);
+}
+
+function parseSheet(sheet){
+ const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true});
+ const found=findHeaderRow(matrix);
+
+ if(!found) return {headers:[],rows:[],headerRow:-1};
+
+ const headers=found.headers;
+ const typeIndexes={};
+
+ headers.forEach((h,i)=>{
+  const type=headerType(h);
+  if(type&&typeIndexes[type]===undefined) typeIndexes[type]=i;
+ });
+
+ const rows=[];
+
+ for(let r=found.row+1;r<matrix.length;r++){
+  const line=matrix[r]||[];
+  const resolvedValues=[];
+  const colCount=Math.max(headers.length,line.length);
+
+  for(let c=0;c<colCount;c++){
+   resolvedValues.push(resolveCellVal(sheet,r,c,line[c]));
+  }
+
+  const fields={};
+  Object.keys(typeIndexes).forEach(type=>{
+   const cIdx=typeIndexes[type];
+   fields[type]=resolvedValues[cIdx]||"";
+  });
+
+  const obj={
+   pi:fields.pi||"",
+   buyer:fields.buyer||"",
+   color:fields.color||"",
+   construction:fields.construction||"",
+   composition:fields.composition||"",
+   qty:fields.qty||"",
+   piReceivedDate:fields.piReceivedDate||"",
+   greigeDate:fields.greigeDate||"",
+   deliDate:fields.deliDate||"",
+   remarks:fields.remarks||"",
+   goodRcvd:fields.goodRcvd||"",
+   short:fields.short||"",
+   presentStatus:fields.presentStatus||"",
+   deliveryStatus:fields.deliveryStatus||"",
+   _fields:fields,
+   _values:resolvedValues
+  };
+
+  if(obj.pi||obj.color||obj.construction){
+   rows.push(obj);
+  }
+ }
+
+ return {headers,rows,headerRow:found.row};
+}
+
+async function readWorkbook(file){
+ if(!window.XLSX) throw new Error("Excel library is not loaded. Please verify internet connection.");
+
+ const buffer=await file.arrayBuffer();
+ const workbook=XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellNF:true,cellStyles:true});
+ const result=[];
+
+ for(const name of workbook.SheetNames){
+  const sheet=workbook.Sheets[name];
+  if(!sheet||!sheet["!ref"]) continue;
+
+  const range=XLSX.utils.decode_range(sheet["!ref"]);
+  const cellCount=(range.e.r-range.s.r+1)*(range.e.c-range.s.c+1);
+
+  if(cellCount>2000000){
+   console.warn("Sheet exceeds safety threshold (2M cells):",name,cellCount);
+   continue;
+  }
+
+  const parsed=parseSheet(sheet);
+  if(parsed.rows.length){
+   result.push({
+    name,
+    headers:parsed.headers,
+    rows:parsed.rows,
+    headerRow:parsed.headerRow
+   });
+  }
+ }
+
+ return result;
+}
+
+function getField(row,field){
+ if(!row) return "";
+ if(row[field]!==undefined&&row[field]!==null&&row[field]!=="") return row[field];
+ if(row._fields&&row._fields[field]!==undefined&&row._fields[field]!=="") return row._fields[field];
+
+ if(field==="deliveryStatus"&&row.presentStatus) return row.presentStatus;
+ if(field==="presentStatus"&&row.deliveryStatus) return row.deliveryStatus;
+
+ const synonyms=HEADER_SYNONYMS[field]||[];
+ for(const syn of synonyms){
+  if(row[syn]!==undefined&&row[syn]!==null&&row[syn]!=="") return row[syn];
+  if(row._fields&&row._fields[syn]!==undefined&&row._fields[syn]!=="") return row._fields[syn];
+ }
+
+ return "";
+}
+
+/* ================= DASHBOARD METRICS ================= */
+
+async function updateDashboard(){
+ let orderCount=0;
+ let totalQtySum=0;
+
+ try{
+  const allFiles=await getAllCategoryFiles();
+  let countSet=new Set();
+
+  if(allFiles && allFiles.length){
+   allFiles.forEach(file=>{
+    (file.data||[]).forEach(sheet=>{
+     (sheet.rows||[]).forEach(r=>{
+      const pi=clean(r.pi);
+      const color=clean(r.color);
+      if(pi){
+       if(color){
+        const colors=color.split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
+        colors.forEach(c=>countSet.add(pairKey(pi,c)));
+       }else{
+        countSet.add(pairKey(pi,"default"));
+       }
+       totalQtySum += numberValue(getField(r,"qty"));
+      }
+     });
+    });
+   });
+   orderCount = countSet.size;
+  }
+
+  if(!orderCount && orders.length){
+   orders.forEach(o=>{
+    const pi=clean(o.pi);
+    const color=clean(o.color);
+    if(pi){
+     const colors=color.split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
+     if(colors.length){
+      colors.forEach(c=>countSet.add(pairKey(pi,c)));
+     }else{
+      countSet.add(pairKey(pi,"default"));
+     }
+     totalQtySum += numberValue(o.qty);
+    }
+   });
+   orderCount = countSet.size;
+  }
+ }catch(e){
+  console.warn("Could not calculate dashboard metrics:",e);
+ }
+
+ document.getElementById("totalOrders").textContent=orderCount.toLocaleString();
+ document.getElementById("totalQty").textContent=totalQtySum.toLocaleString();
+ document.getElementById("matchedCount").textContent=
+  document.getElementById("matchRows").textContent||"0";
+ document.getElementById("unmatchedCount").textContent=
+  document.getElementById("unmatchRows").textContent||"0";
+}
+
+/* ================= ORDER ENTRY WITH PAGINATION & FILTER ================= */
+
+let orderFilterQuery="";
+let orderCurrentPage=1;
+const ORDER_PAGE_SIZE=25;
+
+function clearOrderForm(){
+ ["piInput","buyerInput","colorInput","constructionInput","qtyInput"].forEach(id=>{
+  document.getElementById(id).value="";
+ });
+ editingId=null;
+ document.getElementById("saveOrderBtn").textContent="Add Order";
+ document.getElementById("cancelEditBtn").classList.add("hidden");
+}
+
+function renderOrders(){
+ const body=document.getElementById("orderTable");
+ body.innerHTML="";
+
+ const q=normalize(orderFilterQuery);
+ const filtered=orders.filter(o=>{
+  if(!q) return true;
+  return normalize(o.pi).includes(q)||
+         normalize(o.buyer).includes(q)||
+         normalize(o.color).includes(q)||
+         normalize(o.construction).includes(q);
+ });
+
+ const total=filtered.length;
+ const totalPages=Math.max(1,Math.ceil(total/ORDER_PAGE_SIZE));
+ if(orderCurrentPage>totalPages) orderCurrentPage=totalPages;
+
+ const start=(orderCurrentPage-1)*ORDER_PAGE_SIZE;
+ const pageItems=filtered.slice(start,start+ORDER_PAGE_SIZE);
+
+ if(!pageItems.length){
+  body.innerHTML='<tr><td colspan="7" style="text-align:center;padding:18px;color:#64748b">No orders found.</td></tr>';
+ }else{
+  pageItems.forEach(order=>{
+   const tr=document.createElement("tr");
+
+   const displayQty=order.qty!==""&&order.qty!==null&&!isNaN(order.qty)?Number(order.qty).toLocaleString():"";
+   [order.pi,order.buyer,order.color,order.construction,displayQty].forEach(value=>{
+    const td=document.createElement("td");
+    td.textContent=value??"";
+    tr.appendChild(td);
+   });
+
+   const srcTd=document.createElement("td");
+   srcTd.innerHTML=order.source==="manual"
+    ?'<span class="badge blue">Manual</span>'
+    :'<span class="badge">Excel</span>';
+   tr.appendChild(srcTd);
+
+   const action=document.createElement("td");
+   const edit=document.createElement("button");
+   edit.className="small";
+   edit.textContent="Edit";
+   edit.onclick=()=>editOrder(order.id);
+
+   const del=document.createElement("button");
+   del.className="small danger";
+   del.textContent="Delete";
+   del.style.marginLeft="5px";
+   del.onclick=()=>deleteOrder(order.id);
+
+   action.append(edit,del);
+   tr.appendChild(action);
+   body.appendChild(tr);
+  });
+ }
+
+ const pagEl=document.getElementById("orderPagination");
+ pagEl.innerHTML=`
+  <div>Showing ${total?start+1:0} to ${Math.min(start+ORDER_PAGE_SIZE,total)} of ${total} orders</div>
+  <div class="pagination-controls">
+   <button class="small outline" ${orderCurrentPage<=1?"disabled":""} id="orderPrevBtn">&larr; Prev</button>
+   <span style="padding:6px 10px;font-weight:600">Page ${orderCurrentPage} of ${totalPages}</span>
+   <button class="small outline" ${orderCurrentPage>=totalPages?"disabled":""} id="orderNextBtn">Next &rarr;</button>
+  </div>
+ `;
+
+ const prev=document.getElementById("orderPrevBtn");
+ const next=document.getElementById("orderNextBtn");
+ if(prev) prev.onclick=()=>{if(orderCurrentPage>1){orderCurrentPage--;renderOrders();}};
+ if(next) next.onclick=()=>{if(orderCurrentPage<totalPages){orderCurrentPage++;renderOrders();}};
+
+ updateDashboard();
+}
+
+document.getElementById("orderFilterInput").addEventListener("input",(e)=>{
+ orderFilterQuery=e.target.value;
+ orderCurrentPage=1;
+ renderOrders();
+});
+
+function editOrder(id){
+ const order=orders.find(o=>o.id===id);
+ if(!order) return;
+
+ editingId=id;
+ document.getElementById("piInput").value=order.pi;
+ document.getElementById("buyerInput").value=order.buyer;
+ document.getElementById("colorInput").value=order.color;
+ document.getElementById("constructionInput").value=order.construction;
+ document.getElementById("qtyInput").value=order.qty;
+ document.getElementById("saveOrderBtn").textContent="Update Order";
+ document.getElementById("cancelEditBtn").classList.remove("hidden");
+ document.getElementById("entry").scrollIntoView({behavior:"smooth"});
+}
+
+async function deleteOrder(id){
+ if(!confirm("Are you sure you want to delete this Order?")) return;
+ orders=orders.filter(o=>o.id!==id);
+ manualOrders=manualOrders.filter(o=>o.id!==id);
+ await saveState();
+ renderOrders();
+ showToast("Order deleted successfully","info");
+}
+
+document.getElementById("saveOrderBtn").addEventListener("click",async()=>{
+ const row=normalizeOrderRow({
+  pi:document.getElementById("piInput").value,
+  buyer:document.getElementById("buyerInput").value,
+  color:document.getElementById("colorInput").value,
+  construction:document.getElementById("constructionInput").value,
+  qty:document.getElementById("qtyInput").value
+ });
+
+ if(!row.pi||!row.color){
+  showToast("PI Number and Color are required!","error");
+  return;
+ }
+
+ if(editingId){
+  const old=orders.find(o=>o.id===editingId);
+  const updated={...row,id:editingId,source:old?.source||"manual"};
+  orders=orders.map(o=>o.id===editingId?updated:o);
+  if(updated.source==="manual"){
+   manualOrders=manualOrders.map(o=>o.id===editingId?updated:o);
+  }
+  showToast("Order updated successfully!","success");
+ }else{
+  const item={...row,id:Date.now()+"_"+Math.random().toString(36).slice(2),source:"manual"};
+  orders.push(item);
+  manualOrders.push(item);
+  showToast("New order added successfully!","success");
+ }
+
+ await saveState();
+ clearOrderForm();
+ renderOrders();
+});
+
+document.getElementById("cancelEditBtn").addEventListener("click",clearOrderForm);
+
+document.getElementById("clearOrdersBtn").addEventListener("click",async()=>{
+ if(!confirm("Are you sure you want to clear ALL orders? This cannot be undone.")) return;
+ orders=[];
+ manualOrders=[];
+ mainData=[];
+ await saveState();
+ renderOrders();
+ renderMatching();
+ showToast("All orders have been cleared.","info");
+});
+
+document.getElementById("exportOrdersBtn").addEventListener("click",()=>{
+ if(!orders.length){showToast("No orders to export","error");return;}
+ const exportData=orders.map(o=>({
+  "PI Number":o.pi,
+  "Buyer":o.buyer,
+  "Color":o.color,
+  "Construction":o.construction,
+  "Order Qty":numberValue(o.qty),
+  "Source":o.source
+ }));
+ const ws=XLSX.utils.json_to_sheet(exportData);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,"Orders");
+ XLSX.writeFile(wb,`Nahid_Textile_Orders_${Date.now()}.xlsx`);
+ showToast("Orders exported successfully!","success");
+});
+
+/* ================= MAIN EXCEL IMPORT ================= */
+
+document.getElementById("importMainBtn").addEventListener("click",async()=>{
+ const file=document.getElementById("mainFile").files[0];
+ if(!file){showToast("Please select an Excel file first.","error");return;}
+
+ showLoading("Reading and parsing Excel file...");
+ try{
+  const sheets=await readWorkbook(file);
+  const imported=[];
+
+  sheets.forEach(sheet=>{
+   sheet.rows.forEach(row=>{
+    if(row.pi){
+     imported.push({...normalizeOrderRow(row),id:"main_"+Math.random().toString(36).slice(2),source:"main"});
+    }
+   });
+  });
+
+  if(!imported.length){
+   hideLoading();
+   showToast("No PI records found. Please check header row in Excel.","error");
+   return;
+  }
+
+  mainData=imported;
+  orders=[...manualOrders,...mainData];
+  await saveState();
+  hideLoading();
+  renderOrders();
+  showToast(`${imported.length} orders imported successfully!`,"success");
+ }catch(error){
+  hideLoading();
+  console.error(error);
+  showToast("Excel Import failed: "+error.message,"error");
+ }
+});
+
+/* ================= MATCHING ENGINE WITH FILTERS & EXPORT ================= */
+
+let matchFilter="all";
+
+function renderMatching(){
+ const mainBody=document.getElementById("mainMatchTable");
+ const newBody=document.getElementById("newMatchTable");
+ mainBody.innerHTML="";
+ newBody.innerHTML="";
+
+ const mainKeys=new Set(mainData.map(keyOf));
+ const newKeys=new Set(newData.map(keyOf));
+ let matched=0,unmatched=0;
+
+ function addRows(data,body,otherKeys){
+  if(!data.length){
+   body.innerHTML='<tr><td colspan="6" style="text-align:center;padding:14px;color:#64748b">No data imported.</td></tr>';
+   return;
+  }
+
+  data.forEach(row=>{
+   const yes=otherKeys.has(keyOf(row));
+   if(yes) matched++; else unmatched++;
+
+   if(matchFilter==="matched"&&!yes) return;
+   if(matchFilter==="unmatched"&&yes) return;
+
+   const tr=document.createElement("tr");
+   const status=document.createElement("td");
+   status.innerHTML=yes?'<span class="badge green">Matched</span>':'<span class="badge red">Unmatched</span>';
+   tr.appendChild(status);
+
+   [row.pi,row.buyer,row.color,row.construction,row.qty].forEach(value=>{
+    const td=document.createElement("td");
+    td.textContent=value??"";
+    tr.appendChild(td);
+   });
+   body.appendChild(tr);
+  });
+ }
+
+ addRows(mainData,mainBody,newKeys);
+ addRows(newData,newBody,mainKeys);
+
+ document.getElementById("matchRows").textContent=matched;
+ document.getElementById("unmatchRows").textContent=unmatched;
+ updateDashboard();
+}
+
+document.getElementById("filterMatchAll").onclick=()=>{
+ matchFilter="all";
+ highlightMatchFilterBtn("filterMatchAll");
+ renderMatching();
+};
+document.getElementById("filterMatchMatched").onclick=()=>{
+ matchFilter="matched";
+ highlightMatchFilterBtn("filterMatchMatched");
+ renderMatching();
+};
+document.getElementById("filterMatchUnmatched").onclick=()=>{
+ matchFilter="unmatched";
+ highlightMatchFilterBtn("filterMatchUnmatched");
+ renderMatching();
+};
+
+function highlightMatchFilterBtn(activeId){
+ ["filterMatchAll","filterMatchMatched","filterMatchUnmatched"].forEach(id=>{
+  const b=document.getElementById(id);
+  if(id===activeId){
+   b.classList.remove("outline");
+  }else{
+   b.classList.add("outline");
+  }
+ });
+}
+
+document.getElementById("importNewBtn").addEventListener("click",async()=>{
+ const file=document.getElementById("newFile").files[0];
+ if(!file){showToast("Please select New/Updated Excel file.","error");return;}
+
+ showLoading("Comparing files...");
+ try{
+  const sheets=await readWorkbook(file);
+  const imported=[];
+
+  sheets.forEach(sheet=>{
+   sheet.rows.forEach(row=>{
+    if(row.pi) imported.push(normalizeOrderRow(row));
+   });
+  });
+
+  if(!imported.length){
+   hideLoading();
+   showToast("No valid rows found in the new file.","error");
+   return;
+  }
+
+  newData=imported;
+  await saveState();
+  hideLoading();
+  renderMatching();
+  showToast(`${imported.length} rows imported and compared successfully!`,"success");
+ }catch(error){
+  hideLoading();
+  showToast("Import error: "+error.message,"error");
+ }
+});
+
+document.getElementById("exportMatchBtn").addEventListener("click",()=>{
+ if(!mainData.length&&!newData.length){showToast("No matching data to export","error");return;}
+
+ const newKeys=new Set(newData.map(keyOf));
+ const report=mainData.map(r=>({
+  "Status":newKeys.has(keyOf(r))?"Matched":"Unmatched",
+  "PI Number":r.pi,
+  "Buyer":r.buyer,
+  "Color":r.color,
+  "Construction":r.construction,
+  "Order Qty":numberValue(r.qty)
+ }));
+
+ const ws=XLSX.utils.json_to_sheet(report);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,"Matching_Report");
+ XLSX.writeFile(wb,`Matching_Report_${Date.now()}.xlsx`);
+ showToast("Matching report exported!","success");
+});
+
+/* ================= 3 DEDICATED SHEETS (ORDER UPDATE) ================= */
+
+let activeSheetTab="delivery";
+
+async function refreshUploadedSheetsUI(){
+ if(!db) return;
+ const allFiles=await getAllCategoryFiles();
+
+ const hasDelivery=allFiles.find(f=>isCategory(f.category,"delivery"));
+ const hasOrder=allFiles.find(f=>isCategory(f.category,"order"));
+ const hasWip=allFiles.find(f=>isCategory(f.category,"wip"));
+
+ updateSlotUI("Delivery",hasDelivery);
+ updateSlotUI("OrderStatus",hasOrder);
+ updateSlotUI("Wip",hasWip);
+
+ renderUpdatePIResults();
+ updateDashboard();
+}
+
+function updateSlotUI(name,fileRecord){
+ const badge=document.getElementById(`badge${name}File`);
+ if(!badge) return;
+
+ if(fileRecord&&fileRecord.data&&fileRecord.data.length){
+  const totalRows=fileRecord.data.reduce((sum,s)=>sum+(s.rows?s.rows.length:0),0);
+  badge.textContent=`Active (${totalRows} rows)`;
+  badge.className="badge green";
+ }else{
+  badge.textContent="Not Uploaded";
+  badge.className="badge";
+ }
+}
+
+async function handleDedicatedUpload(categoryName,fileInputId){
+ const fileInput=document.getElementById(fileInputId);
+ const file=fileInput?.files?.[0];
+ if(!file){showToast("Please choose an Excel file first.","error");return;}
+
+ showLoading(`Reading and processing ${categoryName}...`);
+ try{
+  const sheets=await readWorkbook(file);
+  if(!sheets.length){
+   hideLoading();
+   showToast("No recognizable sheets/headers found in the first 50 rows.","error");
+   return;
+  }
+  await saveCategoryFile(categoryName,sheets);
+  fileInput.value="";
+  await refreshUploadedSheetsUI();
+  hideLoading();
+  showToast(`${categoryName} file uploaded successfully!`,"success");
+ }catch(error){
+  hideLoading();
+  console.error(error);
+  showToast("Upload error: "+error.message,"error");
+ }
+}
+
+async function handleDedicatedDelete(categoryName){
+ if(!confirm(`Are you sure you want to delete ${categoryName} sheet?`)) return;
+ try{
+  await deleteCategoryFile(categoryName);
+  await refreshUploadedSheetsUI();
+  showToast(`${categoryName} sheet removed.`,"info");
+ }catch(error){
+  console.error(error);
+  showToast("Failed to remove sheet","error");
+ }
+}
+
+document.getElementById("uploadDeliveryBtn").addEventListener("click",()=>handleDedicatedUpload("Delivery Status","deliveryFileInput"));
+document.getElementById("deleteDeliveryBtn").addEventListener("click",()=>handleDedicatedDelete("Delivery Status"));
+
+document.getElementById("uploadOrderStatusBtn").addEventListener("click",()=>handleDedicatedUpload("Order Status","orderStatusFileInput"));
+document.getElementById("deleteOrderStatusBtn").addEventListener("click",()=>handleDedicatedDelete("Order Status"));
+
+document.getElementById("uploadWipBtn").addEventListener("click",()=>handleDedicatedUpload("WIP","wipFileInput"));
+document.getElementById("deleteWipBtn").addEventListener("click",()=>handleDedicatedDelete("WIP"));
+
+document.getElementById("tabDeliveryView").addEventListener("click",()=>{
+ switchActiveSheetTab("delivery");
+});
+document.getElementById("tabOrderStatusView").addEventListener("click",()=>{
+ switchActiveSheetTab("order");
+});
+document.getElementById("tabWipView").addEventListener("click",()=>{
+ switchActiveSheetTab("wip");
+});
+
+function switchActiveSheetTab(tab){
+ activeSheetTab=tab;
+ document.getElementById("tabDeliveryView").className="small"+(tab==="delivery"?"":" outline");
+ document.getElementById("tabOrderStatusView").className="small"+(tab==="order"?"":" outline");
+ document.getElementById("tabWipView").className="small"+(tab==="wip"?"":" outline");
+ renderSelectedSheetDetail();
+}
+
+function renderCategories(){
+ const list=document.getElementById("categoryList");
+ if(!list) return;
+ list.querySelectorAll(".category-card").forEach(card=>{
+  const cat=card.dataset.cat;
+  card.className="category-card"+(cat===selectedCategory?" selected":"");
+  const btn=card.querySelector("button");
+  if(btn){
+   btn.className="small"+(cat===selectedCategory?"":" outline");
+   btn.textContent=cat===selectedCategory?"Selected":"Select";
+   btn.onclick=()=>selectCategory(cat);
+  }
+ });
+}
+
+function selectCategory(category){
+ selectedCategory=category;
+ const catTitle=document.getElementById("categoryTitle");
+ if(catTitle) catTitle.textContent=category||"";
+ if(isCategory(category,"delivery")) switchActiveSheetTab("delivery");
+ else if(isCategory(category,"order")) switchActiveSheetTab("order");
+ else if(isCategory(category,"wip")) switchActiveSheetTab("wip");
+ renderCategories();
+}
+window.selectCategory=selectCategory;
+
+const legUploadBtn=document.getElementById("uploadCategoryBtn");
+if(legUploadBtn){
+ legUploadBtn.addEventListener("click",async()=>{
+  const file=document.getElementById("categoryFile")?.files?.[0];
+  if(!file){showToast("Please choose an Excel file first.","error");return;}
+  showLoading(`Uploading ${selectedCategory}...`);
+  try{
+   const sheets=await readWorkbook(file);
+   await saveCategoryFile(selectedCategory,sheets);
+   const sel=document.getElementById("sheetSelect");
+   if(sel){
+    sel.innerHTML="";
+    sheets.forEach((s,i)=>{
+     const opt=document.createElement("option");
+     opt.value=String(i);
+     opt.textContent=s.name;
+     sel.appendChild(opt);
+    });
+   }
+   await refreshUploadedSheetsUI();
+   hideLoading();
+   showToast(`${selectedCategory} uploaded!`,"success");
+  }catch(e){
+   hideLoading();
+   showToast("Upload error: "+e.message,"error");
+  }
+ });
+}
+
+function uniqueValues(values){
+ const map=new Map();
+ values.forEach(v=>{
+  const value=clean(v);
+  if(value&&!map.has(normalize(value))) map.set(normalize(value),value);
+ });
+ return [...map.values()];
+}
+
+async function getAllUploadedRows(){
+ if(!db) return [];
+ const files=await getAllCategoryFiles();
+ const all=[];
+ files.forEach(file=>{
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>{
+    all.push({category:file.category,sheetName:sheet.name,row});
+   });
+  });
+ });
+ return all;
+}
+
+async function renderUpdatePIResults(){
+ const query=normalize(document.getElementById("updatePiSearch").value);
+ const results=document.getElementById("piResults");
+ results.innerHTML="";
+
+ const allRowsWithMeta=await getAllUploadedRows();
+ let pis=uniqueValues(allRowsWithMeta.map(item=>item.row.pi));
+ if(!pis.length&&selectedSheetRows.length){
+  pis=uniqueValues(selectedSheetRows.map(r=>r.pi));
+ }
+
+ if(query){
+  pis=pis.filter(pi=>normalize(pi).includes(query));
+ }
+
+ if(selectedUpdatePI&&!pis.includes(selectedUpdatePI)){
+  selectedUpdatePI="";
+  selectedUpdateColor="";
+ }
+
+ pis.slice(0,40).forEach(pi=>{
+  const btn=document.createElement("button");
+  btn.className="small"+(selectedUpdatePI===pi?"":" outline");
+  btn.textContent=pi;
+  btn.onclick=()=>{
+   selectedUpdatePI=pi;
+   selectedUpdateColor="";
+   document.querySelectorAll("#piResults button").forEach(b=>{
+    b.className="small"+(b.textContent===pi?"":" outline");
+   });
+   renderUpdateColors();
+  };
+  results.appendChild(btn);
+ });
+
+ if(!pis.length){
+  results.innerHTML='<span class="muted">No matching PI found in uploaded sheets.</span>';
+  renderUpdateColors();
+ }
+}
+
+document.getElementById("updatePiSearch").addEventListener("input",renderUpdatePIResults);
+
+async function renderUpdateColors(){
+ const box=document.getElementById("colorResults");
+ box.innerHTML="";
+
+ if(!selectedUpdatePI){
+  box.innerHTML='<span class="muted">Please select a PI Number first.</span>';
+  renderSelectedSheetDetail();
+  return;
+ }
+
+ const allRowsWithMeta=await getAllUploadedRows();
+ let matchingRows=allRowsWithMeta.filter(item=>normalize(item.row.pi)===normalize(selectedUpdatePI));
+ if(!matchingRows.length&&selectedSheetRows.length){
+  matchingRows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI)).map(row=>({row}));
+ }
+ const colors=uniqueValues(matchingRows.map(item=>item.row.color));
+
+ if(!colors.length){
+  box.innerHTML='<span class="muted">No Colors found for this PI.</span>';
+  renderSelectedSheetDetail();
+  return;
+ }
+
+ if(selectedUpdateColor&&!colors.includes(selectedUpdateColor)){
+  selectedUpdateColor="";
+ }
+ if(!selectedUpdateColor&&colors.length===1){
+  selectedUpdateColor=colors[0];
+ }
+
+ colors.forEach(color=>{
+  const btn=document.createElement("button");
+  btn.className="small"+(selectedUpdateColor===color?"":" outline");
+  btn.textContent=color;
+  btn.onclick=()=>{
+   selectedUpdateColor=color;
+   document.querySelectorAll("#colorResults button").forEach(b=>{
+    b.className="small"+(b.textContent===color?"":" outline");
+   });
+   renderSelectedSheetDetail();
+  };
+  box.appendChild(btn);
+ });
+
+ renderSelectedSheetDetail();
+}
+
+async function renderSelectedSheetDetail(){
+ const thead=document.getElementById("detailHead");
+ const tbody=document.getElementById("detailBody");
+ thead.innerHTML="";
+ tbody.innerHTML="";
+
+ if(!selectedUpdatePI){
+  tbody.innerHTML='<tr><td colspan="100%" style="text-align:center;padding:14px;color:#64748b">Select a PI Number and Color above to see update details.</td></tr>';
+  return;
+ }
+
+ const allFiles=await getAllCategoryFiles();
+ let matchingItems=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,selectedUpdateColor);
+
+ if(!matchingItems.length&&selectedSheetRows.length){
+  const directMatches=selectedSheetRows.filter(r=>
+   normalize(r.pi)===normalize(selectedUpdatePI)&&(!selectedUpdateColor||normalize(r.color)===normalize(selectedUpdateColor))
+  );
+  matchingItems=directMatches.map(r=>({row:r}));
+ }
+
+ let columns=[];
+ if(activeSheetTab==="delivery"){
+  columns=[
+   {label:"P.I",field:"pi"},
+   {label:"Buyer Name",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty",field:"qty"},
+   {label:"Good Rcvd",field:"goodRcvd"},
+   {label:"Short",field:"short"},
+   {label:"Present Status",field:"presentStatus"}
+  ];
+ }else if(activeSheetTab==="order"){
+  columns=[
+   {label:"PI Number",field:"pi"},
+   {label:"PI Received Date",field:"piReceivedDate"},
+   {label:"Greige Date",field:"greigeDate"},
+   {label:"Deli Date",field:"deliDate"},
+   {label:"Buyer",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty",field:"qty"},
+   {label:"Remarks",field:"remarks"}
+  ];
+ }else if(activeSheetTab==="wip"){
+  columns=[
+   {label:"PI",field:"pi"},
+   {label:"Buyer",field:"buyer"},
+   {label:"Construction",field:"construction"},
+   {label:"Color",field:"color"},
+   {label:"Order Qty (yds)",field:"qty"},
+   {label:"Delivery Status",field:"deliveryStatus"}
+  ];
+ }
+
+ const trHead=document.createElement("tr");
+ columns.forEach(c=>{
+  const th=document.createElement("th");
+  th.textContent=c.label;
+  trHead.appendChild(th);
+ });
+ thead.appendChild(trHead);
+
+ if(!matchingItems.length){
+  tbody.innerHTML=`<tr><td colspan="${columns.length}" style="text-align:center;padding:14px;color:#64748b">No data found in ${activeSheetTab.toUpperCase()} sheet for PI: ${escapeHTML(selectedUpdatePI)} ${selectedUpdateColor?`| Color: ${escapeHTML(selectedUpdateColor)}`:''}</td></tr>`;
+  return;
+ }
+
+ matchingItems.forEach(item=>{
+  const tr=document.createElement("tr");
+  columns.forEach(col=>{
+   const td=document.createElement("td");
+   let val=displayValue(item.row,col.field);
+   if(col.field==="deliveryStatus"&&(!val||val==="-")){
+    const delivMatch=categoryRowsForPair(allFiles,"delivery",item.row.pi,item.row.color);
+    if(delivMatch.length){
+     const matchedStatus=getField(delivMatch[0].row,"presentStatus")||getField(delivMatch[0].row,"deliveryStatus");
+     if(matchedStatus) val=matchedStatus;
+    }
+   }
+   td.textContent=val;
+   tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+ });
+}
+
+/* ================= GLOBAL SEARCH FOR ALL 3 SHEETS ================= */
+
+let globalSearchDebounce=null;
+
+document.getElementById("globalInput").addEventListener("input",()=>{
+ clearTimeout(globalSearchDebounce);
+ globalSearchDebounce=setTimeout(runGlobalSearch,250);
+});
+
+document.getElementById("globalSearchBtn").addEventListener("click",runGlobalSearch);
+document.getElementById("globalInput").addEventListener("keydown",e=>{
+ if(e.key==="Enter"){
+  clearTimeout(globalSearchDebounce);
+  runGlobalSearch();
+ }
+});
+
+document.getElementById("globalClearBtn").addEventListener("click",()=>{
+ document.getElementById("globalInput").value="";
+ document.getElementById("globalResults").innerHTML='<p class="muted">Type a query above to search instantly.</p>';
+ document.getElementById("globalSummary").innerHTML="";
+ document.getElementById("globalChoices").innerHTML="";
+ document.getElementById("globalDetails").innerHTML="";
+ globalFiles=[];
+});
+
+function isCategory(category,kind){
+ const c=normalize(category);
+ if(kind==="order") return c==="orderstatus"||c.includes("orderstatus")||c==="order"||c.includes("orderreport");
+ if(kind==="delivery") return c==="deliverystatus"||c.includes("deliverystatus")||c==="delivery"||c.includes("deliveryreport");
+ if(kind==="wip") return c==="wip"||c.includes("wip")||c.includes("wipstatus")||c.includes("workinprogress");
+ return false;
+}
+
+function rowMatchesPair(row,pi,color){
+ const rowPi=normalize(row.pi);
+ const targetPi=normalize(pi);
+ if(!rowPi || rowPi !== targetPi) return false;
+ if(!color) return true;
+ return normalize(row.color)===normalize(color);
+}
+
+function categoryRowsForPair(files,kind,pi,color){
+ const found=[];
+ files.forEach(file=>{
+  if(!isCategory(file.category,kind)) return;
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>{
+    if(rowMatchesPair(row,pi,color)){
+     found.push({category:file.category,sheet:sheet.name,row});
+    }
+   });
+  });
+ });
+ return found;
+}
+
+function displayValue(row,field){
+ return clean(getField(row,field))||"-";
+}
+
+function renderSheetSection(title,columns,items){
+ const section=document.createElement("div");
+ section.className="detail-section";
+
+ const heading=document.createElement("h3");
+ heading.innerHTML=`<span>${escapeHTML(title)}</span><span class="badge ${items.length?'green':''}">${items.length} records</span>`;
+ section.appendChild(heading);
+
+ if(!items.length){
+  const empty=document.createElement("div");
+  empty.className="detail-empty";
+  empty.textContent="No data found for this category.";
+  section.appendChild(empty);
+  return section;
+ }
+
+ const sourceNames=uniqueValues(items.map(item=>item.category+" / "+item.sheet));
+ const source=document.createElement("p");
+ source.className="muted";
+ source.textContent="Source: "+sourceNames.join(", ");
+ section.appendChild(source);
+
+ const wrap=document.createElement("div");
+ wrap.className="table-wrap";
+ const table=document.createElement("table");
+ const thead=document.createElement("thead");
+ const tbody=document.createElement("tbody");
+ const headerRow=document.createElement("tr");
+
+ columns.forEach(col=>{
+  const th=document.createElement("th");
+  th.textContent=col.label;
+  headerRow.appendChild(th);
+ });
+ thead.appendChild(headerRow);
+
+ items.forEach(item=>{
+  const tr=document.createElement("tr");
+  columns.forEach(col=>{
+   const td=document.createElement("td");
+   let val=displayValue(item.row,col.field);
+   if(col.field==="deliveryStatus"&&(!val||val==="-")){
+    const delivMatch=categoryRowsForPair(globalFiles,"delivery",item.row.pi,item.row.color);
+    if(delivMatch.length){
+     const matchedStatus=getField(delivMatch[0].row,"presentStatus")||getField(delivMatch[0].row,"deliveryStatus");
+     if(matchedStatus) val=matchedStatus;
+    }
+   }
+   td.textContent=val;
+   tr.appendChild(td);
+  });
+  tbody.appendChild(tr);
+ });
+
+ table.append(thead,tbody);
+ wrap.appendChild(table);
+ section.appendChild(wrap);
+ return section;
+}
+
+function renderCustomSheetSection(file,pi,color){
+ const matchingRows=[];
+ (file.data||[]).forEach(sheet=>{
+  (sheet.rows||[]).forEach(row=>{
+   if(rowMatchesPair(row,pi,color)){
+    matchingRows.push({sheetName:sheet.name,headers:sheet.headers,row});
+   }
+  });
+ });
+
+ if(!matchingRows.length) return null;
+
+ const section=document.createElement("div");
+ section.className="detail-section";
+ section.innerHTML=`<h3><span>📂 ${escapeHTML(file.category)}</span><span class="badge green">${matchingRows.length} records</span></h3>`;
+
+ matchingRows.forEach(mr=>{
+  const p=document.createElement("p");
+  p.className="muted";
+  p.textContent="Sheet: "+mr.sheetName;
+  section.appendChild(p);
+
+  const wrap=document.createElement("div");
+  wrap.className="table-wrap";
+  const table=document.createElement("table");
+  const thead=document.createElement("thead");
+  const tbody=document.createElement("tbody");
+
+  const trH=document.createElement("tr");
+  (mr.headers||[]).forEach(h=>{
+   const th=document.createElement("th");
+   th.textContent=h||"-";
+   trH.appendChild(th);
+  });
+  thead.appendChild(trH);
+
+  const trB=document.createElement("tr");
+  (mr.row._values||[]).forEach(val=>{
+   const td=document.createElement("td");
+   td.textContent=val??"";
+   trB.appendChild(td);
+  });
+  tbody.appendChild(trB);
+
+  table.append(thead,tbody);
+  wrap.appendChild(table);
+  section.appendChild(wrap);
+ });
+
+ return section;
+}
+
+function showGlobalDetail(pi,color){
+ const box=document.getElementById("globalDetails");
+ box.innerHTML="";
+
+ const titleWrap=document.createElement("div");
+ titleWrap.style.display="flex";
+ titleWrap.style.justifyContent="space-between";
+ titleWrap.style.alignItems="center";
+ titleWrap.innerHTML=`<h3>Details for PI: <span style="color:var(--accent)">${escapeHTML(pi)}</span> | Color: <span style="color:var(--accent)">${escapeHTML(color)}</span></h3>`;
+ box.appendChild(titleWrap);
+
+ const orderRows=categoryRowsForPair(globalFiles,"order",pi,color);
+ const deliveryRows=categoryRowsForPair(globalFiles,"delivery",pi,color);
+ const wipRows=categoryRowsForPair(globalFiles,"wip",pi,color);
+
+ let sumOrderQty=0,sumGoodRcvd=0,sumShort=0;
+ [...orderRows,...deliveryRows,...wipRows].forEach(item=>{
+  const q=numberValue(getField(item.row,"qty"));
+  const gr=numberValue(getField(item.row,"goodRcvd"));
+  const sh=numberValue(getField(item.row,"short"));
+  if(q) sumOrderQty=Math.max(sumOrderQty,q);
+  if(gr) sumGoodRcvd+=gr;
+  if(sh) sumShort+=sh;
+ });
+
+ const summaryCards=document.createElement("div");
+ summaryCards.className="summary-grid";
+ summaryCards.innerHTML=`
+  <div class="summary-card"><span>Order Qty</span><div class="val">${sumOrderQty?sumOrderQty.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Good Received</span><div class="val" style="color:var(--success)">${sumGoodRcvd?sumGoodRcvd.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Shortage / Balance</span><div class="val" style="color:var(--danger)">${sumShort?sumShort.toLocaleString():"-"}</div></div>
+  <div class="summary-card"><span>Matched Categories</span><div class="val">${orderRows.length+deliveryRows.length+wipRows.length}</div></div>
+ `;
+ box.appendChild(summaryCards);
+
+ const orderColumns=[
+  {label:"PI Number",field:"pi"},
+  {label:"Buyer",field:"buyer"},
+  {label:"PI Received Date",field:"piReceivedDate"},
+  {label:"Deli Date",field:"deliDate"},
+  {label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Remarks",field:"remarks"}
+ ];
+
+ const deliveryColumns=[
+  {label:"PI",field:"pi"},
+  {label:"Buyer",field:"buyer"},
+  {label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Good Rcvd",field:"goodRcvd"},
+  {label:"Short",field:"short"},
+  {label:"Present Status",field:"presentStatus"}
+ ];
+
+ const wipColumns=[
+  {label:"PI",field:"pi"},
+  {label:"Color",field:"color"},
+  {label:"Construction",field:"construction"},
+  {label:"Order Qty",field:"qty"},
+  {label:"Delivery Status",field:"deliveryStatus"}
+ ];
+
+ box.appendChild(renderSheetSection("1. ORDER STATUS",orderColumns,orderRows));
+ box.appendChild(renderSheetSection("2. DELIVERY STATUS",deliveryColumns,deliveryRows));
+ box.appendChild(renderSheetSection("3. WIP",wipColumns,wipRows));
+
+ globalFiles.forEach(file=>{
+  if(!isCategory(file.category,"order")&&!isCategory(file.category,"delivery")&&!isCategory(file.category,"wip")){
+   const customSection=renderCustomSheetSection(file,pi,color);
+   if(customSection) box.appendChild(customSection);
+  }
+ });
+
+ box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+async function runGlobalSearch(){
+ const query=clean(document.getElementById("globalInput").value);
+ const resultBox=document.getElementById("globalResults");
+ const choices=document.getElementById("globalChoices");
+ const details=document.getElementById("globalDetails");
+ const summaryEl=document.getElementById("globalSummary");
+
+ choices.innerHTML="";
+ details.innerHTML="";
+ summaryEl.innerHTML="";
+
+ if(!query){
+  resultBox.innerHTML='<p class="muted">Type a query above to search instantly.</p>';
+  return;
+ }
+
+ const q=normalize(query);
+ resultBox.innerHTML="<p>Searching all files and sheets...</p>";
+
+ try{
+  globalFiles=await getAllCategoryFiles();
+ }catch(error){
+  console.error("Failed to load category files for search:",error);
+  globalFiles=[];
+ }
+
+ const pairs=new Map();
+
+ function addPair(row,source){
+  if(!row.pi&&!row.color&&!row.buyer) return;
+  const matchPI=normalize(row.pi).includes(q);
+  const matchColor=normalize(row.color).includes(q);
+  const matchBuyer=normalize(row.buyer).includes(q);
+  const matchConst=normalize(row.construction).includes(q);
+
+  if(!matchPI&&!matchColor&&!matchBuyer&&!matchConst) return;
+
+  const key=pairKey(row.pi,row.color);
+  if(!pairs.has(key)){
+   pairs.set(key,{
+    pi:clean(row.pi)||"No PI",
+    color:clean(row.color)||"No Color",
+    buyer:clean(row.buyer),
+    construction:clean(row.construction),
+    qty:numberValue(row.qty),
+    sources:new Set()
+   });
+  }
+  pairs.get(key).sources.add(source);
+ }
+
+ mainData.forEach(row=>addPair(row,"Main Data"));
+ manualOrders.forEach(row=>addPair(row,"Manual Order"));
+
+ globalFiles.forEach(file=>{
+  (file.data||[]).forEach(sheet=>{
+   (sheet.rows||[]).forEach(row=>addPair(row,file.category+" / "+sheet.name));
+  });
+ });
+
+ const records=[...pairs.values()];
+
+ if(!records.length){
+  resultBox.innerHTML=`<div class="result-box" style="border-left:4px solid var(--danger)"><strong class="unmatched">No matching PI, Color, or Buyer found for "${escapeHTML(query)}".</strong><p class="muted" style="margin:4px 0 0">Try checking spelling or uploading the corresponding sheet in Order Update.</p></div>`;
+  return;
+ }
+
+ resultBox.innerHTML=`<div style="font-weight:600;margin-bottom:8px">Found <strong>${records.length}</strong> matching item(s) across Main Orders & Categories:</div>`;
+
+ records.forEach((item,index)=>{
+  const card=document.createElement("div");
+  card.className="result-box";
+
+  const top=document.createElement("div");
+  top.style.display="flex";
+  top.style.justifyContent="space-between";
+  top.style.alignItems="center";
+  top.innerHTML=`<strong>${index+1}. PI: ${escapeHTML(item.pi)} &bull; ${escapeHTML(item.color)}</strong>`;
+
+  const btn=document.createElement("button");
+  btn.className="small";
+  btn.textContent="⚡ View Details";
+  btn.onclick=()=>showGlobalDetail(item.pi,item.color);
+  top.appendChild(btn);
+
+  const info=document.createElement("p");
+  info.className="muted";
+  info.style.margin="6px 0 0";
+  info.textContent=`Buyer: ${item.buyer||"N/A"} | Construction: ${item.construction||"N/A"} | Found in: ${[...item.sources].join(", ")}`;
+
+  card.append(top,info);
+  resultBox.appendChild(card);
+ });
+
+ records.slice(0,30).forEach(item=>{
+  const btn=document.createElement("button");
+  btn.className="small outline";
+  btn.textContent=`${item.pi} / ${item.color}`;
+  btn.onclick=()=>showGlobalDetail(item.pi,item.color);
+  choices.appendChild(btn);
+ });
+
+ if(records.length===1){
+  showGlobalDetail(records[0].pi,records[0].color);
+ }
+}
+
+/* ================= STARTUP ================= */
+
+async function init(){
+ showLoading("Initializing Textile ERP...");
+ try{
+  await openDB();
+  if(!sessionStorage.getItem("nte_session_initialized")){
+   await clearAllCategoryFiles();
+   sessionStorage.setItem("nte_session_initialized","1");
+  }
+  await loadInitialState();
+ }catch(error){
+  console.error("DB Init failed:",error);
+  showToast("Database initialisation failed","error");
+ }finally{
+  hideLoading();
+ }
+
+ renderOrders();
+ renderMatching();
+ await refreshUploadedSheetsUI();
+}
+
+window.addEventListener("DOMContentLoaded",init);
+</script>
+</body>
+</html>
