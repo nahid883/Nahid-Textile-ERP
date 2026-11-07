@@ -58,7 +58,7 @@ h2{font-size:19px;margin:0 0 14px;color:var(--primary);display:flex;align-items:
 h3{font-size:15px;margin:16px 0 10px;color:var(--primary)}
 
 .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin:14px 0}
-.stat{background:#f8fafc;border:1px solid var(--border-light);padding:14px;border-radius:99px;text-align:center}
+.stat{background:#f8fafc;border:1px solid var(--border-light);padding:14px;border-radius:12px;text-align:center}
 .stat span{font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase}
 .stat strong{display:block;font-size:22px;color:var(--primary-light);margin-top:6px}
 
@@ -191,7 +191,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <p class="muted">Auto-detects common textile columns: PI, Buyer, Color, Construction, Order Qty. Cleanly handles headers up to row 50.</p>
 
 <hr>
-<div class="actions" style="justify-content:space-between">
+<div class="actions" style="justify-space-between">
 <h3>Order List</h3>
 <div style="display:flex;gap:6px">
 <button class="small outline" id="exportOrdersBtn">📥 Export Excel</button>
@@ -258,9 +258,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <h2>Order Update Management</h2>
 <p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently.</p>
 
-<!-- 3 Dedicated Upload Slots -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0" id="threeSheetsUploadContainer">
- <!-- Delivery Status Card -->
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
    <h3 style="margin:0;font-size:14px">🚚 1. Delivery Status</h3>
@@ -274,7 +272,6 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
   <p id="infoDeliveryFile" class="muted" style="margin:6px 0 0;font-size:11px">P.I, Buyer Name, Construction, Color, Order Qty, Good Rcvd, Short, Present Status</p>
  </div>
 
- <!-- Order Status Card -->
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
    <h3 style="margin:0;font-size:14px">📋 2. Order Status</h3>
@@ -288,7 +285,6 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
   <p id="infoOrderStatusFile" class="muted" style="margin:6px 0 0;font-size:11px">PI Number, PI Received date, Greige Date, Deli date, Buyer, Construction, Color, Order Qty, Remarks</p>
  </div>
 
- <!-- WIP Card -->
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
    <h3 style="margin:0;font-size:14px">⚙️ WIP Slot</h3>
@@ -303,8 +299,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
  </div>
 </div>
 
-<!-- Legacy fallback elements for full compatibility -->
-<div style="opacity:0;position:absolute;pointer-events:auto;height:1px;width:1px;overflow:hidden">
+<div style="opacity:0;position:absolute;pointer-events:none;height:1px;width:1px;overflow:hidden">
  <div id="categoryList">
   <div class="category-card" data-cat="Delivery Status"><strong>Delivery Status</strong><button class="small outline" onclick="selectCategory('Delivery Status')">Select</button></div>
   <div class="category-card" data-cat="Order Status"><strong>Order Status</strong><button class="small outline" onclick="selectCategory('Order Status')">Select</button></div>
@@ -427,7 +422,6 @@ let selectedSheetRows=[];
 let selectedSheetHeaders=[];
 let globalFiles=[];
 
-// In-Memory Fast Search Index
 const searchIndex={
  piMap:new Map(),
  colorMap:new Map()
@@ -511,6 +505,7 @@ async function getCategoryFile(category){
 
 async function getAllCategoryFiles(){
  return new Promise((resolve,reject)=>{
+  if(!db) return resolve([]);
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").getAll();
   request.onsuccess=()=>resolve(request.result||[]);
@@ -1382,35 +1377,6 @@ function selectCategory(category){
  renderCategories();
 }
 window.selectCategory=selectCategory;
-
-const legUploadBtn=document.getElementById("uploadCategoryBtn");
-if(legUploadBtn){
- legUploadBtn.addEventListener("click",async()=>{
-  const file=document.getElementById("categoryFile")?.files?.[0];
-  if(!file){showToast("Please choose an Excel file first.","error");return;}
-  showLoading(`Uploading ${selectedCategory}...`);
-  try{
-   const sheets=await readWorkbook(file);
-   await saveCategoryFile(selectedCategory,sheets);
-   const sel=document.getElementById("sheetSelect");
-   if(sel){
-    sel.innerHTML="";
-    sheets.forEach((s,i)=>{
-     const opt=document.createElement("option");
-     opt.value=String(i);
-     opt.textContent=s.name;
-     sel.appendChild(opt);
-    });
-   }
-   await refreshUploadedSheetsUI();
-   hideLoading();
-   showToast(`${selectedCategory} uploaded!`,"success");
-  }catch(e){
-   hideLoading();
-   showToast("Upload error: "+e.message,"error");
-  }
- });
-}
 
 function uniqueValues(values){
  const map=new Map();
