@@ -104,6 +104,10 @@ tr:last-child td{border-bottom:0}
 .pagination{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;font-size:12px;color:var(--text-muted)}
 .pagination-controls{display:flex;gap:4px}
 
+.slot-warn{color:#991b1b;font-weight:600}
+.slot-ok{color:#065f46;font-weight:600}
+.color-note td{background:var(--warning-bg);color:#92400e;font-weight:600;white-space:normal}
+
 /* Toast Notification */
 #toast-container{position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:350px}
 .toast{background:#1e293b;color:white;padding:12px 16px;border-radius:8px;font-size:13px;box-shadow:0 4px 12px rgba(0,0,0,0.15);opacity:0;transform:translateY(10px);transition:all 0.25s ease;display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -318,6 +322,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <h3>Step 1: Find PI Number</h3>
 <input id="updatePiSearch" placeholder="Type to filter PI Number across all uploaded sheets...">
 <div id="piResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
+<p id="piHint" class="muted"></p>
 
 <hr>
 <h3>Step 2: Select Color</h3>
@@ -405,6 +410,408 @@ function hideLoading(){
  document.getElementById("loading-overlay").classList.remove("show");
 }
 
+function escapeHTML(value){
+ return String(value??"").replace(/[&<>"']/g,ch=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+ })[ch]);
+}
+
+/* ==== PARSER CORE START ==== */
+
+function clean(value){
+ return String(value??"").trim();
+}
+
+function normalize(value){
+ return clean(value).toLowerCase().replace(/[^a-z0-9]/g,"");
+}
+
+function numberValue(value){
+ if(typeof value==="number") return Number.isFinite(value)?value:0;
+ const n=Number(String(value??"").replace(/,/g,"").trim());
+ return Number.isFinite(n)?n:0;
+}
+
+function pad2(n){
+ return String(n).padStart(2,"0");
+}
+
+function formatSerial(serial){
+ const d=XLSX.SSF.parse_date_code(serial);
+ if(!d) return String(serial);
+ return pad2(d.d)+"/"+pad2(d.m)+"/"+d.y;
+}
+
+function isDateFormat(z){
+ try{
+  return !!z&&z!=="General"&&XLSX.SSF.is_date(z);
+ }catch(e){
+  return false;
+ }
+}
+
+function cellToText(cell,forceDate){
+ if(!cell) return "";
+ if(cell.t==="e") return "";
+
+ if(cell.t==="d"&&cell.v instanceof Date&&!isNaN(cell.v)){
+  return pad2(cell.v.getDate())+"/"+pad2(cell.v.getMonth()+1)+"/"+cell.v.getFullYear();
+ }
+
+ if(cell.t==="n"&&typeof cell.v==="number"){
+  if(cell.v>=1&&cell.v<80000&&((forceDate&&cell.v>20000)||isDateFormat(cell.z))){
+   return formatSerial(cell.v);
+  }
+  if(cell.w!==undefined&&cell.w!==null&&String(cell.w).trim()!=="") return String(cell.w).trim();
+  return String(cell.v);
+ }
+
+ if(cell.v!==undefined&&cell.v!==null) return String(cell.v).trim();
+ if(cell.w!==undefined&&cell.w!==null) return String(cell.w).trim();
+ return "";
+}
+
+function getRawCell(sheet,r,c){
+ return sheet[XLSX.utils.encode_cell({r,c})]||null;
+}
+
+/* ================= ADVANCED TEXTILE HEADER IDENTIFIER ================= */
+
+const HEADER_SYNONYMS={
+ pi:[
+  "pi","pinumber","pino","piref","pinum","p.i.","pi#","pireferenceno","pino.","orderno","order#","pinumber/ref"
+ ],
+ buyer:[
+  "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand","party","partyname"
+ ],
+ piReceivedDate:[
+  "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
+ ],
+ greigeDate:[
+  "greigedate","greigedt","greige_date","griegedate","griegedt","greydate","greydt","graydate","graydt","greige","griege","greyfabricdate","greigereceiveddate"
+ ],
+ deliDate:[
+  "delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli","delivery","shipdate","shipmentdate","targetdelv","delvdate"
+ ],
+ color:[
+  "color","colour","shade","blank","colorname","colourname","shade/color","colorshade","fabriccolor"
+ ],
+ construction:[
+  "construction","fabricconstruction","constr","quality","fabricquality","spec","specification","count/cons","countcons","cons","construction/quality"
+ ],
+ composition:[
+  "composition","fabricdesc","fabricdescription","blend","content","fabriccomposition"
+ ],
+ qty:[
+  "orderqty","orderquantity","qty","quantity","orderqnty","orderqnt","totalqty","bookingqty","ord.qty","ordqty","ord_qty","poqty","lotqty","bookingquantity","orderyds","orderpcs","qty(yds)","qty(pcs)","qty(mtr)","orderqty(yds)","orderqty(pcs)","orderqty(mtr)","orderqty(yds.)","orderqtyyds","orderqtypcs","reqqty","reqquantity","totalorderqty"
+ ],
+ remarks:[
+  "remarks","remark","comments","comment","note","notes","specialinstruction","specialnotes"
+ ],
+ goodRcvd:[
+  "goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive","totalrcvd","recdqty","passedqty","rcvdqty","delvqty","deliveredqty","totaldelivered"
+ ],
+ short:[
+  "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty","remainingqty"
+ ],
+ presentStatus:[
+  "presentstatus","currentstatus","deliverycondition","prodstatus","productionstatus","currentstage","stage","status","presentcondition"
+ ],
+ deliveryStatus:[
+  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","del_status","deliv_status","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage","deliverystate","delivery_state","delivstate","delstatusupdate","deliverystatusupdate"
+ ]
+};
+
+const DATE_TYPES=new Set(["piReceivedDate","greigeDate","deliDate"]);
+
+const SYN_NORM={};
+Object.keys(HEADER_SYNONYMS).forEach(type=>{
+ SYN_NORM[type]=HEADER_SYNONYMS[type].map(normalize);
+});
+
+const FUZZY_RULES={
+ pi:{keys:["pinumber","pino"],exclude:/date|status|qty/},
+ buyer:{keys:["buyer"],exclude:/status/},
+ color:{keys:["color","colour","shade"],exclude:/status|new|repeat|approv|comment|method/},
+ construction:{keys:["construction"],exclude:/status/},
+ qty:{keys:["orderqty","orderquantity"],exclude:/status/},
+ remarks:{keys:["remark"],exclude:/status/},
+ deliveryStatus:{keys:["deliverystatus","delvstatus","delstatus"],exclude:/qty|date/},
+ piReceivedDate:{keys:["pireceived"],exclude:/status/},
+ greigeDate:{keys:["greigedate","greydate","graydate"],exclude:/status/},
+ deliDate:{keys:["delidate","deliverydate"],exclude:/status/}
+};
+
+function headerTypeInfo(value){
+ const h=normalize(value);
+ if(!h) return null;
+ for(const type in SYN_NORM){
+  const idx=SYN_NORM[type].indexOf(h);
+  if(idx>=0) return {type,rank:idx};
+ }
+ return null;
+}
+
+function headerType(value){
+ const info=headerTypeInfo(value);
+ return info?info.type:"";
+}
+
+function headerTextAt(sheet,merges,r,c){
+ const own=cellToText(getRawCell(sheet,r,c),false);
+ if(own) return own;
+ for(let i=0;i<merges.length;i++){
+  const m=merges[i];
+  if(r>=m.s.r&&r<=m.e.r&&c>=m.s.c&&c<=m.e.c&&!(m.s.r===r&&m.s.c===c)){
+   const t=cellToText(getRawCell(sheet,m.s.r,m.s.c),false);
+   if(t) return t;
+  }
+ }
+ return "";
+}
+
+function trimSheetRange(sheet){
+ let maxR=-1,maxC=-1;
+ for(const key in sheet){
+  if(key.charCodeAt(0)===33) continue;
+  const cell=sheet[key];
+  if(!cell||cell.v===undefined||cell.v===null||cell.v==="") continue;
+  const a=XLSX.utils.decode_cell(key);
+  if(a.r>maxR) maxR=a.r;
+  if(a.c>maxC) maxC=a.c;
+ }
+ if(maxR<0) return null;
+ const range={s:{r:0,c:0},e:{r:maxR,c:maxC}};
+ sheet["!ref"]=XLSX.utils.encode_range(range);
+ return range;
+}
+
+function emptyParse(reason){
+ return {headers:[],rows:[],headerRow:-1,fieldsFound:[],reason};
+}
+
+function parseSheet(sheet){
+ const range=trimSheetRange(sheet);
+ if(!range) return emptyParse("sheet is empty");
+
+ const merges=sheet["!merges"]||[];
+ const maxR=range.e.r;
+ const maxC=range.e.c;
+
+ let best={row:-1,score:0};
+ const limit=Math.min(maxR+1,50);
+ for(let r=0;r<limit;r++){
+  const types=new Set();
+  for(let c=0;c<=maxC;c++){
+   const t=headerTextAt(sheet,merges,r,c);
+   if(!t) continue;
+   const ty=headerType(t);
+   if(ty) types.add(ty);
+  }
+  if(types.size>best.score) best={row:r,score:types.size};
+ }
+ if(best.score<2){
+  return emptyParse("no header row found in the first 50 rows (need at least 2 of: PI, Buyer, Color, Construction, Order Qty ...)");
+ }
+
+ const hr=best.row;
+ const headers=[];
+ for(let c=0;c<=maxC;c++) headers.push(headerTextAt(sheet,merges,hr,c));
+
+ const picked={};
+ headers.forEach((h,c)=>{
+  const info=headerTypeInfo(h);
+  if(!info) return;
+  const cur=picked[info.type];
+  if(!cur||info.rank<cur.rank) picked[info.type]={col:c,rank:info.rank};
+ });
+
+ for(let rr=hr-1;rr>=Math.max(0,hr-5);rr--){
+  for(let c=0;c<=maxC;c++){
+   if(headers[c]) continue;
+   const t=cellToText(getRawCell(sheet,rr,c),false);
+   if(!t) continue;
+   const info=headerTypeInfo(t);
+   if(info&&!picked[info.type]){
+    picked[info.type]={col:c,rank:info.rank};
+    headers[c]=t;
+   }
+  }
+ }
+
+ const used=new Set(Object.keys(picked).map(t=>picked[t].col));
+ Object.keys(FUZZY_RULES).forEach(type=>{
+  if(picked[type]) return;
+  const rule=FUZZY_RULES[type];
+  let bestCol=-1,bestLen=1e9;
+  headers.forEach((h,c)=>{
+   if(used.has(c)||!h) return;
+   const n=normalize(h);
+   if(rule.exclude&&rule.exclude.test(n)) return;
+   if(rule.keys.some(k=>n.includes(k))&&n.length<bestLen){
+    bestLen=n.length;
+    bestCol=c;
+   }
+  });
+  if(bestCol>=0){
+   picked[type]={col:bestCol,rank:99};
+   used.add(bestCol);
+  }
+ });
+
+ const typeIndexes={};
+ Object.keys(picked).forEach(type=>{typeIndexes[type]=picked[type].col;});
+
+ const dateCols=new Set();
+ Object.keys(typeIndexes).forEach(type=>{
+  if(DATE_TYPES.has(type)) dateCols.add(typeIndexes[type]);
+ });
+
+ const rows=[];
+ for(let r=hr+1;r<=maxR;r++){
+  const values=new Array(maxC+1);
+  let hasAny=false;
+  for(let c=0;c<=maxC;c++){
+   const txt=cellToText(getRawCell(sheet,r,c),dateCols.has(c));
+   values[c]=txt;
+   if(txt) hasAny=true;
+  }
+  if(!hasAny) continue;
+
+  const fields={};
+  Object.keys(typeIndexes).forEach(type=>{
+   fields[type]=values[typeIndexes[type]]||"";
+  });
+
+  const obj={
+   pi:fields.pi||"",
+   buyer:fields.buyer||"",
+   color:fields.color||"",
+   construction:fields.construction||"",
+   composition:fields.composition||"",
+   qty:fields.qty||"",
+   piReceivedDate:fields.piReceivedDate||"",
+   greigeDate:fields.greigeDate||"",
+   deliDate:fields.deliDate||"",
+   remarks:fields.remarks||"",
+   goodRcvd:fields.goodRcvd||"",
+   short:fields.short||"",
+   presentStatus:fields.presentStatus||"",
+   deliveryStatus:fields.deliveryStatus||"",
+   _fields:fields,
+   _values:values
+  };
+
+  if(obj.pi||obj.color||obj.construction) rows.push(obj);
+ }
+
+ return {
+  headers,
+  rows,
+  headerRow:hr,
+  fieldsFound:Object.keys(typeIndexes),
+  reason:rows.length?"":"header found at row "+(hr+1)+" but no data rows below it"
+ };
+}
+
+function parseWorkbookBuffer(buffer){
+ const workbook=XLSX.read(buffer,{type:"array",cellDates:false,cellNF:true,cellFormula:false,cellStyles:false});
+ const result=[];
+ const diagnostics=[];
+
+ workbook.SheetNames.forEach(name=>{
+  const sheet=workbook.Sheets[name];
+  if(!sheet||!sheet["!ref"]){
+   diagnostics.push('Sheet "'+name+'": empty');
+   return;
+  }
+  const parsed=parseSheet(sheet);
+  if(parsed.rows.length){
+   result.push({
+    name,
+    headers:parsed.headers,
+    rows:parsed.rows,
+    headerRow:parsed.headerRow,
+    fieldsFound:parsed.fieldsFound
+   });
+  }else{
+   diagnostics.push('Sheet "'+name+'": '+(parsed.reason||"no usable rows"));
+  }
+ });
+
+ result.diagnostics=diagnostics;
+ return result;
+}
+
+function getField(row,field){
+ if(!row) return "";
+ if(row[field]!==undefined&&row[field]!==null&&row[field]!=="") return row[field];
+ if(row._fields&&row._fields[field]!==undefined&&row._fields[field]!=="") return row._fields[field];
+
+ if(field==="deliveryStatus"&&row.presentStatus) return row.presentStatus;
+ if(field==="presentStatus"&&row.deliveryStatus) return row.deliveryStatus;
+
+ const synonyms=HEADER_SYNONYMS[field]||[];
+ for(const syn of synonyms){
+  if(row[syn]!==undefined&&row[syn]!==null&&row[syn]!=="") return row[syn];
+  if(row._fields&&row._fields[syn]!==undefined&&row._fields[syn]!=="") return row._fields[syn];
+ }
+
+ return "";
+}
+
+/* ================= MATCHING HELPERS ================= */
+
+function piKeys(pi){
+ const raw=clean(pi);
+ if(!raw) return [];
+ const keys=new Set([normalize(raw)]);
+ if(raw.indexOf("+")>=0){
+  const m=raw.match(/^(.*?)\s*\/\s*(\d{2,4})$/);
+  const body=m?m[1]:raw;
+  const suffix=m?"/"+m[2]:"";
+  body.split("+").map(s=>s.trim()).filter(Boolean).forEach(part=>{
+   keys.add(normalize(part+suffix));
+  });
+ }
+ return Array.from(keys);
+}
+
+function colorKey(color){
+ const raw=clean(color);
+ const stripped=raw.replace(/\([^)]*\)/g," ");
+ return normalize(stripped)||normalize(raw);
+}
+
+function keyOf(row){
+ return [normalize(row.pi),normalize(row.color),normalize(row.construction)].join("|");
+}
+
+function pairKey(pi,color){
+ return normalize(pi)+"|"+colorKey(color);
+}
+
+function rowMatchesPair(row,pi,color){
+ const targetKeys=piKeys(pi);
+ if(!targetKeys.length) return false;
+ const rowKeys=piKeys(row.pi);
+ if(!rowKeys.length||!rowKeys.some(k=>targetKeys.indexOf(k)>=0)) return false;
+ if(!color) return true;
+ return normalize(row.color)===normalize(color)||colorKey(row.color)===colorKey(color);
+}
+/* ==== PARSER CORE END ==== */
+
+async function readWorkbook(file){
+ if(!window.XLSX) throw new Error("Excel library is not loaded. Please verify internet connection.");
+ const buffer=await file.arrayBuffer();
+ return parseWorkbookBuffer(buffer);
+}
+
+function diagText(sheets){
+ const list=(sheets&&sheets.diagnostics)||[];
+ return list.length?list.join(" | "):"";
+}
+
 /* ================= STORAGE ENGINE (INDEXEDDB) ================= */
 
 const DB_NAME="NahidTextileERP_DB";
@@ -421,8 +828,6 @@ let editingId=null;
 let selectedCategory="Delivery Status";
 let selectedUpdatePI="";
 let selectedUpdateColor="";
-let selectedSheetRows=[];
-let selectedSheetHeaders=[];
 let globalFiles=[];
 
 const searchIndex={
@@ -597,120 +1002,7 @@ document.querySelectorAll("nav button").forEach(button=>{
  button.addEventListener("click",()=>switchPage(button.dataset.page));
 });
 
-/* ================= HELPERS ================= */
-
-function clean(value){
- return String(value??"").trim();
-}
-
-function normalize(value){
- return clean(value).toLowerCase().replace(/[\s\-_./\\#,:;]+/g,"").replace(/[^a-z0-9]/g,"");
-}
-
-function escapeHTML(value){
- return String(value??"").replace(/[&<>"']/g,ch=>({
-  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
- })[ch]);
-}
-
-function keyOf(row){
- return [normalize(row.pi),normalize(row.color),normalize(row.construction)].join("|");
-}
-
-function pairKey(pi,color){
- return normalize(pi)+"|"+normalize(color);
-}
-
-function numberValue(value){
- if(typeof value==="number") return Number.isFinite(value)?value:0;
- const n=Number(String(value??"").replace(/,/g,"").trim());
- return Number.isFinite(n)?n:0;
-}
-
-function cellText(value){
- if(value instanceof Date&&!isNaN(value)){
-  return value.toLocaleDateString("en-GB");
- }
- if(typeof value==="number"&&value>20000&&value<80000){
-  const date=XLSX.SSF.parse_date_code(value);
-  if(date){
-   return String(date.d).padStart(2,"0")+"/"+String(date.m).padStart(2,"0")+"/"+date.y;
-  }
- }
- return value==null?"":String(value).trim();
-}
-
-/* ================= ADVANCED TEXTILE HEADER IDENTIFIER ================= */
-
-const HEADER_SYNONYMS={
- pi:[
-  "pi","pinumber","pino","piref","pinum","p.i.","pi#","pireferenceno","pino.","orderno","order#","pinumber/ref"
- ],
- buyer:[
-  "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand","party","partyname"
- ],
- piReceivedDate:[
-  "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
- ],
- greigeDate:[
-  "greigedate","greigedt","greige_date","griegedate","griegedt","greydate","greydt","graydate","graydt","greige","griege","greyfabricdate","greigereceiveddate"
- ],
- deliDate:[
-  "delidate","deliverydate","deliverydt","deldate","deliverytargetdate","exfactorydate","deli","delivery","shipdate","shipmentdate","targetdelv","delvdate"
- ],
- color:[
-  "color","colour","shade","blank","colorname","colourname","shade/color","colorshade","fabriccolor"
- ],
- construction:[
-  "construction","fabricconstruction","constr","quality","fabricquality","spec","specification","count/cons","countcons","cons","construction/quality"
- ],
- composition:[
-  "composition","fabricdesc","fabricdescription","blend","content","fabriccomposition"
- ],
- qty:[
-  "orderqty","orderquantity","qty","quantity","orderqnty","orderqnt","totalqty","bookingqty","ord.qty","ordqty","ord_qty","poqty","lotqty","bookingquantity","orderyds","orderpcs","qty(yds)","qty(pcs)","qty(mtr)","orderqty(yds)","orderqty(pcs)","orderqty(mtr)","orderqty(yds.)","orderqtyyds","orderqtypcs","reqqty","reqquantity","totalorderqty"
- ],
- remarks:[
-  "remarks","remark","comments","comment","note","notes","specialinstruction","specialnotes"
- ],
- goodRcvd:[
-  "goodrcvd","goodreceived","goodreceivedqty","goodrcvdqty","receivedqty","goodqty","goodreceive","totalrcvd","recdqty","passedqty","rcvdqty","delvqty","deliveredqty","totaldelivered"
- ],
- short:[
-  "short","shortqty","shortage","shortageqty","balanceqty","balance","balanceorderqty","remqty","pendingqty","dueqty","remainingqty"
- ],
- presentStatus:[
-  "presentstatus","currentstatus","deliverycondition","prodstatus","productionstatus","currentstage","stage","status","presentcondition"
- ],
- deliveryStatus:[
-  "deliverystatus","delivery_status","status","wipstatus","wip_status","presentdeliverystatus","shipmentstatus","ship_status","deliverycondition","delivery_condition","delstatus","delivstatus","del_status","deliv_status","wipstage","stage","processstatus","deliverystage","deliveryrem","deliveryremarks","currentstage","deliverystate","delivery_state","delivstate","delstatusupdate","deliverystatusupdate"
- ]
-};
-
-function headerType(value){
- const h=normalize(value);
- if(!h) return "";
- for(const [type,synonyms] of Object.entries(HEADER_SYNONYMS)){
-  if(synonyms.map(normalize).includes(h)) return type;
- }
- return "";
-}
-
-function findHeaderRow(matrix){
- let best={row:-1,score:0,headers:[]};
- const limit=Math.min(matrix.length,50);
-
- for(let r=0;r<limit;r++){
-  const row=matrix[r]||[];
-  const types=row.map(headerType);
-  const score=new Set(types.filter(Boolean)).size;
-
-  if(score>best.score){
-   best={row:r,score,headers:row.map(v=>clean(v))};
-  }
- }
- return best.score>=2?best:null;
-}
+/* ================= ORDER ROW HELPER ================= */
 
 function normalizeOrderRow(raw){
  return {
@@ -722,144 +1014,15 @@ function normalizeOrderRow(raw){
  };
 }
 
-function getRawCell(sheet,r,c){
- if(!sheet) return null;
- const addr=XLSX.utils.encode_cell({r,c});
- return sheet[addr]||null;
-}
-
-function resolveCellVal(sheet,r,c,valFromMatrix){
- const cell=getRawCell(sheet,r,c);
- if(cell){
-  if(cell.w!==undefined&&cell.w!==null&&String(cell.w).trim()!=="") return String(cell.w).trim();
-  if(cell.v!==undefined&&cell.v!==null&&String(cell.v).trim()!=="") return cellText(cell.v);
-  if(cell.f&&String(cell.f).trim()!==""){
-   return cellText(valFromMatrix);
-  }
- }
- return cellText(valFromMatrix);
-}
-
-function parseSheet(sheet){
- const matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:true});
- const found=findHeaderRow(matrix);
-
- if(!found) return {headers:[],rows:[],headerRow:-1};
-
- const headers=found.headers;
- const typeIndexes={};
-
- headers.forEach((h,i)=>{
-  const type=headerType(h);
-  if(type&&typeIndexes[type]===undefined) typeIndexes[type]=i;
- });
-
- const rows=[];
-
- for(let r=found.row+1;r<matrix.length;r++){
-  const line=matrix[r]||[];
-  const resolvedValues=[];
-  const colCount=Math.max(headers.length,line.length);
-
-  for(let c=0;c<colCount;c++){
-   resolvedValues.push(resolveCellVal(sheet,r,c,line[c]));
-  }
-
-  const fields={};
-  Object.keys(typeIndexes).forEach(type=>{
-   const cIdx=typeIndexes[type];
-   fields[type]=resolvedValues[cIdx]||"";
-  });
-
-  const obj={
-   pi:fields.pi||"",
-   buyer:fields.buyer||"",
-   color:fields.color||"",
-   construction:fields.construction||"",
-   composition:fields.composition||"",
-   qty:fields.qty||"",
-   piReceivedDate:fields.piReceivedDate||"",
-   greigeDate:fields.greigeDate||"",
-   deliDate:fields.deliDate||"",
-   remarks:fields.remarks||"",
-   goodRcvd:fields.goodRcvd||"",
-   short:fields.short||"",
-   presentStatus:fields.presentStatus||"",
-   deliveryStatus:fields.deliveryStatus||"",
-   _fields:fields,
-   _values:resolvedValues
-  };
-
-  if(obj.pi||obj.color||obj.construction){
-   rows.push(obj);
-  }
- }
-
- return {headers,rows,headerRow:found.row};
-}
-
-async function readWorkbook(file){
- if(!window.XLSX) throw new Error("Excel library is not loaded. Please verify internet connection.");
-
- const buffer=await file.arrayBuffer();
- const workbook=XLSX.read(buffer,{type:"array",cellDates:true,cellFormula:true,cellNF:true,cellStyles:true});
- const result=[];
-
- for(const name of workbook.SheetNames){
-  const sheet=workbook.Sheets[name];
-  if(!sheet||!sheet["!ref"]) continue;
-
-  const range=XLSX.utils.decode_range(sheet["!ref"]);
-  const cellCount=(range.e.r-range.s.r+1)*(range.e.c-range.s.c+1);
-
-  if(cellCount>2000000){
-   console.warn("Sheet exceeds safety threshold (2M cells):",name,cellCount);
-   continue;
-  }
-
-  const parsed=parseSheet(sheet);
-  if(parsed.rows.length){
-   result.push({
-    name,
-    headers:parsed.headers,
-    rows:parsed.rows,
-    headerRow:parsed.headerRow
-   });
-  }
- }
-
- return result;
-}
-
-function getField(row,field){
- if(!row) return "";
- if(row[field]!==undefined&&row[field]!==null&&row[field]!=="") return row[field];
- if(row._fields&&row._fields[field]!==undefined&&row._fields[field]!=="") return row._fields[field];
-
- if(field==="deliveryStatus"&&row.presentStatus) return row.presentStatus;
- if(field==="presentStatus"&&row.deliveryStatus) return row.deliveryStatus;
-
- const synonyms=HEADER_SYNONYMS[field]||[];
- for(const syn of synonyms){
-  if(row[syn]!==undefined&&row[syn]!==null&&row[syn]!=="") return row[syn];
-  if(row._fields&&row._fields[syn]!==undefined&&row._fields[syn]!=="") return row._fields[syn];
- }
-
- return "";
-}
-
 /* ================= DASHBOARD METRICS ================= */
 
 async function updateDashboard(){
- /* Unique PI+Color items across Manual/Main orders AND all uploaded sheets.
-    Quantity is counted once per item (highest qty found), so the same order
-    appearing in several sheets is not added up multiple times. */
  const itemQty=new Map();
 
  function addItem(pi,color,qty){
   const p=clean(pi);
   if(!p) return;
-  const colors=clean(color).split(/[,/]+/).map(c=>c.trim()).filter(Boolean);
+  const colors=clean(color).split(/[,;]+/).map(c=>c.trim()).filter(Boolean);
   const list=colors.length?colors:["default"];
   list.forEach((c,idx)=>{
    const k=pairKey(p,c);
@@ -1105,7 +1268,7 @@ document.getElementById("importMainBtn").addEventListener("click",async()=>{
 
   if(!imported.length){
    hideLoading();
-   showToast("No PI records found. Please check header row in Excel.","error");
+   showToast("No PI records found. "+diagText(sheets),"error",9000);
    return;
   }
 
@@ -1136,9 +1299,6 @@ function renderMatching(){
  const mainKeys=new Set(mainData.map(keyOf));
  const newKeys=new Set(newData.map(keyOf));
 
- /* Counts are independent of the view filter:
-    Matched   = Main rows that exist in the New file
-    Unmatched = Main rows missing in New + New rows missing in Main */
  let matched=0,unmatched=0;
  mainData.forEach(r=>{ if(newKeys.has(keyOf(r))) matched++; else unmatched++; });
  newData.forEach(r=>{ if(!mainKeys.has(keyOf(r))) unmatched++; });
@@ -1227,7 +1387,7 @@ document.getElementById("importNewBtn").addEventListener("click",async()=>{
 
   if(!imported.length){
    hideLoading();
-   showToast("No valid rows found in the new file.","error");
+   showToast("No valid rows found in the new file. "+diagText(sheets),"error",9000);
    return;
   }
 
@@ -1266,6 +1426,13 @@ document.getElementById("exportMatchBtn").addEventListener("click",()=>{
 
 let activeSheetTab="delivery";
 
+const SLOT_REQUIRED={
+ Delivery:[["pi","P.I"],["buyer","Buyer Name"],["construction","Construction"],["color","Color"],["qty","Order Qty"],["goodRcvd","Good Rcvd"],["short","Short"],["presentStatus","Present Status"]],
+ OrderStatus:[["pi","PI Number"],["piReceivedDate","PI Received date"],["greigeDate","Greige Date"],["deliDate","Deli date"],["buyer","Buyer"],["construction","Construction"],["color","Color"],["qty","Order Qty"],["remarks","Remarks"]],
+ Wip:[["pi","PI"],["buyer","Buyer"],["construction","Construction"],["color","Color"],["qty","Order Qty (yds)"],["deliveryStatus","Delivery Status"]]
+};
+const SLOT_DEFAULT_INFO={};
+
 async function refreshUploadedSheetsUI(){
  if(!db) return;
  const allFiles=await getAllCategoryFiles();
@@ -1282,17 +1449,45 @@ async function refreshUploadedSheetsUI(){
  updateDashboard();
 }
 
+function slotFoundFields(fileRecord){
+ const found=new Set();
+ (fileRecord.data||[]).forEach(sheet=>{
+  let list=sheet.fieldsFound;
+  if(!list&&sheet.rows&&sheet.rows[0]&&sheet.rows[0]._fields) list=Object.keys(sheet.rows[0]._fields);
+  (list||[]).forEach(f=>found.add(f));
+ });
+ if(found.has("deliveryStatus")) found.add("presentStatus");
+ if(found.has("presentStatus")) found.add("deliveryStatus");
+ return found;
+}
+
 function updateSlotUI(name,fileRecord){
  const badge=document.getElementById(`badge${name}File`);
+ const info=document.getElementById(`info${name}File`);
  if(!badge) return;
+
+ if(info&&SLOT_DEFAULT_INFO[name]===undefined) SLOT_DEFAULT_INFO[name]=info.textContent;
 
  if(fileRecord&&fileRecord.data&&fileRecord.data.length){
   const totalRows=fileRecord.data.reduce((sum,s)=>sum+(s.rows?s.rows.length:0),0);
   badge.textContent=`Active (${totalRows} rows)`;
   badge.className="badge green";
+
+  if(info){
+   const found=slotFoundFields(fileRecord);
+   const required=SLOT_REQUIRED[name]||[];
+   const missing=required.filter(([key])=>!found.has(key)).map(([,label])=>label);
+   const headerRows=(fileRecord.data||[]).map(s=>(s.headerRow>=0?s.headerRow+1:"?")).join(", ");
+   if(missing.length){
+    info.innerHTML=`<span class="slot-warn">⚠ Column not found: ${escapeHTML(missing.join(", "))}</span> (header row ${escapeHTML(headerRows)})`;
+   }else{
+    info.innerHTML=`<span class="slot-ok">✓ All columns found</span> (header row ${escapeHTML(headerRows)})`;
+   }
+  }
  }else{
   badge.textContent="Not Uploaded";
   badge.className="badge";
+  if(info&&SLOT_DEFAULT_INFO[name]!==undefined) info.textContent=SLOT_DEFAULT_INFO[name];
  }
 }
 
@@ -1306,7 +1501,7 @@ async function handleDedicatedUpload(categoryName,fileInputId){
   const sheets=await readWorkbook(file);
   if(!sheets.length){
    hideLoading();
-   showToast("No recognizable sheets/headers found in the first 50 rows.","error");
+   showToast("No usable data found. "+diagText(sheets),"error",10000);
    return;
   }
   await saveCategoryFile(categoryName,sheets);
@@ -1395,6 +1590,16 @@ function uniqueValues(values){
  return [...map.values()];
 }
 
+function uniqueColors(values){
+ const map=new Map();
+ values.forEach(v=>{
+  const value=clean(v);
+  const k=colorKey(value);
+  if(value&&k&&!map.has(k)) map.set(k,value);
+ });
+ return [...map.values()];
+}
+
 async function getAllUploadedRows(){
  if(!db) return [];
  const files=await getAllCategoryFiles();
@@ -1409,16 +1614,17 @@ async function getAllUploadedRows(){
  return all;
 }
 
+const PI_BUTTON_LIMIT=60;
+
 async function renderUpdatePIResults(){
  const query=normalize(document.getElementById("updatePiSearch").value);
  const results=document.getElementById("piResults");
+ const hint=document.getElementById("piHint");
  results.innerHTML="";
+ if(hint) hint.textContent="";
 
  const allRowsWithMeta=await getAllUploadedRows();
  let pis=uniqueValues(allRowsWithMeta.map(item=>item.row.pi));
- if(!pis.length&&selectedSheetRows.length){
-  pis=uniqueValues(selectedSheetRows.map(r=>r.pi));
- }
 
  if(query){
   pis=pis.filter(pi=>normalize(pi).includes(query));
@@ -1429,7 +1635,7 @@ async function renderUpdatePIResults(){
   selectedUpdateColor="";
  }
 
- pis.slice(0,40).forEach(pi=>{
+ pis.slice(0,PI_BUTTON_LIMIT).forEach(pi=>{
   const btn=document.createElement("button");
   btn.className="small"+(selectedUpdatePI===pi?"":" outline");
   btn.textContent=pi;
@@ -1447,6 +1653,8 @@ async function renderUpdatePIResults(){
  if(!pis.length){
   results.innerHTML='<span class="muted">No matching PI found in uploaded sheets.</span>';
   renderUpdateColors();
+ }else if(hint&&pis.length>PI_BUTTON_LIMIT){
+  hint.textContent=`Showing ${PI_BUTTON_LIMIT} of ${pis.length} PI numbers - type in the box above to narrow down.`;
  }
 }
 
@@ -1463,11 +1671,8 @@ async function renderUpdateColors(){
  }
 
  const allRowsWithMeta=await getAllUploadedRows();
- let matchingRows=allRowsWithMeta.filter(item=>normalize(item.row.pi)===normalize(selectedUpdatePI));
- if(!matchingRows.length&&selectedSheetRows.length){
-  matchingRows=selectedSheetRows.filter(r=>normalize(r.pi)===normalize(selectedUpdatePI)).map(row=>({row}));
- }
- const colors=uniqueValues(matchingRows.map(item=>item.row.color));
+ const matchingRows=allRowsWithMeta.filter(item=>rowMatchesPair(item.row,selectedUpdatePI,""));
+ const colors=uniqueColors(matchingRows.map(item=>item.row.color));
 
  if(!colors.length){
   box.innerHTML='<span class="muted">No Colors found for this PI.</span>';
@@ -1512,12 +1717,14 @@ async function renderSelectedSheetDetail(){
 
  const allFiles=await getAllCategoryFiles();
  let matchingItems=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,selectedUpdateColor);
+ let colorFallback=false;
 
- if(!matchingItems.length&&selectedSheetRows.length){
-  const directMatches=selectedSheetRows.filter(r=>
-   normalize(r.pi)===normalize(selectedUpdatePI)&&(!selectedUpdateColor||normalize(r.color)===normalize(selectedUpdateColor))
-  );
-  matchingItems=directMatches.map(r=>({row:r}));
+ if(!matchingItems.length&&selectedUpdateColor){
+  const piOnly=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,"");
+  if(piOnly.length){
+   matchingItems=piOnly;
+   colorFallback=true;
+  }
  }
 
  let columns=[];
@@ -1566,6 +1773,13 @@ async function renderSelectedSheetDetail(){
  if(!matchingItems.length){
   tbody.innerHTML=`<tr><td colspan="${columns.length}" style="text-align:center;padding:14px;color:#64748b">No data found in ${activeSheetTab.toUpperCase()} sheet for PI: ${escapeHTML(selectedUpdatePI)} ${selectedUpdateColor?`| Color: ${escapeHTML(selectedUpdateColor)}`:''}</td></tr>`;
   return;
+ }
+
+ if(colorFallback){
+  const note=document.createElement("tr");
+  note.className="color-note";
+  note.innerHTML=`<td colspan="${columns.length}">Color "${escapeHTML(selectedUpdateColor)}" is not written the same way in this sheet - showing all colors of PI ${escapeHTML(selectedUpdatePI)}. Check the Color column.</td>`;
+  tbody.appendChild(note);
  }
 
  matchingItems.forEach(item=>{
@@ -1619,14 +1833,6 @@ function isCategory(category,kind){
  if(kind==="delivery") return c==="deliverystatus"||c.includes("deliverystatus")||c==="delivery"||c.includes("deliveryreport");
  if(kind==="wip") return c==="wip"||c.includes("wip")||c.includes("wipstatus")||c.includes("workinprogress");
  return false;
-}
-
-function rowMatchesPair(row,pi,color){
- const rowPi=normalize(row.pi);
- const targetPi=normalize(pi);
- if(!rowPi || rowPi !== targetPi) return false;
- if(!color) return true;
- return normalize(row.color)===normalize(color);
 }
 
 function categoryRowsForPair(files,kind,pi,color){
@@ -1799,6 +2005,7 @@ function showGlobalDetail(pi,color){
   {label:"PI Number",field:"pi"},
   {label:"Buyer",field:"buyer"},
   {label:"PI Received Date",field:"piReceivedDate"},
+  {label:"Greige Date",field:"greigeDate"},
   {label:"Deli Date",field:"deliDate"},
   {label:"Construction",field:"construction"},
   {label:"Color",field:"color"},
@@ -1819,6 +2026,7 @@ function showGlobalDetail(pi,color){
 
  const wipColumns=[
   {label:"PI",field:"pi"},
+  {label:"Buyer",field:"buyer"},
   {label:"Color",field:"color"},
   {label:"Construction",field:"construction"},
   {label:"Order Qty",field:"qty"},
@@ -1887,7 +2095,10 @@ async function runGlobalSearch(){
     sources:new Set()
    });
   }
-  pairs.get(key).sources.add(source);
+  const entry=pairs.get(key);
+  if(!entry.buyer&&clean(row.buyer)) entry.buyer=clean(row.buyer);
+  if(!entry.construction&&clean(row.construction)) entry.construction=clean(row.construction);
+  entry.sources.add(source);
  }
 
  mainData.forEach(row=>addPair(row,"Main Data"));
@@ -1956,8 +2167,6 @@ async function init(){
  showLoading("Initializing Textile ERP...");
  try{
   await openDB();
-  /* Uploaded Delivery / Order Status / WIP sheets are kept saved between
-     sessions. Use the Delete button on each slot to remove them. */
   await loadInitialState();
  }catch(error){
   console.error("DB Init failed:",error);
