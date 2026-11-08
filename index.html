@@ -485,7 +485,7 @@ const HEADER_SYNONYMS={
   "buyer","buyername","buyercompany","customer","customername","brand","client","buyer/customer","buyer/brand","party","partyname"
  ],
  piReceivedDate:[
-  "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate"
+  "pireceiveddate","pireceived","pireceiveddt","pireceivedate","pirecdate","pireciveddate","receiveddate","pireceivedon","pireceiveddatetime","orderdate","bookingdate","p.ireceiveddate","pi.receiveddate","pirecdt"
  ],
  greigeDate:[
   "greigedate","greigedt","greige_date","griegedate","griegedt","greydate","greydt","graydate","graydt","greige","griege","greyfabricdate","greigereceiveddate"
@@ -537,9 +537,9 @@ const FUZZY_RULES={
  qty:{keys:["orderqty","orderquantity"],exclude:/status/},
  remarks:{keys:["remark"],exclude:/status/},
  deliveryStatus:{keys:["deliverystatus","delvstatus","delstatus"],exclude:/qty|date/},
- piReceivedDate:{keys:["pireceived"],exclude:/status/},
- greigeDate:{keys:["greigedate","greydate","graydate"],exclude:/status/},
- deliDate:{keys:["delidate","deliverydate"],exclude:/status/}
+ piReceivedDate:{keys:["pireceived","pirecdate","pirecievedate"],exclude:/status/},
+ greigeDate:{keys:["greigedate","greydate","graydate","griegedate"],exclude:/status/},
+ deliDate:{keys:["delidate","deliverydate","delvdate","shipdate"],exclude:/status/}
 };
 
 function headerTypeInfo(value){
