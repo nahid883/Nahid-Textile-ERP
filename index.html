@@ -144,7 +144,7 @@
           </div>
         </div>
         <div class="muted">
-          Dashboard total order + quantity is calculated only from the Order Status sheet.
+          Dashboard totals are counted only from the Order Status sheet.
         </div>
       </div>
     </section>
@@ -193,7 +193,7 @@
 
         <div class="table-wrap">
           <table>
-            <thead id="updateTableHead">
+            <thead>
               <tr>
                 <th>PI</th>
                 <th>Buyer</th>
@@ -359,6 +359,7 @@
         const row = matrix[r] || [];
         const types = row.map(v => headerType(v));
         const score = new Set(types.filter(Boolean)).size;
+
         if(score > best.score){
           best = { row: r, score, headers: row.map(v => clean(v)) };
         }
@@ -501,16 +502,6 @@
       });
     }
 
-    function getCategoryFile(category){
-      return new Promise((resolve, reject) => {
-        if(!state.db) return reject(new Error("Database not initialized."));
-        const tx = state.db.transaction("files", "readonly");
-        const request = tx.objectStore("files").get(category);
-        request.onsuccess = () => resolve(request.result || null);
-        request.onerror = () => reject(request.error);
-      });
-    }
-
     async function getAllCategoryFiles(){
       if(!state.db) return [];
       const tx = state.db.transaction("files", "readonly");
@@ -549,18 +540,17 @@
     function buildRowsFromCategory(category){
       const rows = [];
 
-      (state.files[category] || []).forEach(file => {
-        (file.data || []).forEach(sheet => {
-          const sName = sheet && sheet.name ? sheet.name : "";
-          if(category === "Delivery Status" && !isDeliveryAllowedSheetName(sName)) return;
-          if(category === "Order Status" && !isOrderStatusVisibleSheetName(sName)) return;
+      (state.files[category] || []).forEach(sheet => {
+        const sheetName = sheet && sheet.name ? sheet.name : "";
 
-          (sheet.rows || []).forEach(row => {
-            rows.push({
-              ...row,
-              __source: category,
-              __sheet: sName
-            });
+        if(category === "Delivery Status" && !isDeliveryAllowedSheetName(sheetName)) return;
+        if(category === "Order Status" && !isOrderStatusVisibleSheetName(sheetName)) return;
+
+        (sheet.rows || []).forEach(row => {
+          rows.push({
+            ...row,
+            __source: category,
+            __sheet: sheetName
           });
         });
       });
@@ -584,7 +574,7 @@
         const input = document.getElementById(fileInputId);
         const file = input.files && input.files[0];
         if(!file){
-          alert("Please choose an Excel file first.");
+          alert("Please choose a file first.");
           return;
         }
 
@@ -616,36 +606,32 @@
     }
 
     function renderDashboard(){
-      let totalOrders = 0;
-      let totalQty = 0;
-
-      const sourceFiles = state.files["Order Status"] || [];
       const seen = new Map();
 
-      sourceFiles.forEach(file => {
-        (file.data || []).forEach(sheet => {
-          const sName = sheet && sheet.name ? sheet.name : "";
-          if(!isDashboardOrderStatusSheetName(sName)) return;
+      const sheets = state.files["Order Status"] || [];
 
-          (sheet.rows || []).forEach(row => {
-            const pi = clean(row.pi);
-            const color = clean(row.color);
-            if(!pi) return;
+      sheets.forEach(sheet => {
+        const sheetName = sheet && sheet.name ? sheet.name : "";
+        if(!isDashboardOrderStatusSheetName(sheetName)) return;
 
-            const key = pairKey(pi, color);
-            const currentQty = numberValue(row.qty);
+        (sheet.rows || []).forEach(row => {
+          const pi = clean(row.pi);
+          const color = clean(row.color);
+          if(!pi) return;
 
-            if(!seen.has(key)){
-              seen.set(key, currentQty);
-            } else if(currentQty > seen.get(key)){
-              seen.set(key, currentQty);
-            }
-          });
+          const key = pairKey(pi, color);
+          const qty = numberValue(row.qty);
+
+          if(!seen.has(key)){
+            seen.set(key, qty);
+          } else if(qty > seen.get(key)){
+            seen.set(key, qty);
+          }
         });
       });
 
-      totalOrders = seen.size;
-      totalQty = Array.from(seen.values()).reduce((sum, v) => sum + v, 0);
+      const totalOrders = seen.size;
+      const totalQty = Array.from(seen.values()).reduce((sum, qty) => sum + qty, 0);
 
       document.getElementById("totalOrders").textContent = totalOrders.toLocaleString();
       document.getElementById("totalQty").textContent = totalQty.toLocaleString();
