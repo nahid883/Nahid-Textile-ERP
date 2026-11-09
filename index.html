@@ -263,7 +263,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <!-- ORDER UPDATE -->
 <section id="update" class="page">
 <h2>Order Update Management</h2>
-<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently. Uploaded sheets stay saved in this browser until you delete them.</p>
+<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently. Uploaded sheets stay saved in this browser until you delete them. Sheets used: Order Status file = "Order Status" + "Complete Details"; Delivery Status file = "Sheet 1" + "Com 2025"; WIP file = all sheets. File name does not matter - the upload box decides the file type.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0" id="threeSheetsUploadContainer">
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
@@ -911,12 +911,44 @@ async function getCategoryFile(category){
  });
 }
 
+/* ================= SHEET RULES (which sheets of each file are used) ================= */
+/* Sheet names are matched ignoring case, spaces, dots and symbols:
+   "Sheet1", "Sheet.1", "Sheet 1" are all the same; "Complete Details." = "Complete Details" */
+const SHEET_RULES={
+ delivery:[{key:"sheet1",label:"Sheet 1"},{key:"com2025",label:"Com 2025"}],
+ order:[{key:"orderstatus",label:"Order Status"},{key:"completedetails",label:"Complete Details"}]
+};
+
+function sheetKindOfCategory(category){
+ const c=normalize(category);
+ if(c.includes("deliver")) return "delivery";
+ if(c.includes("order")) return "order";
+ return "";
+}
+
+function filterSheetsForCategory(category,sheets){
+ const rules=SHEET_RULES[sheetKindOfCategory(category)];
+ if(!rules) return sheets||[];
+ const allowed=rules.map(r=>r.key);
+ return (sheets||[]).filter(sh=>allowed.indexOf(normalize(sh.name))>=0);
+}
+
+function missingRequiredSheets(category,sheets){
+ const rules=SHEET_RULES[sheetKindOfCategory(category)];
+ if(!rules) return [];
+ const have=(sheets||[]).map(sh=>normalize(sh.name));
+ return rules.filter(r=>have.indexOf(r.key)<0).map(r=>r.label);
+}
+
 async function getAllCategoryFiles(){
  return new Promise((resolve,reject)=>{
   if(!db) return resolve([]);
   const tx=db.transaction("files","readonly");
   const request=tx.objectStore("files").getAll();
-  request.onsuccess=()=>resolve(request.result||[]);
+  request.onsuccess=()=>{
+   const list=request.result||[];
+   resolve(list.map(f=>Object.assign({},f,{data:filterSheetsForCategory(f.category,f.data)})));
+  };
   request.onerror=()=>reject(request.error);
  });
 }
@@ -1035,9 +1067,13 @@ async function updateDashboard(){
  try{
   orders.forEach(o=>addItem(o.pi,o.color,o.qty));
 
+  /* Dashboard: only the "Order Status" sheet of the Order Status file.
+     Complete Details, Delivery Status and WIP are NOT counted here. */
   const allFiles=await getAllCategoryFiles();
   (allFiles||[]).forEach(file=>{
+   if(!isCategory(file.category,"order")) return;
    (file.data||[]).forEach(sheet=>{
+    if(normalize(sheet.name)!=="orderstatus") return;
     (sheet.rows||[]).forEach(r=>{
      addItem(r.pi,r.color,getField(r,"qty"));
     });
@@ -1498,17 +1534,26 @@ async function handleDedicatedUpload(categoryName,fileInputId){
 
  showLoading(`Reading and processing ${categoryName}...`);
  try{
-  const sheets=await readWorkbook(file);
+  const allSheets=await readWorkbook(file);
+  const sheets=filterSheetsForCategory(categoryName,allSheets);
   if(!sheets.length){
    hideLoading();
-   showToast("No usable data found. "+diagText(sheets),"error",10000);
+   const need=missingRequiredSheets(categoryName,sheets);
+   const extra=need.length?` Required sheet(s) not found or empty: ${need.join(", ")}.`:"";
+   showToast("No usable data found."+extra+" "+diagText(allSheets),"error",10000);
    return;
   }
   await saveCategoryFile(categoryName,sheets);
   fileInput.value="";
   await refreshUploadedSheetsUI();
   hideLoading();
-  showToast(`${categoryName} file uploaded successfully!`,"success");
+  const usedText=sheets.map(sh=>`${sh.name.trim()} (${sh.rows.length})`).join(", ");
+  const missing=missingRequiredSheets(categoryName,sheets);
+  if(missing.length){
+   showToast(`${categoryName} uploaded, but sheet not found: ${missing.join(", ")}. Used: ${usedText}`,"info",9000);
+  }else{
+   showToast(`${categoryName} uploaded. Sheets used: ${usedText}`,"success",6000);
+  }
  }catch(error){
   hideLoading();
   console.error(error);
@@ -1978,26 +2023,21 @@ function showGlobalDetail(pi,color){
  box.appendChild(titleWrap);
 
  const orderRows=categoryRowsForPair(globalFiles,"order",pi,color);
- const deliveryRows=categoryRowsForPair(globalFiles,"delivery",pi,color);
- const wipRows=categoryRowsForPair(globalFiles,"wip",pi,color);
+ const orderSheetRows=orderRows.filter(item=>normalize(item.sheet)==="orderstatus");
+ const completeRows=orderRows.filter(item=>normalize(item.sheet)!=="orderstatus");
 
- let sumOrderQty=0,sumGoodRcvd=0,sumShort=0;
- [...orderRows,...deliveryRows,...wipRows].forEach(item=>{
+ let sumOrderQty=0;
+ orderRows.forEach(item=>{
   const q=numberValue(getField(item.row,"qty"));
-  const gr=numberValue(getField(item.row,"goodRcvd"));
-  const sh=numberValue(getField(item.row,"short"));
   if(q) sumOrderQty=Math.max(sumOrderQty,q);
-  if(gr) sumGoodRcvd+=gr;
-  if(sh) sumShort+=sh;
  });
 
  const summaryCards=document.createElement("div");
  summaryCards.className="summary-grid";
  summaryCards.innerHTML=`
   <div class="summary-card"><span>Order Qty</span><div class="val">${sumOrderQty?sumOrderQty.toLocaleString():"-"}</div></div>
-  <div class="summary-card"><span>Good Received</span><div class="val" style="color:var(--success)">${sumGoodRcvd?sumGoodRcvd.toLocaleString():"-"}</div></div>
-  <div class="summary-card"><span>Shortage / Balance</span><div class="val" style="color:var(--danger)">${sumShort?sumShort.toLocaleString():"-"}</div></div>
-  <div class="summary-card"><span>Matched Categories</span><div class="val">${orderRows.length+deliveryRows.length+wipRows.length}</div></div>
+  <div class="summary-card"><span>Order Status Rows</span><div class="val">${orderSheetRows.length}</div></div>
+  <div class="summary-card"><span>Complete Details Rows</span><div class="val">${completeRows.length}</div></div>
  `;
  box.appendChild(summaryCards);
 
@@ -2013,29 +2053,8 @@ function showGlobalDetail(pi,color){
   {label:"Remarks",field:"remarks"}
  ];
 
- const deliveryColumns=[
-  {label:"PI",field:"pi"},
-  {label:"Buyer",field:"buyer"},
-  {label:"Construction",field:"construction"},
-  {label:"Color",field:"color"},
-  {label:"Order Qty",field:"qty"},
-  {label:"Good Rcvd",field:"goodRcvd"},
-  {label:"Short",field:"short"},
-  {label:"Present Status",field:"presentStatus"}
- ];
-
- const wipColumns=[
-  {label:"PI",field:"pi"},
-  {label:"Buyer",field:"buyer"},
-  {label:"Color",field:"color"},
-  {label:"Construction",field:"construction"},
-  {label:"Order Qty",field:"qty"},
-  {label:"Delivery Status",field:"deliveryStatus"}
- ];
-
- box.appendChild(renderSheetSection("1. ORDER STATUS",orderColumns,orderRows));
- box.appendChild(renderSheetSection("2. DELIVERY STATUS",deliveryColumns,deliveryRows));
- box.appendChild(renderSheetSection("3. WIP",wipColumns,wipRows));
+ box.appendChild(renderSheetSection("1. ORDER STATUS",orderColumns,orderSheetRows));
+ box.appendChild(renderSheetSection("2. COMPLETE DETAILS",orderColumns,completeRows));
 
  globalFiles.forEach(file=>{
   if(!isCategory(file.category,"order")&&!isCategory(file.category,"delivery")&&!isCategory(file.category,"wip")){
@@ -2067,7 +2086,7 @@ async function runGlobalSearch(){
  resultBox.innerHTML="<p>Searching all files and sheets...</p>";
 
  try{
-  globalFiles=await getAllCategoryFiles();
+  globalFiles=(await getAllCategoryFiles()).filter(f=>isCategory(f.category,"order"));
  }catch(error){
   console.error("Failed to load category files for search:",error);
   globalFiles=[];
