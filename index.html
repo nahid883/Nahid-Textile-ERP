@@ -667,6 +667,11 @@ function parseSheet(sheet){
   if(DATE_TYPES.has(type)) dateCols.add(typeIndexes[type]);
  });
 
+ const presentCols=[];
+ headers.forEach((h,c)=>{
+  if(normalize(h)==="presentstatus") presentCols.push(c);
+ });
+
  const rows=[];
  for(let r=hr+1;r<=maxR;r++){
   const values=new Array(maxC+1);
@@ -682,6 +687,15 @@ function parseSheet(sheet){
   Object.keys(typeIndexes).forEach(type=>{
    fields[type]=values[typeIndexes[type]]||"";
   });
+
+  if(presentCols.length>1){
+   let ps="";
+   for(let k=presentCols.length-1;k>=0;k--){
+    const v=values[presentCols[k]];
+    if(v){ps=v;break;}
+   }
+   fields.presentStatus=ps;
+  }
 
   const obj={
    pi:fields.pi||"",
@@ -912,8 +926,6 @@ async function getCategoryFile(category){
 }
 
 /* ================= SHEET RULES (which sheets of each file are used) ================= */
-/* Sheet names are matched ignoring case, spaces, dots and symbols:
-   "Sheet1", "Sheet.1", "Sheet 1" are all the same; "Complete Details." = "Complete Details" */
 const SHEET_RULES={
  delivery:[{key:"sheet1",label:"Sheet 1"},{key:"com2025",label:"Com 2025"}],
  order:[{key:"orderstatus",label:"Order Status"},{key:"completedetails",label:"Complete Details"}]
@@ -1067,8 +1079,6 @@ async function updateDashboard(){
  try{
   orders.forEach(o=>addItem(o.pi,o.color,o.qty));
 
-  /* Dashboard: only the "Order Status" sheet of the Order Status file.
-     Complete Details, Delivery Status and WIP are NOT counted here. */
   const allFiles=await getAllCategoryFiles();
   (allFiles||[]).forEach(file=>{
    if(!isCategory(file.category,"order")) return;
