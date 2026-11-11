@@ -134,6 +134,30 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
  .form-grid{grid-template-columns:repeat(2,1fr);gap:12px}
  .page{padding:22px}
 }
+
+/* Daily Report module */
+.dr-controls,.dr-detail-controls{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:12px 0 16px}
+.dr-controls>div,.dr-detail-controls>div{display:flex;flex-direction:column;gap:4px}
+.dr-controls label,.dr-detail-controls label{font-size:12px;font-weight:600;color:var(--text-muted)}
+.dr-controls input,.dr-detail-controls input{margin:0;min-width:150px}
+.dr-summary-table th,.dr-summary-table td{padding:12px;text-align:left;border-bottom:1px solid var(--border-light)}
+.dr-summary-table th{background:#f8fafc;color:var(--primary)}
+.dr-summary-table td:nth-child(2){font-weight:700;font-variant-numeric:tabular-nums}
+.dr-detail-table{min-width:1450px}
+.dr-detail-table th{position:sticky;top:0;background:#edf4fb;color:var(--primary);cursor:pointer;white-space:nowrap}
+.dr-detail-table td{white-space:nowrap}
+.dr-detail-table th,.dr-detail-table td{padding:8px 9px;border-bottom:1px solid var(--border-light);font-size:12px}
+.dr-report-open{min-width:70px}
+@media print{
+ body{background:white;padding:0}
+ header,nav,footer,#toast-container,#loading-overlay,.dr-controls,.dr-detail-controls,#drBackSummary{display:none!important}
+ .page{display:none!important;box-shadow:none;margin:0;padding:0}
+ #dailyReport.active,#dailyReportDetail.active{display:block!important}
+ .table-wrap{overflow:visible}
+ .dr-detail-table{min-width:0;width:100%;font-size:8px}
+ .dr-detail-table th,.dr-detail-table td{font-size:8px;padding:3px;white-space:normal}
+}
+
 </style>
 </head>
 
@@ -151,6 +175,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <button data-page="matching">🔄 Excel Matching</button>
 <button data-page="update">📂 Order Update</button>
 <button data-page="search">🔍 Global Search</button>
+<button data-page="dailyReport">📅 Daily Report</button>
 </nav>
 
 <!-- DASHBOARD -->
@@ -367,6 +392,49 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <hr>
 <h3>Full Detailed Breakdown</h3>
 <div id="globalDetails"></div>
+
+</section>
+
+<!-- DAILY REPORT -->
+<section id="dailyReport" class="page">
+ <h2>Daily Report</h2>
+ <h3 style="margin-top:0">Daily Report from Order Status</h3>
+ <p class="muted">All reports are generated only from the latest uploaded Order Status Excel File → Order Status sheet.</p>
+ <div class="dr-controls">
+  <div><label for="drReportDate">Report Date</label><input type="date" id="drReportDate"></div>
+  <div><label for="drTestDate">Test Date (optional override)</label><input type="date" id="drTestDate"></div>
+  <button class="small outline" id="drResetToday">Reset to Today</button>
+  <button class="small" id="drPrintSummary">Print</button>
+ </div>
+ <p class="muted" id="drSourceInfo">Waiting for Order Status upload...</p>
+ <h3>Summary Chart</h3>
+ <div class="table-wrap">
+  <table class="dr-summary-table">
+   <thead><tr><th>Report Name</th><th>Order Count</th><th>Action</th></tr></thead>
+   <tbody id="drSummaryBody"><tr><td colspan="3">Upload an Order Status Excel file from Order Update.</td></tr></tbody>
+  </table>
+ </div>
+</section>
+
+<section id="dailyReportDetail" class="page">
+ <div class="actions between">
+  <div><h2 id="drDetailTitle" style="margin:0">Daily Report</h2><p class="muted" id="drDetailMeta"></p></div>
+  <button class="small outline" id="drBackSummary">← Back to Summary</button>
+ </div>
+ <div class="dr-detail-controls">
+  <input id="drSearch" placeholder="Search PI, GD, Buyer, Color, Remarks..." style="max-width:320px;margin:0">
+  <div><label for="drDateFrom">Date From</label><input type="date" id="drDateFrom"></div>
+  <div><label for="drDateTo">Date To</label><input type="date" id="drDateTo"></div>
+  <button class="small outline" id="drClearFilters">Clear Filters</button>
+  <button class="small" id="drExportExcel">Export Excel</button>
+  <button class="small" id="drPrintDetail">Print</button>
+ </div>
+ <p class="muted" id="drVisibleCount"></p>
+ <div class="table-wrap">
+  <table id="drDetailTable" class="dr-detail-table">
+   <thead id="drDetailHead"></thead><tbody id="drDetailBody"></tbody>
+  </table>
+ </div>
 </section>
 
 <footer>Nahid Textile ERP • High Performance Edition • Fast In-Memory Search</footer>
@@ -1034,7 +1102,7 @@ function rebuildSearchIndex(){
 
 function switchPage(pageId){
  document.querySelectorAll("nav button").forEach(b=>{
-  b.classList.toggle("active",b.dataset.page===pageId);
+  b.classList.toggle("active",b.dataset.page===(pageId==="dailyReportDetail"?"dailyReport":pageId));
  });
  document.querySelectorAll(".page").forEach(p=>{
   p.classList.toggle("active",p.id===pageId);
@@ -1493,6 +1561,7 @@ async function refreshUploadedSheetsUI(){
 
  renderUpdatePIResults();
  updateDashboard();
+ if(document.getElementById("dailyReport")?.classList.contains("active")) drRenderSummary();
 }
 
 function slotFoundFields(fileRecord){
@@ -2207,7 +2276,223 @@ async function init(){
  renderOrders();
  renderMatching();
  await refreshUploadedSheetsUI();
+ drInit();
 }
+
+
+/* ================= DAILY REPORT MODULE ================= */
+const DR_COLUMNS=[
+ {key:"gd",label:"GD Number",index:0},
+ {key:"pi",label:"PI Number",index:1},
+ {key:"piReceivedDate",label:"PI Received Date",index:3},
+ {key:"greigeDate",label:"Greige Date",index:4},
+ {key:"deliveryDate",label:"Delivery Date",index:5},
+ {key:"buyer",label:"Buyer Name",index:7},
+ {key:"construction",label:"Construction",index:10},
+ {key:"greyInDate",label:"Grey In Date",index:11},
+ {key:"color",label:"Color",index:12},
+ {key:"qty",label:"Order Qty",index:17},
+ {key:"remarks",label:"Remarks",index:47}
+];
+const DR_REPORTS=[
+ {id:"upcoming",name:"Upcoming Delivery Watch"},
+ {id:"todayBefore",name:"Today to Before"},
+ {id:"next7",name:"Next 7 Days Running Order"},
+ {id:"lastDay",name:"Last Day Orders"}
+];
+let drReportDate=new Date();drReportDate.setHours(0,0,0,0);
+let drTestDate=null;
+let drActiveReport="";
+let drDetailRows=[];
+let drFilteredRows=[];
+let drSort={key:"",dir:1};
+
+function drLocalDateInput(d){
+ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");
+ return `${y}-${m}-${day}`;
+}
+function drParseDate(value){
+ if(value===null||value===undefined||value==="") return null;
+ if(value instanceof Date&&!isNaN(value)) return new Date(value.getFullYear(),value.getMonth(),value.getDate());
+ if(typeof value==="number"&&value>20000&&value<80000){
+  const dt=new Date(Date.UTC(1899,11,30)+value*86400000);
+  return new Date(dt.getUTCFullYear(),dt.getUTCMonth(),dt.getUTCDate());
+ }
+ const s=String(value).trim();
+ let m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+ if(m){
+  let y=Number(m[3]);if(y<100)y+=y<50?2000:1900;
+  const d=new Date(y,Number(m[2])-1,Number(m[1]));
+  return isNaN(d)?null:d;
+ }
+ m=s.match(/^(\d{4})[\/.\-](\d{1,2})[\/.\-](\d{1,2})/);
+ if(m){const d=new Date(Number(m[1]),Number(m[2])-1,Number(m[3]));return isNaN(d)?null:d;}
+ const d=new Date(s);
+ return isNaN(d)?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());
+}
+function drDateValue(d){
+ if(!d)return "";
+ return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+}
+function drDayDiff(a,b){return Math.round((a.getTime()-b.getTime())/86400000);}
+function drEffectiveDate(){return drTestDate||drReportDate||new Date();}
+function drCleanStatus(v){return String(v??"").toLowerCase().replace(/[\s/.]/g,"");}
+function drStatusWindow(status){
+ const s=drCleanStatus(status);
+ const rules=[["rfd",7],["solid",12],["print",12],["aop",12],["yd",4]];
+ for(const [word,days] of rules) if(s.includes(word)) return days;
+ return 15;
+}
+function drIsWfg(remarks){
+ return String(remarks??"").toLowerCase().replace(/[.\s]/g,"").includes("wfg");
+}
+async function drGetSourceRows(){
+ const file=await getCategoryFile("Order Status");
+ if(!file||!file.data) return {rows:[],sheet:null,updatedAt:null};
+ const sheet=(file.data||[]).find(s=>normalize(s.name)==="orderstatus");
+ if(!sheet) return {rows:[],sheet:null,updatedAt:file.updatedAt};
+ const rows=[];
+ (sheet.rows||[]).forEach((r)=>{
+  const v=r._values||[];
+  const get=(i)=>v[i]!==undefined&&v[i]!==null?v[i]:"";
+  const record={
+   gd:get(0),pi:get(1),piReceivedDate:get(3),greigeDate:get(4),
+   deliveryDate:get(5),buyer:get(7),construction:get(10),greyInDate:get(11),
+   color:get(12),colorStatus:get(13),qty:get(17),remarks:get(47)
+  };
+  if(record.pi||record.gd||record.color) rows.push(record);
+ });
+ return {rows,sheet,updatedAt:file.updatedAt};
+}
+function drBuildReports(rows){
+ const base=drEffectiveDate();
+ const yday=new Date(base);yday.setDate(yday.getDate()-1);
+ const result={upcoming:[],todayBefore:[],next7:[],lastDay:[]};
+ rows.forEach(r=>{
+  const deli=drParseDate(r.deliveryDate);
+  const piDate=drParseDate(r.piReceivedDate);
+  const greyDate=drParseDate(r.greyInDate);
+  if(deli){
+   const days=drStatusWindow(r.colorStatus);
+   if(drIsWfg(r.remarks)&&deli>=base&&deli<=new Date(base.getFullYear(),base.getMonth(),base.getDate()+days)){
+    result.upcoming.push({...r,_window:days});
+   }
+   if(deli<=base) result.todayBefore.push(r);
+   const end=new Date(base);end.setDate(end.getDate()+7);
+   if(deli>=base&&deli<=end&&!drIsWfg(r.remarks)&&!!greyDate) result.next7.push(r);
+  }
+  if(piDate&&piDate.getTime()===yday.getTime()) result.lastDay.push(r);
+ });
+ return result;
+}
+function drFormatCount(n){return Number(n||0).toLocaleString();}
+async function drRenderSummary(){
+ const body=document.getElementById("drSummaryBody");
+ if(!body)return;
+ const source=await drGetSourceRows();
+ const date=drEffectiveDate();
+ const dateText=drDateValue(date);
+ const info=document.getElementById("drSourceInfo");
+ if(info){
+  info.textContent=source.sheet
+   ?`Source: Order Update → Order Status Excel File → Order Status | ${drFormatCount(source.rows.length)} source rows | Report calculation date: ${dateText}`
+   :"No Order Status sheet found. Upload it from Order Update first.";
+ }
+ if(!source.sheet){
+  body.innerHTML='<tr><td colspan="3">Order Status sheet not uploaded. Please upload the Excel file from Order Update.</td></tr>';
+  return;
+ }
+ const reports=drBuildReports(source.rows);
+ body.innerHTML=DR_REPORTS.map(r=>`<tr><td>${escapeHTML(r.name)}</td><td>${drFormatCount(reports[r.id].length)}</td><td><button class="small dr-report-open" data-report="${r.id}">View</button></td></tr>`).join("");
+ body.querySelectorAll("[data-report]").forEach(btn=>btn.addEventListener("click",()=>drOpenDetail(btn.dataset.report,reports[btn.dataset.report])));
+}
+function drOpenDetail(reportId,rows){
+ drActiveReport=reportId;
+ drDetailRows=(rows||[]).map(r=>({...r}));
+ drSort={key:"",dir:1};
+ const report=DR_REPORTS.find(r=>r.id===reportId);
+ document.getElementById("drDetailTitle").textContent=report?report.name:"Daily Report";
+ document.getElementById("drDetailMeta").textContent=`Report date: ${drDateValue(drEffectiveDate())}`;
+ document.getElementById("drSearch").value="";
+ document.getElementById("drDateFrom").value="";
+ document.getElementById("drDateTo").value="";
+ document.getElementById("drDetailHead").innerHTML="<tr>"+DR_COLUMNS.map(c=>`<th data-sort="${c.key}">${escapeHTML(c.label)} ↕</th>`).join("")+"</tr>";
+ document.getElementById("drDetailHead").querySelectorAll("[data-sort]").forEach(th=>th.addEventListener("click",()=>{
+  const key=th.dataset.sort;
+  if(drSort.key===key)drSort.dir*=-1;else drSort={key,dir:1};
+  drRenderDetailRows();
+ }));
+ drRenderDetailRows();
+ switchPage("dailyReportDetail");
+}
+function drRenderDetailRows(){
+ const q=normalize(document.getElementById("drSearch").value||"");
+ const from=drParseDate(document.getElementById("drDateFrom").value);
+ const to=drParseDate(document.getElementById("drDateTo").value);
+ let rows=drDetailRows.filter(r=>{
+  if(q&&!DR_COLUMNS.some(c=>normalize(r[c.key]).includes(q)))return false;
+  const date=drParseDate(r.deliveryDate);
+  if(from&&(!date||date<from))return false;
+  if(to&&(!date||date>to))return false;
+  return true;
+ });
+ if(drSort.key){
+  const k=drSort.key;
+  rows.sort((a,b)=>{
+   const da=drParseDate(a[k]),db=drParseDate(b[k]);
+   let cmp;
+   if(da||db)cmp=(da?da.getTime():-Infinity)-(db?db.getTime():-Infinity);
+   else cmp=String(a[k]??"").localeCompare(String(a[k]??""),undefined,{numeric:true,sensitivity:"base"});
+   return cmp*drSort.dir;
+  });
+ }
+ drFilteredRows=rows;
+ const body=document.getElementById("drDetailBody");
+ body.innerHTML=rows.length?rows.map(r=>"<tr>"+DR_COLUMNS.map(c=>`<td>${escapeHTML(c.key==="piReceivedDate"||c.key==="greigeDate"||c.key==="deliveryDate"||c.key==="greyInDate"?drDateValue(drParseDate(r[c.key])):r[c.key])}</td>`).join("")+"</tr>").join(""):'<tr><td colspan="11">No records found.</td></tr>';
+ document.getElementById("drVisibleCount").textContent=`Displayed rows: ${drFormatCount(rows.length)} | Report rows before detail filters: ${drFormatCount(drDetailRows.length)}`;
+}
+function drExportExcel(){
+ if(!window.XLSX){showToast("Excel library is not loaded.","error");return;}
+ const aoa=[DR_COLUMNS.map(c=>c.label),...drFilteredRows.map(r=>DR_COLUMNS.map(c=>{
+  if(["piReceivedDate","greigeDate","deliveryDate","greyInDate"].includes(c.key))return drDateValue(drParseDate(r[c.key]));
+  return r[c.key]??"";
+ }))];
+ const ws=XLSX.utils.aoa_to_sheet(aoa);
+ const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,ws,"Daily Report");
+ XLSX.writeFile(book,`Daily_Report_${drActiveReport}_${drLocalDateInput(drEffectiveDate())}.xlsx`);
+}
+function drReset(){
+ drReportDate=new Date();drReportDate.setHours(0,0,0,0);drTestDate=null;
+ document.getElementById("drReportDate").value=drLocalDateInput(drReportDate);
+ document.getElementById("drTestDate").value="";
+ drRenderSummary();
+}
+function drInit(){
+ const reportInput=document.getElementById("drReportDate");
+ const testInput=document.getElementById("drTestDate");
+ if(!reportInput||reportInput.dataset.ready)return;
+ reportInput.dataset.ready="1";
+ reportInput.value=drLocalDateInput(drReportDate);
+ testInput.value="";
+ reportInput.addEventListener("change",()=>{drReportDate=drParseDate(reportInput.value)||new Date();drRenderSummary();});
+ testInput.addEventListener("change",()=>{drTestDate=drParseDate(testInput.value);drRenderSummary();});
+ document.getElementById("drResetToday").addEventListener("click",drReset);
+ document.getElementById("drPrintSummary").addEventListener("click",()=>window.print());
+ document.getElementById("drBackSummary").addEventListener("click",()=>{switchPage("dailyReport");drRenderSummary();});
+ document.getElementById("drSearch").addEventListener("input",drRenderDetailRows);
+ document.getElementById("drDateFrom").addEventListener("change",drRenderDetailRows);
+ document.getElementById("drDateTo").addEventListener("change",drRenderDetailRows);
+ document.getElementById("drClearFilters").addEventListener("click",()=>{
+  document.getElementById("drSearch").value="";
+  document.getElementById("drDateFrom").value="";
+  document.getElementById("drDateTo").value="";
+  drRenderDetailRows();
+ });
+ document.getElementById("drExportExcel").addEventListener("click",drExportExcel);
+ document.getElementById("drPrintDetail").addEventListener("click",()=>window.print());
+ document.querySelector('nav button[data-page="dailyReport"]').addEventListener("click",drRenderSummary);
+}
+
 
 window.addEventListener("DOMContentLoaded",init);
 </script>
