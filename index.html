@@ -3216,5 +3216,328 @@ document.querySelectorAll('nav button[data-page="wip"]').forEach(b=>{
 });
 })();
 </script>
+<!-- Nahid ERP: Grey Report add-on -->
+<script>
+/* Nahid Textile ERP - Grey Report add-on (self-contained; does not change any other module) */
+(function(){
+"use strict";
+if(window.__greyModule) return; window.__greyModule=true;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const norm=s=>String(s==null?"":s).toLowerCase().replace(/[^a-z0-9]/g,"");
+const cl=s=>String(s==null?"":s).trim();
+const colorKey=c=>{const r=cl(c);return norm(r.replace(/\([^)]*\)/g," "))||norm(r);};
+function piKeys(pi){
+ const raw=cl(pi); if(!raw) return [];
+ const keys=new Set([norm(raw)]);
+ if(raw.indexOf("+")>=0){
+  const m=raw.match(/^(.*?)\s*\/\s*(\d{2,4})$/);
+  const body=m?m[1]:raw, suf=m?"/"+m[2]:"";
+  body.split("+").map(s=>s.trim()).filter(Boolean).forEach(p=>keys.add(norm(p+suf)));
+ }
+ return [...keys];
+}
+const toast=(m,t,d)=>{try{showToast(m,t,d);}catch(e){alert(m);}};
+const fmt=n=>Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+const p2=n=>String(n).padStart(2,"0");
+function fmtDate(v){
+ if(v===""||v==null) return "";
+ if(typeof v==="number"&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5);return p2(d.getUTCDate())+"/"+p2(d.getUTCMonth()+1)+"/"+d.getUTCFullYear();}
+ return String(v);
+}
+function numOf(v){if(typeof v==="number") return v;const n=Number(String(v).replace(/,/g,"").trim());return String(v).trim()===""||!isFinite(n)?"":n;}
+
+let data=[], methods={}, meta=null;
+const FIELD_OPTS=[["all","All fields"],["pi","PI"],["gd","GD"],["color","Color"],["construction","Construction"]];
+let shown=[], filters={}, searched=false, debounce=null;
+const COLS=[
+ {k:"pi",l:"PI"},{k:"cu",l:"Customer Name"},{k:"co",l:"Construction"},{k:"cl",l:"Color"},
+ {k:"oq",l:"Order Qty (Yds)",num:1},{k:"gd",l:"Grey Issue Date"},{k:"rq",l:"Received Qty (Yds)",num:1},{k:"rm",l:"Remarks"}
+];
+const disp=(it,c)=>c.num?(it[c.k]===""?"":fmt(it[c.k])):(c.k==="gd"?fmtDate(it.gd):cl(it[c.k]));
+
+/* ---------- public lookup used by the WIP Excel ---------- */
+window.greyDyeingMethod=function(pi,color){
+ const set=new Set(), ck=colorKey(color);
+ piKeys(pi).forEach(pk=>{const v=methods[pk+"|"+ck];if(v) v.split(" / ").forEach(x=>set.add(x));});
+ return set.size>1?"CPB / TH":(set.size?[...set][0]:"");
+};
+
+/* ---------- read the Excel (only sheet "Filterwise Grey Received") ---------- */
+async function readGrey(file){
+ if(!window.XLSX) throw new Error("Excel library not loaded");
+ const buf=await file.arrayBuffer();
+ const names=XLSX.read(buf,{type:"array",bookSheets:true}).SheetNames;
+ const name=names.find(n=>norm(n)==="filterwisegreyreceived");
+ if(!name) throw new Error('Sheet "Filterwise Grey Received" not found in this file');
+ const ws=XLSX.read(buf,{type:"array",sheets:name}).Sheets[name];
+ const a=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:""});
+ let hr=-1;
+ for(let r=0;r<Math.min(a.length,40);r++){if(a[r].some(x=>norm(x)==="pino")){hr=r;break;}}
+ if(hr<0) throw new Error("Header row (PI no.) not found");
+ const H=a[hr].map(norm), at=n=>H.indexOf(n);
+ const c={pi:at("pino"),gn:at("gdno"),cu:at("customername"),co:at("construction"),cl:at("color"),oq:at("orderqtyyds"),gd:at("greyissuedate"),rq:at("receivedqtyyds"),rm:at("remarks"),dm:at("dyeingmethod")};
+ if(c.pi<0||c.cl<0) throw new Error("PI no. / Color column not found");
+ const g=i=>i<0?"":i;
+ const rows=[], mset={};
+ for(let r=hr+1;r<a.length;r++){
+  const x=a[r], pi=cl(x[c.pi]);
+  if(!pi||/sdm|sample/i.test(pi)) continue;
+  const color=cl(x[c.cl]);
+  rows.push([pi,cl(x[g(c.cu)]),cl(x[g(c.co)]),color,numOf(x[g(c.oq)]),x[g(c.gd)],numOf(x[g(c.rq)]),cl(x[g(c.rm)]),cl(x[g(c.gn)])]);
+  const m=c.dm<0?"":cl(x[c.dm]).toUpperCase();
+  if(m==="CPB"||m==="TH"){const k=norm(pi)+"|"+colorKey(color);(mset[k]=mset[k]||new Set()).add(m);}
+ }
+ const map={};
+ Object.keys(mset).forEach(k=>{map[k]=mset[k].size>1?"CPB / TH":[...mset[k]][0];});
+ return {rows,methods:map};
+}
+
+function setData(rec){
+ data=[];methods={};meta=null;
+ if(rec&&rec.rows){
+  data=rec.rows.map((r,i)=>({i,pi:r[0],cu:r[1],co:r[2],cl:r[3],oq:r[4],gd:r[5],rq:r[6],rm:r[7],np:norm(r[0]),gn:cl(r[8]),ng:norm(r[8]),nc:norm(r[3]),nco:norm(r[2]),ck:norm(r[0])+"|"+colorKey(r[3])}));
+  methods=rec.methods||{};
+  meta={name:rec.fileName||"",at:rec.updatedAt||""};
+ }
+ paintSlot();
+}
+
+function paintSlot(){
+ const b=$("badgeGreyFile"),inf=$("infoGreyFile");
+ if(!b) return;
+ if(data.length){
+  b.textContent="Active ("+data.length+" rows)";b.className="badge green";
+  inf.innerHTML='<span class="slot-ok">✓ Filterwise Grey Received</span> '+esc(meta&&meta.name?meta.name:"")+" • Dyeing Method pairs: "+Object.keys(methods).length;
+ }else{
+  b.textContent="Not Uploaded";b.className="badge";
+  inf.textContent='Sheet used: "Filterwise Grey Received" only';
+ }
+ if(searched) run();
+}
+
+/* ---------- UI (injected, so index.html needs only one script tag) ---------- */
+function buildUI(){
+ const box=$("threeSheetsUploadContainer");
+ if(!box||$("greySection")) return;
+ const st=document.createElement("style");
+ st.textContent=".grey-foot td{position:sticky;bottom:0;background:#eef6ff;font-weight:700;border-top:2px solid var(--primary-light)}#greyBody td:nth-child(5),#greyBody td:nth-child(7){text-align:right}";
+ document.head.appendChild(st);
+ const slot=document.createElement("div");
+ slot.className="slot-card";
+ slot.style.cssText="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff";
+ slot.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0;font-size:14px">📑 4. Grey Report</h3><span id="badgeGreyFile" class="badge">Not Uploaded</span></div>
+  <input type="file" id="greyFileInput" accept=".xlsx,.xls,.xlsm,.xlsb" style="margin:4px 0 8px">
+  <div style="display:flex;gap:6px;align-items:center"><button class="small" id="uploadGreyBtn">Upload / Update</button><button class="small danger outline" id="deleteGreyBtn">Delete</button></div>
+  <p id="infoGreyFile" class="muted" style="margin:6px 0 0;font-size:11px"></p>`;
+ box.appendChild(slot);
+ const sec=document.createElement("div");
+ sec.id="greySection";sec.className="detail-section";
+ sec.innerHTML=`<h3>📑 Grey Report Search</h3>
+  <p class="muted">Search by PI, GD, Color or Construction. Press <b>+</b> for more boxes (or separate with comma). Same type = "or" (PI 15300 or PI 15302); different types = "and" (those PIs and Black). Use the <b>▼</b> in a column header to filter; totals at the bottom follow the search and filters.</p>
+  <div id="greyTerms"></div>
+  <div class="actions"><button id="greySearch">🔍 Search</button><button class="secondary" id="greyClear">Clear</button><button class="small outline" id="greyClearF">✖ Clear filters</button><button class="small outline" id="greyExport">📥 Export Excel</button></div>
+  <div id="greySummary" style="margin:8px 0"></div>
+  <div class="table-wrap gs-wrap"><table class="gs-table"><thead id="greyHead"></thead><tbody id="greyBody"><tr><td style="padding:14px;color:#64748b">Upload the Grey Report file, then type a PI above.</td></tr></tbody><tfoot id="greyFoot"></tfoot></table></div>
+  <div id="greyPop" class="gs-pop hidden"></div>`;
+ box.parentNode.insertBefore(sec,box.nextSibling);
+
+ addRow(null,false);
+ $("uploadGreyBtn").onclick=upload;
+ $("deleteGreyBtn").onclick=async()=>{
+  if(!confirm("Delete the Grey Report data?")) return;
+  try{await idbPut("app_data","grey_report",null);setData(null);searched=false;shown=[];render();toast("Grey Report removed.","info");}
+  catch(e){toast("Delete failed","error");}
+ };
+ $("greySearch").onclick=run;
+ $("greyClear").onclick=()=>{$("greyTerms").innerHTML="";addRow(null,false);searched=false;shown=[];filters={};render();};
+ $("greyClearF").onclick=()=>{filters={};render();};
+ $("greyExport").onclick=exportXlsx;
+ document.addEventListener("click",e=>{const p=$("greyPop");if(p&&!p.classList.contains("hidden")&&!p.contains(e.target)) closePop();});
+ paintSlot();
+}
+
+async function upload(){
+ const f=$("greyFileInput").files[0];
+ if(!f){toast("Please choose the Grey Received Excel file first.","error");return;}
+ showLoading("Reading Grey Received file...");
+ try{
+  const res=await readGrey(f);
+  if(!res.rows.length) throw new Error("No data rows found");
+  const rec={rows:res.rows,methods:res.methods,fileName:f.name,updatedAt:new Date().toISOString()};
+  await idbPut("app_data","grey_report",rec);
+  $("greyFileInput").value="";
+  setData(rec);hideLoading();
+  toast("Grey Report uploaded: "+res.rows.length+" rows, "+Object.keys(res.methods).length+" PI+Color dyeing methods","success",6000);
+ }catch(e){hideLoading();console.error(e);toast("Grey upload error: "+e.message,"error",8000);}
+}
+
+/* ---------- search ---------- */
+function addRow(after,focus){
+ const row=document.createElement("div");
+ row.className="gs-row";
+ row.innerHTML=`<select>${FIELD_OPTS.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("")}</select><input placeholder="Type here..." autocomplete="off"><button type="button" class="small" title="Add another PI box">+</button><button type="button" class="small outline danger" title="Remove">✕</button>`;
+ const inp=row.querySelector("input"),[plus,del]=row.querySelectorAll("button");row.querySelector("select").onchange=run;
+ inp.addEventListener("input",()=>{clearTimeout(debounce);debounce=setTimeout(run,300);});
+ inp.addEventListener("keydown",e=>{if(e.key==="Enter"){clearTimeout(debounce);run();}});
+ plus.onclick=()=>addRow(row,true);
+ del.onclick=()=>{if($("greyTerms").children.length>1){row.remove();run();}else{inp.value="";run();}};
+ const t=$("greyTerms");
+ if(after&&after.nextSibling) t.insertBefore(row,after.nextSibling); else t.appendChild(row);
+ if(focus) inp.focus();
+}
+
+function run(){
+ const groups={};let any=false;
+ document.querySelectorAll("#greyTerms .gs-row").forEach(r=>{
+  const f=r.querySelector("select").value, v=r.querySelector("input").value;
+  v.split(f==="pi"||f==="gd"?/[,;\s]+/:/[,;]+/).forEach(t=>{t=norm(t);if(t){(groups[f]=groups[f]||[]).push(t);any=true;}});
+ });
+ filters={};
+ if(!any){searched=false;shown=[];render();return;}
+ searched=true;
+ const key={pi:"np",gd:"ng",color:"nc",construction:"nco"};
+ const num=s=>{const m=String(s).match(/\d+/);return m?Number(m[0]):Infinity;};
+ shown=data.filter(it=>Object.keys(groups).every(f=>groups[f].some(t=>
+  f==="all"?(it.np.includes(t)||it.ng.includes(t)||it.nc.includes(t)||it.nco.includes(t)):it[key[f]].includes(t))))
+  .sort((a,b)=>num(a.pi)-num(b.pi)||a.i-b.i);
+ render();
+}
+
+const visible=()=>shown.filter(it=>COLS.every(c=>!filters[c.k]||filters[c.k].has(disp(it,c))));
+
+function render(){
+ closePop();
+ const head=$("greyHead");
+ if(!searched){
+  head.innerHTML="";$("greyFoot").innerHTML="";$("greySummary").innerHTML="";
+  $("greyBody").innerHTML='<tr><td style="padding:14px;color:#64748b">'+(data.length?"Type a PI above to search.":"Upload the Grey Report file, then type a PI above.")+"</td></tr>";
+  return;
+ }
+ const tr=document.createElement("tr");
+ COLS.forEach(c=>{
+  const th=document.createElement("th");
+  th.appendChild(document.createTextNode(c.l));
+  const b=document.createElement("button");
+  b.type="button";b.className="gs-fbtn"+(filters[c.k]?" active":"");b.textContent="▼";
+  b.onclick=e=>{e.stopPropagation();openPop(b,c);};
+  th.appendChild(b);tr.appendChild(th);
+ });
+ head.innerHTML="";head.appendChild(tr);
+ renderBody();
+}
+
+function ordSet(rows){
+ const seen=new Set(),os=new Set();
+ rows.forEach(it=>{if(it.oq===""||seen.has(it.ck)) return;seen.add(it.ck);os.add(it);});
+ return os;
+}
+function renderBody(){
+ const rows=visible(), os=ordSet(rows), body=$("greyBody"), LIM=1000;
+ body.innerHTML="";
+ if(!rows.length) body.innerHTML='<tr><td colspan="8" style="padding:14px;color:#64748b;text-align:center">No rows found'+(Object.keys(filters).length?" (check the filters)":"")+".</td></tr>";
+ rows.slice(0,LIM).forEach(it=>{
+  const tr=document.createElement("tr");
+  COLS.forEach(c=>{const td=document.createElement("td");td.textContent=c.k==="oq"?(os.has(it)?fmt(it.oq):""):disp(it,c);tr.appendChild(td);});
+  body.appendChild(tr);
+ });
+ let oq=0,rq=0;
+ os.forEach(it=>{oq+=it.oq;});
+ rows.forEach(it=>{if(it.rq!=="") rq+=it.rq;});
+ $("greyFoot").innerHTML='<tr class="grey-foot"><td>TOTAL</td><td>'+rows.length+' row(s)</td><td></td><td></td><td style="text-align:right">'+esc(fmt(oq))+'</td><td></td><td style="text-align:right">'+esc(fmt(rq))+"</td><td></td></tr>";
+ const pis=new Set(rows.map(r=>r.pi)), fc=Object.keys(filters).length;
+ $("greySummary").innerHTML='<span class="badge blue">'+pis.size+' PI</span> <span class="badge blue">'+os.size+' PI+Color</span> <span class="badge blue">'+rows.length+' rows</span> <span class="badge green">Order Qty (once per PI+Color): '+esc(fmt(oq))+'</span> <span class="badge green">Received Qty: '+esc(fmt(rq))+"</span>"+(fc?' <span class="badge yellow">'+fc+" filter(s) active</span>":"")+(rows.length>LIM?' <span class="badge red">first '+LIM+" rows drawn, totals include all</span>":"");
+}
+
+/* ---------- column filter popup ---------- */
+function closePop(){const p=$("greyPop");if(p){p.classList.add("hidden");p.innerHTML="";}}
+function openPop(btn,col){
+ const pop=$("greyPop");
+ const all=[...new Set(shown.map(it=>disp(it,col)))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+ const sel=new Set(filters[col.k]||all);
+ pop.innerHTML='<input placeholder="Search values..." autocomplete="off"><div class="gs-links"><a data-a="all">Select all</a><a data-a="none">Deselect all</a></div><div class="gs-list"></div><button type="button" class="small" style="width:100%;margin-top:8px">Done</button>';
+ pop.querySelector("button").onclick=closePop;
+ const list=pop.querySelector(".gs-list"),q=pop.querySelector("input"),boxes=[];
+ const apply=()=>{
+  if(sel.size===all.length) delete filters[col.k]; else filters[col.k]=new Set(sel);
+  btn.classList.toggle("active",!!filters[col.k]);
+  renderBody();
+ };
+ all.forEach(v=>{
+  const lab=document.createElement("label"),cb=document.createElement("input");
+  cb.type="checkbox";cb.checked=sel.has(v);
+  cb.onchange=()=>{if(cb.checked) sel.add(v); else sel.delete(v);apply();};
+  lab.appendChild(cb);lab.appendChild(document.createTextNode(v===""?"(blank)":v));
+  list.appendChild(lab);boxes.push({v,lab,cb});
+ });
+ q.oninput=()=>{const t=norm(q.value);boxes.forEach(b=>{b.lab.style.display=!t||norm(b.v).includes(t)?"":"none";});};
+ pop.querySelectorAll(".gs-links a").forEach(a=>a.onclick=()=>{
+  boxes.forEach(b=>{if(b.lab.style.display==="none") return;b.cb.checked=a.dataset.a==="all";if(b.cb.checked) sel.add(b.v); else sel.delete(b.v);});
+  apply();
+ });
+ pop.classList.remove("hidden");
+ if(window.innerWidth<700){pop.style.width="92vw";pop.style.left="4vw";pop.style.top="8px";list.style.maxHeight="42vh";}
+ else{
+  pop.style.width="";
+  const r=btn.getBoundingClientRect();
+  pop.style.left=Math.max(6,Math.min(r.left,window.innerWidth-pop.offsetWidth-6))+"px";
+  pop.style.top=Math.min(r.bottom+4,window.innerHeight-pop.offsetHeight-6)+"px";
+  q.focus();
+ }
+}
+
+function exportXlsx(){
+ const rows=visible();
+ if(!rows.length){toast("No rows to export","info");return;}
+ const os=ordSet(rows);
+ let oq=0,rq=0;
+ const aoa=[COLS.map(c=>c.l)].concat(rows.map(it=>{
+  if(os.has(it)) oq+=it.oq;
+  if(it.rq!=="") rq+=it.rq;
+  return COLS.map(c=>c.k==="oq"?(os.has(it)?it.oq:""):(c.num?it[c.k]:(c.k==="gd"?fmtDate(it.gd):it[c.k])));
+ }));
+ aoa.push(["TOTAL",rows.length+" rows","","",oq,"",rq,""]);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),"Grey Report");
+ XLSX.writeFile(wb,"GreyReport-Search.xlsx");
+}
+
+/* ---------- WIP Excel: fill "Dyeing Method" (col R) from Grey Report when the file is written ---------- */
+function patchExcelJS(){
+ try{
+  if(!window.ExcelJS||ExcelJS.__greyPatched) return;
+  const X=new ExcelJS.Workbook().xlsx.constructor, orig=X.prototype.writeBuffer;
+  X.prototype.writeBuffer=function(){
+   try{
+    const ws=this.workbook&&this.workbook.worksheets&&this.workbook.worksheets[0];
+    if(ws&&cl(ws.getCell(3,1).value)==="PI"&&/^dyeingmethod$/.test(norm(ws.getCell(3,18).value))){
+     for(let r=4;r<=ws.rowCount;r++){
+      const pi=ws.getCell(r,1).value;
+      if(pi==null||pi==="") continue;
+      ws.getCell(r,18).value=window.greyDyeingMethod(pi,ws.getCell(r,13).value);
+     }
+    }
+   }catch(e){console.warn("Grey dyeing fill failed",e);}
+   return orig.apply(this,arguments);
+  };
+  ExcelJS.__greyPatched=true;
+ }catch(e){console.warn("ExcelJS patch skipped",e);}
+}
+
+/* ---------- start ---------- */
+async function start(){
+ buildUI();
+ patchExcelJS();
+ for(let i=0;i<60;i++){
+  let ok=false;try{ok=!!db;}catch(e){}
+  if(ok) break;
+  await new Promise(r=>setTimeout(r,100));
+ }
+ try{const rec=await idbGet("app_data","grey_report");if(rec) setData(rec);}
+ catch(e){console.warn("Grey load failed",e);}
+}
+start();
+})();
+</script>
 </body>
 </html>
