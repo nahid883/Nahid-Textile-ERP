@@ -3,10 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f3f6e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="referrer" content="no-referrer">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <title>Nahid Textile ERP - High Performance</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
-
 <style>
 :root{
  --primary:#0f3f6e;
@@ -2577,6 +2583,7 @@ const $=id=>document.getElementById(id);
  document.head.appendChild(st);
 })();
 
+ 
 /* ---------- storage (existing IndexedDB, existing "app_data" store, new keys only) ---------- */
 async function ensureLoaded(){
  if(loaded) return true;
@@ -3539,5 +3546,6 @@ async function start(){
 start();
 })();
 </script>
+ <script src="cloud.js"></script>
 </body>
 </html>
