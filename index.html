@@ -453,7 +453,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <section id="dailyReport" class="page">
  <h2>Daily Report</h2>
  <h3 style="margin-top:0">Daily Report from Order Status</h3>
- <p class="muted">All reports are generated only from the latest uploaded Order Status Excel File → Order Status sheet.</p>
+ <p class="muted">First 4 reports come from the Order Status file → Order Status sheet. Last Day Grey Input uses the Grey Report file (Filterwise Grey Received). Delivery Date Mismatch and Order Qty Mismatch compare Order Status with Delivery Status file → Sheet 1.</p>
  <div class="dr-controls">
   <div><label for="drReportDate">Report Date</label><input type="date" id="drReportDate"></div>
   <div><label for="drTestDate">Test Date (optional override)</label><input type="date" id="drTestDate"></div>
@@ -2057,8 +2057,28 @@ const DR_REPORTS=[
  {id:"upcoming",name:"Upcoming Delivery Watch"},
  {id:"todayBefore",name:"Today to Before"},
  {id:"next7",name:"Next 7 Days Running Order"},
- {id:"lastDay",name:"Last Day Orders"}
+ {id:"lastDay",name:"Last Day Orders"},
+ {id:"lastGrey",name:"Last Day Grey Input"},
+ {id:"deliMismatch",name:"Delivery Date Mismatch"},
+ {id:"qtyMismatch",name:"Order Qty Mismatch"}
 ];
+/* column sets for the 3 new reports */
+const DR_COLS_GREY=[
+ {key:"pi",label:"PI Number"},{key:"buyer",label:"Customer Name"},{key:"construction",label:"Construction"},
+ {key:"color",label:"Color"},{key:"qty",label:"Order Qty (Yds)"},{key:"greyDate",label:"Grey Issue Date",date:1},
+ {key:"recvQty",label:"Received Qty (Yds)"},{key:"remarks",label:"Remarks"}
+];
+const DR_COLS_DELI=[
+ {key:"pi",label:"PI Number"},{key:"construction",label:"Construction"},{key:"color",label:"Color"},
+ {key:"osDate",label:"Order Status Delivery Date",date:1},{key:"dsDate",label:"Delivery Status Delivery Date",date:1},
+ {key:"diffDays",label:"Days Earlier"},{key:"qty",label:"Order Qty"}
+];
+const DR_COLS_QTY=[
+ {key:"pi",label:"PI Number"},{key:"construction",label:"Construction"},{key:"color",label:"Color"},
+ {key:"osQty",label:"Order Status Qty"},{key:"dsQty",label:"Delivery Status Qty"},{key:"diffQty",label:"Difference"}
+];
+let drCols=DR_COLUMNS;
+const drIsDateCol=c=>!!(c.date||["piReceivedDate","greigeDate","deliveryDate","greyInDate"].includes(c.key));
 let drReportDate=new Date();drReportDate.setHours(0,0,0,0);
 let drTestDate=null;
 let drActiveReport="";
@@ -2144,6 +2164,117 @@ function drBuildReports(rows){
  });
  return result;
 }
+
+/* ===== NEW REPORTS: Last Day Grey Input / Delivery Date Mismatch / Order Qty Mismatch ===== */
+function drNum(v){
+ if(typeof v==="number") return isFinite(v)?v:null;
+ const t=String(v??"").replace(/,/g,"").trim();
+ if(t==="") return null;
+ const n=Number(t);
+ return isFinite(n)?n:null;
+}
+function drFmtNum(n){return n===null||n===undefined?"":Number(n).toLocaleString(undefined,{maximumFractionDigits:2});}
+/* find a column by header text when the standard header detection missed it */
+function drColByHeader(headers,test){
+ for(let c=0;c<(headers||[]).length;c++){if(test(normalize(headers[c]||""))) return c;}
+ return -1;
+}
+/* Delivery Status file -> "Sheet 1" rows */
+async function drGetDeliveryRows(){
+ const files=await getAllCategoryFiles();
+ const out=[];let found=false;
+ files.forEach(f=>{
+  if(!isCategory(f.category,"delivery")) return;
+  (f.data||[]).forEach(sh=>{
+   if(normalize(sh.name)!=="sheet1") return;
+   found=true;
+   const h=sh.headers||[];
+   const dc=drColByHeader(h,t=>/deli/.test(t)&&/(date|dt)/.test(t)&&!/status/.test(t));
+   const qc=drColByHeader(h,t=>/orderqty/.test(t)||t==="qty"||/orderquantity/.test(t));
+   (sh.rows||[]).forEach(row=>{
+    const pi=clean(getField(row,"pi")),color=clean(getField(row,"color")),construction=clean(getField(row,"construction"));
+    if(!pi&&!color) return;
+    let d=getField(row,"deliDate");
+    if((d===""||d==null)&&dc>=0) d=(row._values||[])[dc];
+    let q=getField(row,"qty");
+    if((q===""||q==null)&&qc>=0) q=(row._values||[])[qc];
+    out.push({pi,color,construction,deliDate:d,qty:q});
+   });
+  });
+ });
+ return {rows:out,found};
+}
+/* fuzzy-ish color compare: exact key, or one contains the other (min 3 chars) */
+function drColorSame(a,b){
+ const x=colorKey(a),y=colorKey(b);
+ if(!x||!y) return x===y;
+ if(x===y) return true;
+ const s=x.length<=y.length?x:y,l=x.length<=y.length?y:x;
+ return s.length>=3&&l.includes(s);
+}
+function drPiSame(a,b){
+ const ka=piKeys(a),kb=piKeys(b);
+ return ka.some(k=>kb.indexOf(k)>=0);
+}
+function drConsSame(a,b){
+ const x=normalize(a),y=normalize(b);
+ if(!x||!y) return true; /* construction missing on one side: PI + Color decide */
+ return x===y||x.includes(y)||y.includes(x);
+}
+/* index delivery rows by PI key for fast match */
+function drIndexByPi(rows){
+ const m={};
+ rows.forEach(r=>{piKeys(r.pi).forEach(k=>{(m[k]=m[k]||[]).push(r);});});
+ return m;
+}
+function drFindMatch(os,idx){
+ const cands=[];
+ piKeys(os.pi).forEach(k=>{(idx[k]||[]).forEach(r=>{if(cands.indexOf(r)<0)cands.push(r);});});
+ let best=cands.filter(r=>drColorSame(os.color,r.color)&&drConsSame(os.construction,r.construction));
+ if(!best.length) best=cands.filter(r=>drColorSame(os.color,r.color));
+ /* prefer exact normalized color+construction */
+ const exact=best.find(r=>normalize(r.color)===normalize(os.color)&&normalize(r.construction)===normalize(os.construction));
+ return exact||best[0]||null;
+}
+async function drBuildExtraReports(osRows){
+ const res={lastGrey:[],deliMismatch:[],qtyMismatch:[]};
+ /* ---- 1) Last Day Grey Input: Grey Report -> Filterwise Grey Received ---- */
+ const base=drEffectiveDate();
+ const yday=new Date(base);yday.setDate(yday.getDate()-1);
+ try{
+  const rec=await idbGet("app_data","grey_report");
+  if(rec&&rec.rows){
+   rec.rows.forEach(r=>{
+    const d=drParseDate(r[5]);
+    if(d&&d.getTime()===yday.getTime()){
+     res.lastGrey.push({pi:r[0],buyer:r[1],construction:r[2],color:r[3],qty:drFmtNum(r[4]),greyDate:r[5],recvQty:drFmtNum(r[6]),remarks:r[7]});
+    }
+   });
+  }
+ }catch(e){console.error("grey read",e);}
+ /* ---- 2) + 3) mismatch reports: Order Status vs Delivery Status (Sheet 1) ---- */
+ const del=await drGetDeliveryRows();
+ if(del.found&&del.rows.length){
+  const idx=drIndexByPi(del.rows);
+  const seen={};
+  osRows.forEach(o=>{
+   if(!o.pi) return;
+   const k=normalize(o.pi)+"|"+colorKey(o.color)+"|"+normalize(o.construction);
+   if(seen[k]) return; seen[k]=1;
+   const m=drFindMatch(o,idx);
+   if(!m) return;
+   const od=drParseDate(o.deliveryDate),dd=drParseDate(m.deliDate);
+   if(od&&dd&&od.getTime()<dd.getTime()){
+    res.deliMismatch.push({pi:o.pi,construction:o.construction,color:o.color,osDate:o.deliveryDate,dsDate:m.deliDate,diffDays:drDayDiff(dd,od),qty:o.qty});
+   }
+   const oq=drNum(o.qty),mq=drNum(m.qty);
+   if(oq!==null&&mq!==null&&Math.abs(oq-mq)>0.0001){
+    res.qtyMismatch.push({pi:o.pi,construction:o.construction,color:o.color,osQty:drFmtNum(oq),dsQty:drFmtNum(mq),diffQty:drFmtNum(oq-mq)});
+   }
+  });
+ }
+ return res;
+}
 function drFormatCount(n){return Number(n||0).toLocaleString();}
 async function drRenderSummary(){
  const body=document.getElementById("drSummaryBody");
@@ -2162,6 +2293,7 @@ async function drRenderSummary(){
   return;
  }
  const reports=drBuildReports(source.rows);
+ try{Object.assign(reports,await drBuildExtraReports(source.rows));}catch(e){console.error("Daily report extra",e);reports.lastGrey=reports.lastGrey||[];reports.deliMismatch=reports.deliMismatch||[];reports.qtyMismatch=reports.qtyMismatch||[];}
  body.innerHTML=DR_REPORTS.map(r=>`<tr><td>${escapeHTML(r.name)}</td><td>${drFormatCount(reports[r.id].length)}</td><td><button class="small dr-report-open" data-report="${r.id}">View</button></td></tr>`).join("");
  body.querySelectorAll("[data-report]").forEach(btn=>btn.addEventListener("click",()=>drOpenDetail(btn.dataset.report,reports[btn.dataset.report])));
 }
@@ -2170,12 +2302,13 @@ function drOpenDetail(reportId,rows){
  drDetailRows=(rows||[]).map(r=>({...r}));
  drSort={key:"",dir:1};
  const report=DR_REPORTS.find(r=>r.id===reportId);
+ drCols=reportId==="lastGrey"?DR_COLS_GREY:reportId==="deliMismatch"?DR_COLS_DELI:reportId==="qtyMismatch"?DR_COLS_QTY:DR_COLUMNS;
  document.getElementById("drDetailTitle").textContent=report?report.name:"Daily Report";
  document.getElementById("drDetailMeta").textContent=`Report date: ${drDateValue(drEffectiveDate())}`;
  document.getElementById("drSearch").value="";
  document.getElementById("drDateFrom").value="";
  document.getElementById("drDateTo").value="";
- document.getElementById("drDetailHead").innerHTML="<tr>"+DR_COLUMNS.map(c=>`<th data-sort="${c.key}">${escapeHTML(c.label)} ↕</th>`).join("")+"</tr>";
+ document.getElementById("drDetailHead").innerHTML="<tr>"+drCols.map(c=>`<th data-sort="${c.key}">${escapeHTML(c.label)} ↕</th>`).join("")+"</tr>";
  document.getElementById("drDetailHead").querySelectorAll("[data-sort]").forEach(th=>th.addEventListener("click",()=>{
   const key=th.dataset.sort;
   if(drSort.key===key)drSort.dir*=-1;else drSort={key,dir:1};
@@ -2189,8 +2322,8 @@ function drRenderDetailRows(){
  const from=drParseDate(document.getElementById("drDateFrom").value);
  const to=drParseDate(document.getElementById("drDateTo").value);
  let rows=drDetailRows.filter(r=>{
-  if(q&&!DR_COLUMNS.some(c=>normalize(r[c.key]).includes(q)))return false;
-  const date=drParseDate(r.deliveryDate);
+  if(q&&!drCols.some(c=>normalize(r[c.key]).includes(q)))return false;
+  const date=drParseDate(r.deliveryDate||r.greyDate||r.osDate);
   if(from&&(!date||date<from))return false;
   if(to&&(!date||date>to))return false;
   return true;
@@ -2207,13 +2340,13 @@ function drRenderDetailRows(){
  }
  drFilteredRows=rows;
  const body=document.getElementById("drDetailBody");
- body.innerHTML=rows.length?rows.map(r=>"<tr>"+DR_COLUMNS.map(c=>`<td>${escapeHTML(c.key==="piReceivedDate"||c.key==="greigeDate"||c.key==="deliveryDate"||c.key==="greyInDate"?drDateValue(drParseDate(r[c.key])):r[c.key])}</td>`).join("")+"</tr>").join(""):'<tr><td colspan="11">No records found.</td></tr>';
+ body.innerHTML=rows.length?rows.map(r=>"<tr>"+drCols.map(c=>`<td>${escapeHTML(drIsDateCol(c)?drDateValue(drParseDate(r[c.key])):r[c.key])}</td>`).join("")+"</tr>").join(""):`<tr><td colspan="${drCols.length}">No records found.</td></tr>`;
  document.getElementById("drVisibleCount").textContent=`Displayed rows: ${drFormatCount(rows.length)} | Report rows before detail filters: ${drFormatCount(drDetailRows.length)}`;
 }
 function drExportExcel(){
  if(!window.XLSX){showToast("Excel library is not loaded.","error");return;}
- const aoa=[DR_COLUMNS.map(c=>c.label),...drFilteredRows.map(r=>DR_COLUMNS.map(c=>{
-  if(["piReceivedDate","greigeDate","deliveryDate","greyInDate"].includes(c.key))return drDateValue(drParseDate(r[c.key]));
+ const aoa=[drCols.map(c=>c.label),...drFilteredRows.map(r=>drCols.map(c=>{
+  if(drIsDateCol(c))return drDateValue(drParseDate(r[c.key]));
   return r[c.key]??"";
  }))];
  const ws=XLSX.utils.aoa_to_sheet(aoa);
