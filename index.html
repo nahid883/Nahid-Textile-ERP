@@ -2688,6 +2688,7 @@ const MTR_TO_YDS=1.09361;   /* people type METER, the Excel file shows YARD */
 
 let data={p1:[],p2:[],p3:[]};   /* saved entries of each person (qty is stored in METER) */
 let snap=null;                  /* submitted snapshot used for the WIP Excel File: {submittedAt, entries[]} */
+let xl={p1:{},p2:{},p3:{},master:{},updatedAt:0};   /* Excel-upload layer: per-person records + Master edits, keyed by PI+Color+Order Qty */
 let loaded=false;
 let tab="p1";
 let deliveryCache=null;
@@ -2727,6 +2728,7 @@ async function ensureLoaded(){
   const s=await idbGet("app_data","wip_excel");
   if(d) data=Object.assign({p1:[],p2:[],p3:[]},d);
   snap=s||null;
+  try{const xd=await idbGet("app_data","wip_xl");if(xd) xl=Object.assign({p1:{},p2:{},p3:{},master:{},updatedAt:0},xd);}catch(e){console.warn("WIP Excel data load failed",e);}
   loaded=true;
   return true;
  }catch(e){
@@ -2825,6 +2827,7 @@ function renderPerson(k){
     <button class="danger" id="wipReset">🗑 Reset</button>
    </div>
   </div>
+  <div id="wipXlBox"></div>
   <div class="wip-step">Search PI Number</div>
   <input id="wipSearch" placeholder="Type PI number..." autocomplete="off" value="${escapeHTML(ps.query)}">
   <div id="wipPis" class="wip-chips"></div>
@@ -2838,6 +2841,7 @@ function renderPerson(k){
  });
  $("wipSubmit").addEventListener("click",()=>submitPerson(k));
  $("wipReset").addEventListener("click",()=>resetPerson(k));
+ renderXlBox(k);
  renderPis(k);
 }
 
@@ -3092,27 +3096,35 @@ async function resetPerson(k){
  renderPerson(k);
 }
 
-/* ---------- WIP Excel File (same layout/format as the uploaded WIP-27-08-26.xlsx) ---------- */
+/* ---------- WIP Excel File + Excel upload / merge (layout = WIP-22-11-26.xlsx, logic = Wpp_Master workbook) ---------- */
+/* ===XL-LOGIC-START=== */
 const C=l=>l.split("").reduce((n,ch)=>n*26+(ch.charCodeAt(0)-64),0);   /* column letters -> 1-based index (A=1) */
 const L=n=>{let s="";while(n>0){const r=(n-1)%26;s=String.fromCharCode(65+r)+s;n=Math.floor((n-1)/26);}return s;};
 const REPORT_HEADERS=["C.P.B.+Jigger Rotation Report","R.F.CPS Report","Re-Dyeing Report ","Q.C. Pending @ Dyeing Report ","R.F.Finishing Report","R.F.Sanforize Report ","Q.C. Pending@Sanforize","R.F.Inspection Report","Inspection Running Report"];
 const PROC_START=C("Y");   /* Y..AG = 9 processes */
 const TOTAL_COL=C("AH");
 const LAST_COL=C("BC");
+const SPARE_ROWS_TO=1003;  /* same capacity as the original workbook (rows 4..1003) */
 
-/* columns hidden in the original file */
+/* columns copied as-is between Excel and ERP (everything except PI, Color, Order Qty, the 9 processes, BT, Remarks, Delivery Status) */
+const STATIC_COLS=(()=>{const a=[];["B","C","D","E","F","G","H","I","J","K","L","N","O","Q","R","S","T","U","V","W","X"].forEach(l=>a.push(C(l)));for(let c=C("AI");c<=C("AZ");c++)a.push(c);return a;})();
+const DIFF_COLS=["B","C","E","F","H","I","K","N","O","Q"].map(C);
+
+/* hidden columns + widths of WIP-22-11-26.xlsx */
 const HIDDEN=new Set();
-["C","D","F","G","J","L","N","O","Q"].forEach(l=>HIDDEN.add(C(l)));
-for(let c=C("S");c<=C("X");c++) HIDDEN.add(c);
+for(let c=2;c<=12;c++) HIDDEN.add(c);
+[14,15,17].forEach(c=>HIDDEN.add(c));
+for(let c=19;c<=24;c++) HIDDEN.add(c);
 for(let c=C("AI");c<=C("AZ");c++) HIDDEN.add(c);
-
-const WIDTHS={A:17.3,B:9.1,C:9.1,D:7.3,E:9.1,F:9.1,G:5.7,H:15.6,I:19.1,J:7.3,K:19.6,L:4.4,M:16.1,N:9.1,O:9.1,P:18.6,Q:9.1,R:9.1,
- Y:17.7,Z:17.3,AA:16.1,AB:16.6,AC:16.7,AD:16.3,AE:16.3,AF:19.3,AG:18.7,AH:11.6,AZ:58.7,BA:29.1,BB:30.4,BC:24.7};
-function widthOf(c){
- const l=L(c);
- if(WIDTHS[l]!==undefined) return WIDTHS[l];
- return 9.1;
-}
+const WIDTH_BY={};
+(function(){
+ const w=(a,b,v)=>{b=b||a;for(let c=C(a);c<=C(b);c++) WIDTH_BY[c]=v;};
+ w("A",0,17.29);w("B","C",9.14);w("D",0,7.29);w("E","F",9.14);w("G",0,5.71);w("H",0,15.57);w("I",0,19.14);w("J",0,7.29);w("K",0,19.57);
+ w("L",0,4.43);w("M",0,19.86);w("N","O",9.14);w("P",0,18.57);w("Q",0,9.14);w("R",0,10.43);w("S","X",9.14);w("Y",0,17.71);w("Z",0,17.29);
+ w("AA",0,16.14);w("AB",0,16.57);w("AC",0,16.71);w("AD","AE",16.29);w("AF",0,19.29);w("AG",0,18.71);w("AH",0,11.57);w("AI","AY",9.14);
+ w("AZ",0,58.71);w("BA",0,29.14);w("BB",0,30.43);w("BC",0,24.71);w("BD",0,22.43);
+})();
+function widthOf(c){return WIDTH_BY[c]!==undefined?WIDTH_BY[c]:9.14;}
 
 function dmy(d,full){
  const dd=pad2(d.getDate()),mm=pad2(d.getMonth()+1),yy=d.getFullYear();
@@ -3139,32 +3151,51 @@ function parseDate(v){
  }
  return null;
 }
-
-/* one Excel row per PI+Color. If several persons filled the same PI+Color, their qty is added per process. */
-function groupEntries(entries){
- const map=new Map(),out=[];
- entries.forEach(e=>{
-  let g=map.get(e.key);
-  if(!g){
-   g={key:e.key,pi:e.pi,color:e.color,meta:e.meta||{},mtr:PROCS.map(()=>[]),remarks:[],bt:[]};
-   map.set(e.key,g);out.push(g);
-  }
-  PROCS.forEach((_,i)=>{
-   const pr=e.parts&&e.parts[i];
-   if(pr&&pr.length){pr.forEach(x=>{if(Number(x)>0) g.mtr[i].push(Number(x));});return;}
-   const q=e.qty&&e.qty[i]!=null?Number(e.qty[i]):null;
-   if(q!==null&&!isNaN(q)&&q>0) g.mtr[i].push(q);
-  });
-  if(e.bt&&g.bt.indexOf(e.bt)<0) g.bt.push(e.bt);
-  if(e.remarks&&g.remarks.indexOf(e.remarks)<0) g.remarks.push(e.remarks);
- });
- return out;
+/* any stored date-ish value (Date / Excel serial / text) -> UTC-midnight Date, or null */
+function dateOf(v){
+ if(v instanceof Date) return isNaN(v.getTime())?null:new Date(Math.round(v.getTime()/864e5)*864e5);
+ if(typeof v==="number"&&v>20000&&v<80000) return new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5);
+ if(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}T/.test(v)){const d=new Date(v);return isNaN(d.getTime())?null:new Date(Math.round(d.getTime()/864e5)*864e5);}
+ return parseDate(v);
 }
 
-/* rows are ordered by PI number, smallest first (15200 before 15300), whatever the order of entry */
+/* ---------- matching key: PI + Color + Order Qty (Construction is NOT part of the key) ---------- */
+const nk=s=>String(s==null?"":s).toLowerCase().replace(/[^a-z0-9]/g,"");
+function oqText(v){const n=toNum(v);return n===null?clean(v).toUpperCase():String(Math.round(n*1e6)/1e6);}
+function oqVal(v){const n=toNum(v);return n===null?clean(v):n;}
+function pcKey(pi,color){return normalize(pi)+"|"+colorKey(color);}
+function xlKey(pi,color,oq){return pcKey(pi,color)+"|"+oqText(oq);}
+
+/* join two texts without repeating what is already there */
+function mergeText(a,b,sep){
+ a=clean(a);b=clean(b);
+ if(!b) return a;
+ if(!a) return b;
+ if(a===b||a.indexOf(b)>=0) return a;
+ if(b.indexOf(a)>=0) return b;
+ return a+sep+b;
+}
+
+/* ---------- process-wise Delivery Status (same text as the original Master File column BC) ---------- */
+const PROC_LABEL=XL_HEADS.map((h,i)=>{const t=h.trim();return i===0?t.replace("Cpb","CPB"):t;});
+function statusText(yds){
+ return yds.map((y,i)=>(y!=null&&y!==0)?Math.round(y)+" yds "+PROC_LABEL[i]:"").filter(Boolean).join(" ");
+}
+function statusFormula(R){
+ const parts=PROCS.map((p,i)=>{
+  const l=L(PROC_START+i),ref=l+R;
+  const label=i===0?`SUBSTITUTE(TRIM($${l}$3),"Cpb","CPB")`:`TRIM($${l}$3)`;
+  return `IF(AND(${ref}<>"",${ref}<>0),ROUND(${ref},0)&" yds "&${label}&" ","")`;
+ });
+ return "TRIM("+parts.join("&")+")";
+}
+
+/* rows are ordered by PI number, smallest first (15200 before 15300). Multi-PI text such as 15282+14775/26 uses its smallest PI;
+   the /26 year part is ignored; anything without digits goes last instead of breaking the sort */
 function piSortKey(pi){
- const nums=(String(pi||"").match(/\d+/g)||[]).map(Number);
- return nums.length?nums[0]:Infinity;
+ const body=String(pi==null?"":pi).split("/")[0];
+ const nums=(body.match(/\d+/g)||[]).map(Number).filter(n=>Number.isFinite(n));
+ return nums.length?Math.min.apply(null,nums):Infinity;
 }
 function comparePI(a,b){
  const x=piSortKey(a.pi),y=piSortKey(b.pi);
@@ -3172,133 +3203,369 @@ function comparePI(a,b){
  return String(a.pi).localeCompare(String(b.pi),undefined,{numeric:true})||String(a.color).localeCompare(String(b.color),undefined,{numeric:true});
 }
 
+/* ---------- read a WIP workbook (person file or Master file) ---------- */
+function evalSimple(f){
+ f=String(f||"").replace(/^=/,"").replace(/\s+/g,"");
+ if(!/^[0-9+\-*\/().]+$/.test(f)) return null;
+ try{const v=Function('"use strict";return ('+f+')')();return Number.isFinite(v)?v:null;}catch(e){return null;}
+}
+function cellOf(ws,r,c){   /* r, c are zero-based */
+ const cell=ws[XLSX.utils.encode_cell({r:r,c:c})];
+ if(!cell) return "";
+ let v=cell.v;
+ if((v===undefined||v===null||v==="")&&cell.f){const e=evalSimple(cell.f);if(e!==null) v=e;}
+ if(v instanceof Date) return dateOf(new Date(v.getTime()-v.getTimezoneOffset()*60000))||"";
+ return v===undefined||v===null?"":v;
+}
+function qtyOf(v){
+ if(typeof v==="number") return Number.isFinite(v)&&v>0?v:null;
+ const s=clean(v);
+ if(!s) return null;
+ let n=toNum(s);
+ if(n===null) n=evalSimple(s);
+ return n!==null&&n>0?n:null;
+}
+/* prefer: list of normalised sheet names to try first; skip: normalised names never used */
+function readWipWorkbook(buf,prefer,skip){
+ const wb=XLSX.read(buf,{type:"array",cellDates:true,cellFormula:true});
+ const names=wb.SheetNames.filter(n=>skip.indexOf(nk(n))<0);
+ names.sort((a,b)=>{
+  const ia=prefer.indexOf(nk(a)),ib=prefer.indexOf(nk(b));
+  return (ia<0?99:ia)-(ib<0?99:ib);
+ });
+ for(const name of names){
+  const ws=wb.Sheets[name];
+  if(!ws||!ws["!ref"]) continue;
+  const rng=XLSX.utils.decode_range(ws["!ref"]);
+  let hr=-1,pc=-1,cc=-1;
+  for(let r=rng.s.r;r<=Math.min(rng.e.r,rng.s.r+14)&&hr<0;r++){
+   let p=-1,c=-1;
+   for(let k=rng.s.c;k<=Math.min(rng.e.c,70);k++){
+    const t=nk(cellOf(ws,r,k));
+    if(t==="pi"&&p<0) p=k;
+    if((t==="color"||t==="colour")&&c<0) c=k;
+   }
+   if(p>=0&&c>=0){hr=r;pc=p;cc=c;}
+  }
+  if(hr<0) continue;
+  let oqc=C("P")-1,btc=C("BA")-1,rmc=C("BB")-1;
+  const procc=PROCS.map((_,i)=>PROC_START-1+i);
+  const hs={};
+  for(let k=rng.s.c;k<=Math.min(rng.e.c,70);k++){const t=nk(cellOf(ws,hr,k));if(t&&hs[t]===undefined) hs[t]=k;}
+  Object.keys(hs).forEach(t=>{if(t.indexOf("orderqty")===0){oqc=hs[t];}});
+  PROCS.forEach((p,i)=>{const t=nk(p);if(hs[t]!==undefined) procc[i]=hs[t];});
+  if(hs.bttno!==undefined) btc=hs.bttno; else if(hs.btno!==undefined) btc=hs.btno;
+  if(hs.remarks!==undefined) rmc=hs.remarks;
+  const rows=[];
+  for(let r=hr+1;r<=rng.e.r;r++){
+   const pi=clean(cellOf(ws,r,pc)),color=clean(cellOf(ws,r,cc));
+   if(!pi||!color) continue;
+   if(nk(pi)==="pi") continue;
+   const x={};
+   STATIC_COLS.forEach(c=>{const v=cellOf(ws,r,c-1);if(v!==""&&!(typeof v==="string"&&!v.trim())) x[L(c)]=v;});
+   rows.push({
+    pi:pi,color:color,oq:cellOf(ws,r,oqc),
+    q:procc.map(c=>qtyOf(cellOf(ws,r,c))),
+    bt:clean(cellOf(ws,r,btc)),rem:clean(cellOf(ws,r,rmc)),x:x
+   });
+  }
+  return {sheet:name,rows:rows};
+ }
+ throw new Error('No sheet with "PI" and "Color" headers was found in this file');
+}
+
+/* rows of one file -> records keyed by PI+Color+Order Qty.
+   Same key + same qty in the same process = counted once; same key + different qty = added (original workbook rule) */
+function recsFromRows(rows,ts){
+ const map={},seen={};
+ rows.forEach(r=>{
+  const key=xlKey(r.pi,r.color,r.oq);
+  let g=map[key];
+  if(!g){
+   g=map[key]={key:key,pi:r.pi,color:r.color,oq:oqVal(r.oq),q:PROCS.map(()=>null),bt:"",rem:"",x:{},ts:ts};
+   seen[key]=PROCS.map(()=>new Set());
+  }
+  r.q.forEach((v,i)=>{
+   if(v>0){
+    const kk=Math.round(v*1e4);
+    if(!seen[key][i].has(kk)){seen[key][i].add(kk);g.q[i]=(g.q[i]||0)+v;}
+   }
+  });
+  g.bt=mergeText(g.bt,r.bt," ");
+  g.rem=mergeText(g.rem,r.rem," / ");
+  Object.keys(r.x).forEach(c=>{if(g.x[c]===undefined||g.x[c]==="") g.x[c]=r.x[c];});
+ });
+ return map;
+}
+
+/* new upload of a record that already exists -> update it, keep everything else */
+function mergeRec(oldRec,newRec,keepBlank){
+ const r=Object.assign({},oldRec);
+ r.q=PROCS.map((_,i)=>{
+  const n=newRec.q[i],o=oldRec.q&&oldRec.q[i]!=null?oldRec.q[i]:null;
+  return n!=null?n:(keepBlank?o:null);
+ });
+ r.bt=mergeText(oldRec.bt,newRec.bt," ");
+ r.rem=mergeText(oldRec.rem,newRec.rem," / ");
+ r.x=Object.assign({},oldRec.x);
+ Object.keys(newRec.x||{}).forEach(c=>{const v=newRec.x[c];if(v!==""&&v!=null) r.x[c]=v;});
+ r.pi=newRec.pi||oldRec.pi;r.color=newRec.color||oldRec.color;r.oq=newRec.oq!==""?newRec.oq:oldRec.oq;
+ r.ts=newRec.ts;
+ return r;
+}
+function sameRec(a,b){return JSON.stringify([a.q,a.bt,a.rem,a.x])===JSON.stringify([b.q,b.bt,b.rem,b.x]);}
+
+/* ---------- consolidation (Master) ---------- */
 function buildModel(entries,when){
+ const map=new Map(),order=[],byPC=new Map();
+ const ensure=(pi,color,oq)=>{
+  const key=xlKey(pi,color,oq);
+  let g=map.get(key);
+  if(!g){
+   g={key:key,pi:pi,color:color,oq:oqVal(oq),x:{},xBt:"",xRem:"",mBt:[],mRem:[],man:PROCS.map(()=>[]),exv:PROCS.map(()=>new Map()),ts:0,auth:null,fill:null};
+   map.set(key,g);order.push(g);
+   const pc=pcKey(pi,color);
+   if(!byPC.has(pc)) byPC.set(pc,[]);
+   byPC.get(pc).push(g);
+  }
+  return g;
+ };
+ const fillX=(g,x)=>Object.keys(x||{}).forEach(c=>{
+  const v=x[c];
+  if(v!==""&&v!=null&&(g.x[c]===undefined||g.x[c]==="")) g.x[c]=v;
+ });
+
+ /* 1) Excel data of Person 1 / 2 / 3 (each person's own store; same qty counted once, different qty added) */
+ ["p1","p2","p3"].forEach(p=>{
+  Object.keys(xl[p]||{}).forEach(k=>{
+   const rec=xl[p][k];
+   const g=ensure(rec.pi,rec.color,rec.oq);
+   g.ts=Math.max(g.ts,rec.ts||0);
+   (rec.q||[]).forEach((v,i)=>{
+    if(v>0){const kk=Math.round(v*1e4);if(!g.exv[i].has(kk)) g.exv[i].set(kk,v);}
+   });
+   g.xBt=mergeText(g.xBt,rec.bt," ");
+   g.xRem=mergeText(g.xRem,rec.rem," / ");
+   fillX(g,rec.x);
+  });
+ });
+
+ /* 2) entries typed in Person 1 / 2 / 3 and submitted with the existing Save + Submit (qty in meter) */
+ entries.forEach(e=>{
+  const m=e.meta||{};
+  let g;
+  if(clean(m.orderQty)===""){
+   const c=byPC.get(pcKey(e.pi,e.color));
+   g=(c&&c.length===1)?c[0]:ensure(e.pi,e.color,"");
+  }else g=ensure(e.pi,e.color,m.orderQty);
+  g.ts=Math.max(g.ts,Date.parse(e.savedAt)||0);
+  fillX(g,{B:m.marketing,E:m.deliDate,H:m.buyer,I:m.composition,K:m.construction,R:m.dyeing});
+  PROCS.forEach((_,i)=>{
+   const pr=e.parts&&e.parts[i];
+   if(pr&&pr.length){pr.forEach(x=>{if(Number(x)>0) g.man[i].push(Number(x));});return;}
+   const q=e.qty&&e.qty[i]!=null?Number(e.qty[i]):null;
+   if(q!==null&&!isNaN(q)&&q>0) g.man[i].push(q);
+  });
+  if(e.bt&&g.mBt.indexOf(e.bt)<0) g.mBt.push(e.bt);
+  if(e.remarks&&g.mRem.indexOf(e.remarks)<0) g.mRem.push(e.remarks);
+ });
+
+ /* 3) edits / new orders from "Upload Updated Master Excel": the newer source wins for that record */
+ Object.keys(xl.master||{}).forEach(k=>{
+  const rec=xl.master[k];
+  const had=map.has(xlKey(rec.pi,rec.color,rec.oq));
+  const g=ensure(rec.pi,rec.color,rec.oq);
+  if(!had||(rec.ts||0)>=g.ts) g.auth=rec; else g.fill=rec;
+ });
+
  const totals=new Array(PROCS.length).fill(0);
  let grand=0;
- const rows=groupEntries(entries).sort(comparePI).map(g=>{
-  const m=g.meta||{};
-  const yds=g.mtr.map(a=>a.length?mtrToYds(a.reduce((s,x)=>s+x,0)):null);
-  const formulas=g.mtr.map(a=>a.length?(a.length>1?"("+a.join("+")+")":String(a[0]))+"*"+MTR_TO_YDS:null);
+ const rows=order.map(g=>{
+  const x=Object.assign({},g.x);
+  let yds,cells,bt,rem;
+  if(g.auth){
+   Object.keys(g.auth.x||{}).forEach(c=>{const v=g.auth.x[c];if(v!==""&&v!=null) x[c]=v;});
+   yds=PROCS.map((_,i)=>{const v=g.auth.q&&g.auth.q[i];return v>0?Number(v):null;});
+   cells=yds.slice();
+   bt=clean(g.auth.bt);rem=clean(g.auth.rem);
+  }else{
+   if(g.fill) Object.keys(g.fill.x||{}).forEach(c=>{const v=g.fill.x[c];if(v!==""&&v!=null&&(x[c]===undefined||x[c]==="")) x[c]=v;});
+   yds=[];cells=[];
+   PROCS.forEach((_,i)=>{
+    const terms=[];let total=0,onlyExcel=true;
+    if(g.man[i].length){
+     const a=g.man[i];
+     terms.push((a.length>1?"("+a.join("+")+")":String(a[0]))+"*"+MTR_TO_YDS);
+     total+=mtrToYds(a.reduce((s,v)=>s+v,0));onlyExcel=false;
+    }
+    g.exv[i].forEach(v=>{terms.push(String(v));total+=v;});
+    if(!terms.length){yds.push(null);cells.push(null);return;}
+    yds.push(total);
+    cells.push(onlyExcel&&terms.length===1?total:{formula:terms.join("+"),result:total});
+   });
+   bt=mergeText(mergeText(g.mBt.join("+"),g.xBt," "),g.fill?g.fill.bt:""," ");
+   rem=mergeText(mergeText(g.mRem.join(" / "),g.xRem," / "),g.fill?g.fill.rem:""," / ");
+  }
   let total=0;
   yds.forEach((y,i)=>{if(y!==null){total+=y;totals[i]+=y;}});
   grand+=total;
-  const status=yds.map((y,i)=>y!==null?Math.round(y)+" yds "+XL_HEADS[i]+"+":"").join("");
-  const oq=toNum(m.orderQty);
+  const oq=toNum(g.oq);
   return {
-   pi:g.pi,color:g.color,marketing:m.marketing||"",deliDate:m.deliDate||"",buyer:m.buyer||"",
-   composition:m.composition||"",construction:m.construction||"",
-   orderQty:oq===null?(m.orderQty||""):oq,dyeing:m.dyeing||"",
-   yds,formulas,total,bt:g.bt.join("+"),remarks:g.remarks.join(" / "),
-   status:status.slice(0,-1)
+   key:g.key,pi:g.pi,color:g.color,x:x,orderQty:oq===null?(g.oq||""):oq,
+   yds:yds,cells:cells,total:total,bt:bt,remarks:rem,status:statusText(yds)
   };
- });
- return {rows,totals,grand,count:rows.length,name:"WIP-"+dmy(when,false)+".xlsx",title:" FINAL DAILY FINISHING\n WIP REPORT  DATE:-"+dmy(when,true)};
+ }).sort(comparePI);
+ return {rows:rows,totals:totals,grand:grand,count:rows.length,name:"WIP-"+dmy(when,false)+".xlsx",title:" FINAL DAILY FINISHING\n WIP REPORT  DATE:-"+dmy(when,true)};
 }
 
-async function downloadExcel(m){
- if(!window.ExcelJS){showToast("Excel library not loaded. Check internet connection.","error");return;}
+/* ---------- formatting of WIP-22-11-26.xlsx, cell by cell ---------- */
+function cellStyle(r,c){
+ const AB=C("AB"),AD=C("AD"),AG=C("AG");
+ if(r===1){
+  if(c<=C("R")) return {sz:14,b:true,h:"center",wrap:true};
+  if(c<=C("U")) return {sz:12,b:true,h:"center",wrap:true};
+  if(c<=C("X")) return {sz:12,b:true,wrap:true};
+  if(c===C("Y")) return {sz:12,b:true,h:"left",wrap:false};
+  if(c<=C("AA")) return {sz:12,b:true,wrap:false};
+  if(c>=AB&&c<=AD) return {sz:12,b:true,h:"center",wrap:false};
+  if(c<=AG) return {sz:12,b:true,wrap:true,nf:"0"};
+  if(c===TOTAL_COL) return {sz:12,b:true,h:"center",wrap:true};
+  if(c<=C("AZ")) return {sz:12,b:true,wrap:true};
+  return {sz:12,b:true,h:"center",wrap:true};
+ }
+ if(r===2){
+  if(c<=C("R")) return {sz:14,b:true,h:"center",wrap:true};
+  if(c<=C("U")) return {sz:12,b:true,h:"center",wrap:true};
+  if(c<=C("X")) return {sz:12,b:true,wrap:true};
+  if(c<=TOTAL_COL) return {sz:12,b:true,h:"center",wrap:true,nf:"#,##0"};
+  if(c<=C("AQ")) return {sz:12,b:true,wrap:true,nf:"#,##0"};
+  if(c<=C("AZ")) return {sz:12,b:true,wrap:true};
+  return {sz:12,b:true,h:"center",wrap:true};
+ }
+ if(r===3){
+  const sz=c===C("A")?20:c===C("M")?18:(c===C("P")||c===C("R"))?14:12;
+  return {sz:sz,b:true,h:"center",wrap:true};
+ }
+ /* data rows */
+ if(c===C("A")) return {sz:20,b:true,h:"center",wrap:true};
+ if(c===C("B")) return {sz:11,h:"center",wrap:false};
+ if(c===C("C")) return {sz:11,h:"center",wrap:true};
+ if(c===C("D")) return {sz:10,h:"center",wrap:false};
+ if(c===C("E")) return {sz:10,h:"center",wrap:false,nf:"d-mmm"};
+ if(c===C("F")||c===C("G")) return {sz:10,h:"center",wrap:false};
+ if(c===C("H")||c===C("I")||c===C("K")) return {sz:11,h:"center",wrap:true};
+ if(c===C("J")||c===C("L")||c===C("N")||c===C("O")) return {sz:10,h:"center",wrap:false};
+ if(c===C("M")) return {sz:18,b:true,h:"center",wrap:true};
+ if(c===C("P")) return {sz:14,b:true,h:"center",wrap:false,nf:"#,##0"};
+ if(c===C("Q")) return {sz:12,b:true,wrap:true};
+ if(c===C("R")) return {sz:14,b:true,h:"center",wrap:true};
+ if(c<=C("X")) return {sz:12,b:true,wrap:true};
+ if(c<=AG) return {sz:12,b:true,h:"center",wrap:true,nf:"#,##0"};
+ if(c===TOTAL_COL) return {sz:12,b:true,h:"center",wrap:true,nf:"0"};
+ return {sz:12,b:true,h:"center",wrap:true};
+}
+
+/* builds the Master workbook (same layout as WIP-22-11-26.xlsx). Y..AG hold numbers/formulas, AH and BC are live formulas,
+   and rows down to 1003 are pre-formatted with the formulas, so orders typed in Excel get their Delivery Status automatically */
+function buildWorkbook(m){
  const wb=new ExcelJS.Workbook();
  const ws=wb.addWorksheet("Sheet1",{
   views:[{state:"frozen",xSplit:17,ySplit:3,topLeftCell:"R4",zoomScale:70}],
-  pageSetup:{orientation:"landscape",paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0}
+  pageSetup:{orientation:"landscape",paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0,right:0.7,top:0.787,bottom:0.75,header:0.3,footer:0.3}}
  });
  const thin={style:"thin",color:{argb:"FF000000"}};
  const BORDER={top:thin,left:thin,bottom:thin,right:thin};
  const WHITE={type:"pattern",pattern:"solid",fgColor:{argb:"FFFFFFFF"}};
  const n=m.rows.length;
- const last=3+n;                      /* last data row */
- const subEnd=Math.max(150,last);     /* same SUBTOTAL range style as the original (Y4:Y150) */
+ const last=3+n;
+ const endRow=Math.max(SPARE_ROWS_TO,last+100);
 
- /* column widths + hidden columns */
- for(let c=1;c<=LAST_COL;c++){
+ for(let c=1;c<=C("BD");c++){
   const col=ws.getColumn(c);
   col.width=widthOf(c);
   if(HIDDEN.has(c)) col.hidden=true;
  }
 
- /* base look for every cell of the table: border + white fill + centred */
  const style=(cell,o)=>{
-  o=o||{};
   cell.font={name:"Calibri",size:o.sz||11,bold:!!o.b};
-  cell.alignment={horizontal:o.h||"center",vertical:"center",wrapText:o.wrap===undefined?false:o.wrap};
+  const al={vertical:"middle",wrapText:!!o.wrap};
+  if(o.h) al.horizontal=o.h;
+  cell.alignment=al;
   cell.border=BORDER;cell.fill=WHITE;
   if(o.nf) cell.numFmt=o.nf;
  };
- for(let r=1;r<=last;r++){
-  for(let c=1;c<=LAST_COL;c++){
-   style(ws.getCell(r,c),r<=3?{sz:12,b:true,wrap:true}:{sz:11});
-  }
+ for(let r=1;r<=endRow;r++){
+  for(let c=1;c<=LAST_COL;c++) style(ws.getCell(r,c),cellStyle(r<=3?r:4,c));
+  if(r>=4) ws.getRow(r).height=51;
  }
 
- /* ---- row 1 ---- */
- let cell=ws.getCell(1,1);cell.value=m.title;style(cell,{sz:14,b:true,wrap:true});
- cell=ws.getCell(1,C("AB"));cell.value="TOTAL Finishing WIP";style(cell,{sz:12,b:true});
- cell=ws.getCell(1,C("AE"));cell.value={formula:"SUM(Y2:AG2)",result:m.grand};style(cell,{sz:12,b:true,wrap:true,nf:"0"});
- [["BA","BT/T NO."],["BB","Remarks"],["BC","Delivery Status"]].forEach(([l,t])=>{
-  const c=ws.getCell(1,C(l));c.value=t;style(c,{sz:12,b:true,wrap:true});
- });
+ /* row 1 */
+ let cell=ws.getCell(1,1);cell.value=m.title;
+ cell=ws.getCell(1,C("AB"));cell.value="TOTAL Finishing WIP";
+ cell=ws.getCell(1,C("AE"));cell.value={formula:"SUM(Y2:AG2)",result:m.grand};
+ [["BA","BT/T NO."],["BB","Remarks"],["BC","Delivery Status"]].forEach(([l,t])=>{ws.getCell(1,C(l)).value=t;});
+ ws.getCell(1,C("Y")).value=" ";
 
- /* ---- row 2: process totals ---- */
+ /* row 2: process totals */
  PROCS.forEach((p,i)=>{
-  const c=ws.getCell(2,PROC_START+i);
   const l=L(PROC_START+i);
-  c.value={formula:`SUBTOTAL(9,${l}4:${l}${subEnd})`,result:m.totals[i]};
-  style(c,{sz:12,b:true,wrap:true,nf:"#,##0"});
+  ws.getCell(2,PROC_START+i).value={formula:`SUBTOTAL(9,${l}4:${l}${endRow})`,result:m.totals[i]};
  });
- cell=ws.getCell(2,TOTAL_COL);cell.value={formula:"SUM(Y2:AG2)",result:m.grand};style(cell,{sz:12,b:true,wrap:true,nf:"#,##0"});
- cell=ws.getCell(2,C("AI"));cell.value="Process Dates";style(cell,{sz:12,b:true,wrap:true,h:"general"});
- cell=ws.getCell(2,C("AR"));cell.value="AGE";style(cell,{sz:12,b:true,wrap:true,h:"general"});
+ ws.getCell(2,TOTAL_COL).value={formula:"SUM(Y2:AG2)",result:m.grand};
+ ws.getCell(2,C("AI")).value="Process Dates";
+ ws.getCell(2,C("AR")).value="AGE";
 
- /* ---- row 3: headers ---- */
+ /* row 3: headers */
  const H={A:"PI",B:"Marketing Person",E:"Plan Deli.Dt",H:"Buyer Name",I:"Composition",K:"Construction",M:"Color",N:"L/D App. Comments",O:"L/D App. New/  Repeat",P:"Order Qty. (Yds)",Q:"Plan Del Date",R:"Dyeing Method",S:"Grey Required %",T:"RF Sieinging",U:"RF Bleach",V:"RF Mercerize",W:"RF Peach",X:"RF Dyeing",AH:"Total Qty in Process"};
- Object.keys(H).forEach(l=>{const c=ws.getCell(3,C(l));c.value=H[l];style(c,{sz:l==="A"?20:12,b:true,wrap:true});});
- XL_HEADS.forEach((p,i)=>{const c=ws.getCell(3,PROC_START+i);c.value=p;style(c,{sz:12,b:true,wrap:true});});
+ Object.keys(H).forEach(l=>{ws.getCell(3,C(l)).value=H[l];});
+ XL_HEADS.forEach((p,i)=>{ws.getCell(3,PROC_START+i).value=p;});
  REPORT_HEADERS.forEach((t,i)=>{
-  [C("AI")+i,C("AR")+i].forEach(col=>{const c=ws.getCell(3,col);c.value=t;style(c,{sz:12,b:true,wrap:true});});
+  ws.getCell(3,C("AI")+i).value=t;
+  ws.getCell(3,C("AR")+i).value=t;
  });
 
- /* ---- data rows ---- */
+ /* data rows */
  m.rows.forEach((r,idx)=>{
   const R=4+idx;
-  ws.getRow(R).height=51;
-  for(let c=1;c<=LAST_COL;c++){
-   const sz=(c===C("A"))?20:(c===C("M"))?14:(c===C("B")||c===C("H")||c===C("I")||c===C("K")||c===C("E")||c===C("P"))?(c===C("E")?10:11):12;
-   const bold=!(c===C("B")||c===C("E")||c===C("H")||c===C("I")||c===C("K"));
-   const wrap=!(c===C("B")||c===C("E")||c===C("P"));
-   const nf=(c===C("P")||(c>=PROC_START&&c<PROC_START+PROCS.length))?"#,##0":(c===TOTAL_COL?"0":(c===C("E")?"d-mmm":undefined));
-   style(ws.getCell(R,c),{sz,b:bold,wrap,nf});
-  }
   ws.getCell(R,C("A")).value=r.pi;
-  ws.getCell(R,C("B")).value=r.marketing;
-  const d=parseDate(r.deliDate);
-  ws.getCell(R,C("E")).value=d||r.deliDate;
-  ws.getCell(R,C("H")).value=r.buyer;
-  ws.getCell(R,C("I")).value=r.composition;
-  ws.getCell(R,C("K")).value=r.construction;
   ws.getCell(R,C("M")).value=r.color;
   ws.getCell(R,C("P")).value=r.orderQty;
-  ws.getCell(R,C("R")).value=r.dyeing;
-  r.yds.forEach((y,i)=>{
-   if(y!==null) ws.getCell(R,PROC_START+i).value={formula:r.formulas[i],result:y};
+  STATIC_COLS.forEach(c=>{
+   let v=r.x[L(c)];
+   if(v===undefined||v==="") return;
+   if(c===C("E")){const d=dateOf(v);v=d||v;}
+   else if(v instanceof Date||(typeof v==="string"&&/^\d{4}-\d{2}-\d{2}T/.test(v))){const d=dateOf(v);if(d) v=d;}
+   const cl2=ws.getCell(R,c);
+   cl2.value=v;
+   if(v instanceof Date&&(!cl2.numFmt||cl2.numFmt==="General")) cl2.numFmt="d-mmm";
+  });
+  r.cells.forEach((v,i)=>{
+   if(v===null) return;
+   ws.getCell(R,PROC_START+i).value=(typeof v==="number")?v:{formula:v.formula,result:v.result};
   });
   ws.getCell(R,TOTAL_COL).value={formula:`SUM(Y${R}:AG${R})`,result:r.total};
   ws.getCell(R,C("BA")).value=r.bt;
   ws.getCell(R,C("BB")).value=r.remarks;
-  /* Delivery Status text, same idea as the original BC formula */
-  const parts=[];
-  PROCS.forEach((p,i)=>{const l=L(PROC_START+i);parts.push(`IF(${l}${R}="","",ROUND(${l}${R},0)&" yds "&$${l}$3&"+")`);});
-  const joined=parts.join("&");
-  ws.getCell(R,C("BC")).value={formula:`IF(${joined}="","",LEFT(${joined},LEN(${joined})-1))`,result:r.status};
+  ws.getCell(R,C("BC")).value={formula:statusFormula(R),result:r.status};
  });
+ /* spare rows: formulas ready for orders typed later in Excel */
+ for(let R=last+1;R<=endRow;R++){
+  ws.getCell(R,TOTAL_COL).value={formula:`IF(COUNT(Y${R}:AG${R})=0,"",SUM(Y${R}:AG${R}))`,result:""};
+  ws.getCell(R,C("BC")).value={formula:statusFormula(R),result:""};
+ }
  ws.getRow(1).height=22.5;ws.getRow(2).height=25.5;ws.getRow(3).height=36.75;
 
- /* ---- merges (after styling, so merged cells keep the borders) ---- */
  ws.mergeCells(1,1,2,C("R"));
  ws.mergeCells(1,C("AB"),1,C("AD"));
  ["BA","BB","BC"].forEach(l=>ws.mergeCells(1,C(l),3,C(l)));
+ ws.autoFilter={from:{row:3,column:1},to:{row:endRow,column:LAST_COL}};
+ return wb;
+}
+/* ===XL-LOGIC-END=== */
 
- ws.autoFilter={from:{row:3,column:1},to:{row:Math.max(last,3),column:LAST_COL}};
-
+async function downloadExcel(m){
+ if(!window.ExcelJS){showToast("Excel library not loaded. Check internet connection.","error");return;}
+ const wb=buildWorkbook(m);
  const buf=await wb.xlsx.writeBuffer();
  const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
  const a=document.createElement("a");
@@ -3309,14 +3576,210 @@ async function downloadExcel(m){
  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
 }
 
-function renderExcel(){
+/* ---------- storage of the Excel layer: read-modify-write so another person's / another tab's data is never overwritten ---------- */
+const emptyXl=()=>({p1:{},p2:{},p3:{},master:{},updatedAt:0});
+async function refreshXl(){
+ try{const d=await idbGet("app_data","wip_xl");if(d) xl=Object.assign(emptyXl(),d);}
+ catch(e){console.warn("WIP Excel data load failed",e);}
+}
+async function updateXl(fn){
+ if(!db){showToast("Database not ready","error");return false;}
+ try{
+  const fresh=Object.assign(emptyXl(),await idbGet("app_data","wip_xl")||{});
+  fn(fresh);
+  fresh.updatedAt=Date.now();
+  await idbPut("app_data","wip_xl",fresh);
+  xl=fresh;
+  return true;
+ }catch(e){
+  console.error("WIP Excel save failed",e);
+  showToast("Failed to save Excel data","error");
+  return false;
+ }
+}
+const countXl=k=>Object.keys((xl&&xl[k])||{}).length;
+
+/* ---------- "Upload Excel File" inside Person 1 / 2 / 3 ---------- */
+const pendingXl={p1:null,p2:null,p3:null};
+const PERSON_SHEET={p1:"wip1",p2:"wip2",p3:"wip3"};
+
+function renderXlBox(k){
+ const box=$("wipXlBox");
+ if(!box) return;
+ const n=countXl(k);
+ box.innerHTML=`
+  <div class="wip-file" style="margin-top:0">
+   <div>
+    <strong>📤 Upload Excel File</strong>
+    <div class="muted">WIP Excel of ${PERSONS[k]} (same layout as WIP-dd-mm-yy.xlsx). Rows are matched by PI + Color + Order Qty and merged with the data this person submitted before. ${n?`<span class="badge blue">Excel records stored: ${n}</span>`:""}</div>
+   </div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input type="file" id="wipXlFile" accept=".xlsx,.xlsm,.xls" style="margin:0;max-width:260px">
+    <label class="muted" style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" id="wipXlKeep" style="margin:0"> keep old qty where new cell is blank</label>
+    ${n?`<button class="small danger outline" id="wipXlClear">🗑 Clear ${PERSONS[k]} Excel data</button>`:""}
+   </div>
+  </div>
+  <div id="wipXlPreview"></div>`;
+ $("wipXlFile").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  try{
+   const buf=await f.arrayBuffer();
+   const res=readWipWorkbook(buf,["sheet1",PERSON_SHEET[k]],["masterfile"]);
+   const recs=recsFromRows(res.rows,Date.now());
+   pendingXl[k]={file:f.name,sheet:res.sheet,rowsRead:res.rows.length,recs:recs};
+   renderXlPreview(k);
+  }catch(err){
+   console.error(err);pendingXl[k]=null;
+   $("wipXlPreview").innerHTML="";
+   showToast("Excel read failed: "+err.message,"error",6000);
+  }
+ });
+ const clr=$("wipXlClear");
+ if(clr) clr.addEventListener("click",async()=>{
+  if(!window.confirm("Delete the uploaded Excel data of "+PERSONS[k]+" only? Other persons' data is not touched.")) return;
+  if(await updateXl(x=>{x[k]={};})){showToast(PERSONS[k]+" Excel data cleared","success");renderXlBox(k);}
+ });
+ renderXlPreview(k);
+}
+
+function renderXlPreview(k){
+ const pv=$("wipXlPreview");
+ if(!pv) return;
+ const p=pendingXl[k];
+ if(!p){pv.innerHTML="";return;}
+ const keep=!!($("wipXlKeep")&&$("wipXlKeep").checked);
+ let nNew=0,nUpd=0,nSame=0;
+ Object.keys(p.recs).forEach(key=>{
+  const old=(xl[k]||{})[key];
+  if(!old) nNew++;
+  else if(sameRec(mergeRec(old,p.recs[key],keep),old)) nSame++;
+  else nUpd++;
+ });
+ pv.innerHTML=`<div class="wip-info">
+  <strong>${escapeHTML(p.file)}</strong> (sheet ${escapeHTML(p.sheet)}) - ${p.rowsRead} row(s) read, ${Object.keys(p.recs).length} unique PI + Color + Order Qty.<br>
+  New: <b>${nNew}</b> &nbsp; Updated: <b>${nUpd}</b> &nbsp; Unchanged: <b>${nSame}</b> &nbsp; <span class="muted">Records of ${PERSONS[k]} that are not in this file stay as they are.</span>
+  <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+   <button class="success" id="wipXlSubmit">✅ Submit Excel Data</button>
+   <button class="outline" id="wipXlCancel">Cancel</button>
+  </div></div>`;
+ $("wipXlCancel").addEventListener("click",()=>{pendingXl[k]=null;$("wipXlFile").value="";renderXlPreview(k);});
+ $("wipXlSubmit").addEventListener("click",async()=>{
+  const keepNow=!!($("wipXlKeep")&&$("wipXlKeep").checked);
+  const ts=Date.now();
+  const ok=await updateXl(x=>{
+   const store=x[k]||(x[k]={});
+   Object.keys(p.recs).forEach(key=>{
+    const nr=Object.assign({},p.recs[key],{ts:ts});
+    const old=store[key];
+    if(!old){store[key]=nr;return;}
+    const merged=mergeRec(old,nr,keepNow);
+    if(sameRec(merged,old)) return;   /* nothing changed: keep the old timestamp */
+    store[key]=merged;
+   });
+  });
+  if(!ok) return;
+  pendingXl[k]=null;
+  showToast(`${PERSONS[k]}: ${nNew} new, ${nUpd} updated, ${nSame} unchanged. See WIP Excel File.`,"success",5000);
+  setTab("excel");
+ });
+}
+
+/* ---------- Upload Updated Master Excel ---------- */
+function xText(v,c){
+ if(c===C("E")){const d=dateOf(v);return d?d.toISOString().slice(0,10):clean(v);}
+ if(v instanceof Date) return v.toISOString().slice(0,10);
+ return clean(v);
+}
+function recDiffers(rec,row){
+ for(let i=0;i<PROCS.length;i++){
+  if(Math.abs((rec.q[i]||0)-(row.yds[i]||0))>0.005) return true;
+ }
+ if(clean(rec.bt)!==clean(row.bt)) return true;
+ if(clean(rec.rem)!==clean(row.remarks)) return true;
+ for(const c of DIFF_COLS){
+  const v=rec.x[L(c)];
+  if(v===undefined||v===""||v==null) continue;
+  if(xText(v,c)!==xText(row.x[L(c)],c)) return true;
+ }
+ return false;
+}
+
+async function uploadMaster(file){
+ const msg=$("wipMasterMsg");
+ try{
+  const buf=await file.arrayBuffer();
+  const res=readWipWorkbook(buf,["sheet1","masterfile"],[]);
+  const ts=Date.now();
+  const recs=recsFromRows(res.rows,ts);
+  const entries=(snap&&snap.entries)||[];
+  const cur=buildModel(entries,new Date());
+  const curMap=new Map(cur.rows.map(r=>[r.key,r]));
+  const toStore=[];let nNew=0,nUpd=0,nSame=0;
+  Object.keys(recs).forEach(key=>{
+   const rec=recs[key],row=curMap.get(key);
+   if(!row){nNew++;toStore.push(rec);}
+   else if(recDiffers(rec,row)){nUpd++;toStore.push(rec);}
+   else nSame++;
+  });
+  if(!toStore.length){
+   if(msg) msg.innerHTML=`<div class="wip-info">${escapeHTML(file.name)}: ${res.rows.length} row(s) read - nothing new or changed compared with the ERP data.</div>`;
+   showToast("No new or changed rows in this Master Excel","info");
+   return;
+  }
+  const ok=await updateXl(x=>{
+   const store=x.master||(x.master={});
+   toStore.forEach(rec=>{
+    const old=store[rec.key];
+    store[rec.key]=old?mergeRec(old,rec,false):rec;
+    store[rec.key].ts=ts;
+   });
+  });
+  if(!ok) return;
+  showToast(`Master Excel merged: ${nNew} new order(s), ${nUpd} updated, ${nSame} unchanged`,"success",5000);
+  await renderExcel();
+  const m2=$("wipMasterMsg");
+  if(m2) m2.innerHTML=`<div class="wip-info">${escapeHTML(file.name)} (sheet ${escapeHTML(res.sheet)}): ${res.rows.length} row(s) read - <b>${nNew}</b> new order(s), <b>${nUpd}</b> updated, <b>${nSame}</b> unchanged. The next download uses this data.</div>`;
+ }catch(err){
+  console.error(err);
+  showToast("Master Excel upload failed: "+err.message,"error",6000);
+ }
+}
+
+function masterUploadHTML(){
+ return `<div class="wip-file">
+  <div>
+   <strong>⬆ Upload Updated Master Excel</strong>
+   <div class="muted">Download the Master Excel, add or edit orders on your PC (type process qty only - Delivery Status fills itself), then upload it here. Records are matched by PI + Color + Order Qty; nothing else is deleted.</div>
+  </div>
+  <input type="file" id="wipMasterFile" accept=".xlsx,.xlsm" style="margin:0;max-width:280px">
+ </div>
+ <div id="wipMasterMsg"></div>`;
+}
+function wireMasterUpload(){
+ const inp=$("wipMasterFile");
+ if(!inp) return;
+ inp.addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];
+  if(!f) return;
+  await uploadMaster(f);
+  inp.value="";
+ });
+}
+
+async function renderExcel(){
+ await refreshXl();
  const panel=$("wipPanel");
+ if(tab!=="excel") return;
  const entries=(snap&&snap.entries)||[];
- if(!entries.length){
-  panel.innerHTML='<div class="detail-empty">No WIP Excel file yet. Save data in Person 1 / 2 / 3 and press Submit to create it.</div>';
+ const hasXl=["p1","p2","p3","master"].some(p=>countXl(p)>0);
+ if(!entries.length&&!hasXl){
+  panel.innerHTML='<div class="detail-empty">No WIP Excel file yet. Save data in Person 1 / 2 / 3 (or upload their Excel file) and press Submit to create it.</div>'+masterUploadHTML();
+  wireMasterUpload();
   return;
  }
- const when=new Date(snap.submittedAt||Date.now());
+ const lastTs=Math.max(Date.parse(snap&&snap.submittedAt)||0,xl.updatedAt||0)||Date.now();
+ const when=new Date(lastTs);
  const m=buildModel(entries,when);
  const head=["PI","Color","Order Qty (yds)"].concat(PROCS.map(p=>p+" (yds)")).concat(["Total (yds)","BT/T NO.","Remarks","Delivery Status"]);
  const trows=m.rows.map(r=>{
@@ -3326,19 +3789,22 @@ function renderExcel(){
   return "<tr>"+cells.map(v=>"<td>"+escapeHTML(v)+"</td>").join("")+"</tr>";
  }).join("");
  const totRow='<tr style="font-weight:700;background:#f8fafc"><td>Process total</td><td></td><td></td>'+m.totals.map(t=>"<td>"+fmt(Math.round(t))+"</td>").join("")+"<td>"+fmt(Math.round(m.grand))+"</td><td></td><td></td><td></td></tr>";
+ const src=["p1","p2","p3"].filter(p=>countXl(p)>0||data[p].some(e=>e.submitted)).map(p=>PERSONS[p]).join(", ");
  panel.innerHTML=`
   <div class="wip-file">
    <div>
     <strong>📄 ${escapeHTML(m.name)}</strong>
-    <div class="muted">${m.count} row(s) • Total ${fmt(Math.round(m.grand))} yds (converted from mtr) • Submitted ${escapeHTML(when.toLocaleString())}</div>
+    <div class="muted">${m.count} row(s) • Total ${fmt(Math.round(m.grand))} yds • Latest data ${escapeHTML(when.toLocaleString())}${src?" • From: "+escapeHTML(src):""}${countXl("master")?" • Includes Master Excel edits":""}</div>
    </div>
    <button class="success" id="wipDownload">⬇ Download Excel</button>
   </div>
+  ${masterUploadHTML()}
   <div class="table-wrap"><table style="min-width:900px"><thead><tr>${head.map(h=>"<th>"+escapeHTML(h)+"</th>").join("")}</tr></thead><tbody>${totRow}${trows}</tbody></table></div>`;
  $("wipDownload").addEventListener("click",async()=>{
-  try{await downloadExcel(m);}
+  try{await refreshXl();await downloadExcel(buildModel((snap&&snap.entries)||[],new Date(Math.max(Date.parse(snap&&snap.submittedAt)||0,xl.updatedAt||0)||Date.now())));}
   catch(e){console.error(e);showToast("Excel download failed: "+e.message,"error");}
  });
+ wireMasterUpload();
 }
 
 /* ---------- wiring ---------- */
