@@ -185,6 +185,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 @media(max-width:700px){.gs-pop label{padding:9px 6px;font-size:15px}.gs-table th .gs-fbtn{padding:4px 9px;font-size:13px}}
 .gs-pop .gs-links{display:flex;gap:10px;margin-bottom:6px;font-size:12px}
 .gs-pop .gs-links a{color:var(--primary-light);cursor:pointer;font-weight:600}
+.gs-foot td{position:sticky;bottom:0;background:#eef6ff;font-weight:700;border-top:2px solid var(--primary-light)}
 </style>
 
 <!-- WIP MANAGEMENT (independent module styles) -->
@@ -336,7 +337,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <!-- ORDER UPDATE -->
 <section id="update" class="page">
 <h2>Order Update Management</h2>
-<p class="muted">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently. Uploaded sheets stay saved in this browser until you delete them. Sheets used: Order Status file = "Order Status" + "Complete Details"; Delivery Status file = "Sheet 1" + "Com 2025"; WIP file = all sheets. File name does not matter - the upload box decides the file type.</p>
+<p class="muted" style="display:none">Upload and manage 3 dedicated Excel sheets: Delivery Status, Order Status, and WIP. You can add, replace, or delete any sheet independently. Uploaded sheets stay saved in this browser until you delete them. Sheets used: Order Status file = "Order Status" + "Complete Details"; Delivery Status file = "Sheet 1" + "Com 2025"; WIP file = all sheets. File name does not matter - the upload box decides the file type.</p>
 
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:16px 0" id="threeSheetsUploadContainer">
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
@@ -349,7 +350,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
    <button class="small" id="uploadDeliveryBtn">Upload / Update</button>
    <button class="small danger outline" id="deleteDeliveryBtn">Delete</button>
   </div>
-  <p id="infoDeliveryFile" class="muted" style="margin:6px 0 0;font-size:11px">P.I, Buyer Name, Construction, Color, Order Qty, Good Rcvd, Short, Present Status</p>
+  <p id="infoDeliveryFile" class="muted" style="margin:6px 0 0;font-size:11px"></p>
  </div>
 
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
@@ -362,7 +363,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
    <button class="small" id="uploadOrderStatusBtn">Upload / Update</button>
    <button class="small danger outline" id="deleteOrderStatusBtn">Delete</button>
   </div>
-  <p id="infoOrderStatusFile" class="muted" style="margin:6px 0 0;font-size:11px">PI Number, PI Received date, Greige Date, Deli date, Buyer, Construction, Color, Order Qty, Remarks</p>
+  <p id="infoOrderStatusFile" class="muted" style="margin:6px 0 0;font-size:11px"></p>
  </div>
 
  <div class="slot-card" style="margin:0;border:1px solid var(--border);border-radius:9px;padding:14px;background:#fff">
@@ -375,7 +376,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
    <button class="small" id="uploadWipBtn">Upload / Update</button>
    <button class="small danger outline" id="deleteWipBtn">Delete</button>
   </div>
-  <p id="infoWipFile" class="muted" style="margin:6px 0 0;font-size:11px">PI, Buyer, Construction, Color, Order Qty.(yds), Delivery Status</p>
+  <p id="infoWipFile" class="muted" style="margin:6px 0 0;font-size:11px"></p>
  </div>
 </div>
 
@@ -392,18 +393,21 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 </div>
 
 <hr>
-<h3>Step 1: Find PI Number</h3>
-<input id="updatePiSearch" placeholder="Type to filter PI Number across all uploaded sheets...">
+<h3>Find PI</h3>
+<div id="fpTerms"></div>
+<div class="actions">
+ <button id="fpSearch">🔍 Search</button>
+ <button class="secondary" id="fpClear">Clear</button>
+ <button class="small outline" id="fpClearFilters">✖ Clear filters</button>
+</div>
+<div id="fpSummary" style="margin:10px 0 4px"></div>
 <div id="piResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
 <p id="piHint" class="muted"></p>
-
-<hr>
-<h3>Step 2: Select Color</h3>
 <div id="colorResults" style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0"></div>
 
 <hr>
 <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
- <h3 style="margin:0">Step 3: Select Sheet to View Update</h3>
+ <h3 style="margin:0">Sheet View</h3>
  <div style="display:flex;gap:6px" id="sheetViewTabs">
   <button class="small" id="tabDeliveryView">🚚 Delivery Status</button>
   <button class="small outline" id="tabOrderStatusView">📋 Order Status</button>
@@ -411,18 +415,21 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
  </div>
 </div>
 
-<div class="table-wrap" style="margin-top:12px">
-<table>
+<p class="muted" id="fpCount" style="margin:10px 0 4px"></p>
+<div class="table-wrap gs-wrap" style="margin-top:6px">
+<table class="gs-table">
 <thead id="detailHead"></thead>
 <tbody id="detailBody"></tbody>
+<tfoot id="detailFoot"></tfoot>
 </table>
 </div>
+<div id="fpPop" class="gs-pop hidden"></div>
 </section>
 
 <!-- GLOBAL SEARCH -->
 <section id="search" class="page">
 <h2>⚡ Global Search</h2>
-<p class="muted">Data comes only from: <b>Delivery Status file → Sheet 1</b> and <b>Order Status file → Order Status sheet</b>. Search by PI, GD, Color or Construction. Press <b>+</b> to add more search boxes (any number of PI, colors...). Same type = "or" (PI 15300 or PI 15302); different types = "and" (those PIs <u>and</u> Black). Then use the <b>▼ filter in the table header</b> to keep only the colors / values you need.</p>
+<p class="muted" style="display:none">Data comes only from: <b>Delivery Status file → Sheet 1</b> and <b>Order Status file → Order Status sheet</b>. Search by PI, GD, Color or Construction. Press <b>+</b> to add more search boxes (any number of PI, colors...). Same type = "or" (PI 15300 or PI 15302); different types = "and" (those PIs <u>and</u> Black). Then use the <b>▼ filter in the table header</b> to keep only the colors / values you need.</p>
 
 <div id="gsTerms"></div>
 <div class="actions">
@@ -444,6 +451,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
  <table class="gs-table">
   <thead id="gsHead"></thead>
   <tbody id="gsBody"><tr><td style="padding:14px;color:#64748b">Type a PI, GD, Color or Construction above to search.</td></tr></tbody>
+  <tfoot id="gsFoot"></tfoot>
  </table>
 </div>
 <div id="gsPop" class="gs-pop hidden"></div>
@@ -453,7 +461,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <section id="dailyReport" class="page">
  <h2>Daily Report</h2>
  <h3 style="margin-top:0">Daily Report from Order Status</h3>
- <p class="muted">First 4 reports come from the Order Status file → Order Status sheet. Last Day Grey Input uses the Grey Report file (Filterwise Grey Received). Delivery Date Mismatch and Order Qty Mismatch compare Order Status with Delivery Status file → Sheet 1.</p>
+ <p class="muted" style="display:none">First 4 reports come from the Order Status file → Order Status sheet. Last Day Grey Input uses the Grey Report file (Filterwise Grey Received). Delivery Date Mismatch and Order Qty Mismatch compare Order Status with Delivery Status file → Sheet 1.</p>
  <div class="dr-controls">
   <div><label for="drReportDate">Report Date</label><input type="date" id="drReportDate"></div>
   <div><label for="drTestDate">Test Date (optional override)</label><input type="date" id="drTestDate"></div>
@@ -937,6 +945,27 @@ function keyOf(row){
 
 function pairKey(pi,color){
  return normalize(pi)+"|"+colorKey(color);
+}
+
+/* exact PI / GD matching used by Find PI, Global Search and Grey Search (typed 15282 finds PI 15282/26 only, never 152820/26) */
+function exactPiKeys(pi){
+ const raw=clean(pi);
+ if(!raw) return [];
+ const keys=new Set(piKeys(raw));
+ const m=raw.match(/^(.*?)\s*\/\s*(\d{2,4})$/);
+ const body=m?m[1]:raw;
+ keys.add(normalize(body));
+ if(body.indexOf("+")>=0){
+  body.split("+").map(x=>x.trim()).filter(Boolean).forEach(part=>{keys.add(normalize(part));if(m) keys.add(normalize(part+"/"+m[2]));});
+ }
+ return Array.from(keys);
+}
+function piMatchesExact(pi,t){return !!t&&exactPiKeys(pi).indexOf(t)>=0;}
+function gdMatchesExact(gd,t){
+ const raw=clean(gd);
+ if(!raw||!t) return false;
+ if(normalize(raw)===t) return true;
+ return raw.split(/[+,;]+/).some(x=>normalize(x)===t);
 }
 
 function rowMatchesPair(row,pi,color){
@@ -1804,192 +1833,339 @@ async function getAllUploadedRows(){
  return all;
 }
 
+/* ================= FIND PI (multi search: PI / Color / Construction / GD) =================
+   PI and GD are matched EXACTLY (typed PI shows only that PI). Same type = "or", different types = "and".
+   Each new "+" box starts as PI. Table has column filters and a total row. */
 const PI_BUTTON_LIMIT=60;
+const FP_FIELDS=[["pi","PI"],["color","Color"],["construction","Construction"],["gd","GD"]];
+const FP_KINDS=["delivery","order","wip"];
+const FP_LIMIT=1000;
+const FP_NUM=new Set(["qty","goodRcvd","short"]);
+let fpShown={delivery:[],order:[],wip:[]};
+let fpSearched=false,fpFilters={},fpDebounce=null,fpDelivStatus=new Map();
 
-async function renderUpdatePIResults(){
- const query=normalize(document.getElementById("updatePiSearch").value);
- const results=document.getElementById("piResults");
- const hint=document.getElementById("piHint");
- results.innerHTML="";
- if(hint) hint.textContent="";
-
- const allRowsWithMeta=await getAllUploadedRows();
- let pis=uniqueValues(allRowsWithMeta.map(item=>item.row.pi));
-
- if(query){
-  pis=pis.filter(pi=>normalize(pi).includes(query));
- }
-
- if(selectedUpdatePI&&!pis.includes(selectedUpdatePI)){
-  selectedUpdatePI="";
-  selectedUpdateColor="";
- }
-
- pis.slice(0,PI_BUTTON_LIMIT).forEach(pi=>{
-  const btn=document.createElement("button");
-  btn.className="small"+(selectedUpdatePI===pi?"":" outline");
-  btn.textContent=pi;
-  btn.onclick=()=>{
-   selectedUpdatePI=pi;
-   selectedUpdateColor="";
-   document.querySelectorAll("#piResults button").forEach(b=>{
-    b.className="small"+(b.textContent===pi?"":" outline");
-   });
-   renderUpdateColors();
-  };
-  results.appendChild(btn);
+function fpAddRow(afterRow,focus){
+ const row=document.createElement("div");
+ row.className="gs-row";
+ row.innerHTML=`<select>${FP_FIELDS.map(o=>`<option value="${o[0]}">${o[1]}</option>`).join("")}</select>
+  <input placeholder="Type here..." autocomplete="off">
+  <button type="button" class="small" title="Add another search box">+</button>
+  <button type="button" class="small outline danger" title="Remove this box">✕</button>`;
+ const sel=row.querySelector("select"),inp=row.querySelector("input"),[plus,del]=row.querySelectorAll("button");
+ sel.value="pi";
+ inp.addEventListener("input",()=>{clearTimeout(fpDebounce);fpDebounce=setTimeout(fpRun,300);});
+ inp.addEventListener("keydown",e=>{if(e.key==="Enter"){clearTimeout(fpDebounce);fpRun();}});
+ sel.addEventListener("change",fpRun);
+ plus.addEventListener("click",()=>fpAddRow(row,true));
+ del.addEventListener("click",()=>{
+  const box=document.getElementById("fpTerms");
+  if(box.children.length>1){row.remove();fpRun();}
+  else{inp.value="";fpRun();}
  });
+ const box=document.getElementById("fpTerms");
+ if(afterRow&&afterRow.nextSibling) box.insertBefore(row,afterRow.nextSibling); else box.appendChild(row);
+ if(focus) inp.focus();
+}
 
- if(!pis.length){
-  results.innerHTML='<span class="muted">No matching PI found in uploaded sheets.</span>';
-  renderUpdateColors();
- }else if(hint&&pis.length>PI_BUTTON_LIMIT){
-  hint.textContent=`Showing ${PI_BUTTON_LIMIT} of ${pis.length} PI numbers - type in the box above to narrow down.`;
+function fpGd(row,headers,kind){
+ const h=headers||[],v=row._values||[];
+ for(let c=0;c<h.length;c++){
+  if(/^gd/.test(normalize(h[c]||""))){const x=clean(v[c]);if(x) return x;}
+ }
+ return kind==="order"?clean(v[0]):"";
+}
+
+async function fpLoad(){
+ const out={delivery:[],order:[],wip:[]};
+ const files=await getAllCategoryFiles();
+ files.forEach(f=>{
+  const kind=isCategory(f.category,"delivery")?"delivery":(isCategory(f.category,"order")?"order":(isCategory(f.category,"wip")?"wip":""));
+  if(!kind) return;
+  (f.data||[]).forEach(sh=>{
+   (sh.rows||[]).forEach(row=>{
+    const pi=clean(getField(row,"pi")),color=clean(getField(row,"color")),construction=clean(getField(row,"construction")),gd=fpGd(row,sh.headers,kind);
+    if(!pi&&!color&&!gd) return;
+    out[kind].push({row,pi,color,construction,gd,key:pairKey(pi,color),n:{color:normalize(color),construction:normalize(construction)}});
+   });
+  });
+ });
+ return out;
+}
+
+function fpPiNum(pi){const m=String(pi||"").match(/\d+/);return m?Number(m[0]):Infinity;}
+function fpCmp(a,b){
+ const x=fpPiNum(a.pi),y=fpPiNum(b.pi);
+ if(x!==y) return x<y?-1:1;
+ return a.pi.localeCompare(b.pi,undefined,{numeric:true})||a.color.localeCompare(b.color,undefined,{numeric:true});
+}
+
+function fpTokens(field,value){
+ const parts=(field==="pi"||field==="gd")?String(value||"").split(/[,;\s]+/):String(value||"").split(/[,;]+/);
+ return parts.map(normalize).filter(Boolean);
+}
+
+async function fpRun(){
+ const groups={};
+ let any=false;
+ document.querySelectorAll("#fpTerms .gs-row").forEach(r=>{
+  const f=r.querySelector("select").value;
+  fpTokens(f,r.querySelector("input").value).forEach(t=>{(groups[f]=groups[f]||[]).push(t);any=true;});
+ });
+ fpFilters={};
+ selectedUpdatePI="";
+ selectedUpdateColor="";
+ if(!any){
+  fpSearched=false;
+  fpShown={delivery:[],order:[],wip:[]};
+  fpRender();
+  return;
+ }
+ let data;
+ try{data=await fpLoad();}
+ catch(e){console.error(e);showToast("Could not read uploaded sheets","error");return;}
+ fpSearched=true;
+ const test={
+  pi:(it,t)=>piMatchesExact(it.pi,t),
+  gd:(it,t)=>gdMatchesExact(it.gd,t),
+  color:(it,t)=>it.n.color.includes(t),
+  construction:(it,t)=>it.n.construction.includes(t)
+ };
+ const pass=it=>Object.keys(groups).every(f=>groups[f].some(t=>test[f](it,t)));
+ const keys=new Set();
+ FP_KINDS.forEach(k=>data[k].forEach(it=>{if(pass(it)) keys.add(it.key);}));
+ FP_KINDS.forEach(k=>{fpShown[k]=data[k].filter(it=>keys.has(it.key)).sort(fpCmp);});
+ if(groups.gd) fpShown.order=fpShown.order.filter(it=>groups.gd.some(t=>gdMatchesExact(it.gd,t)));   /* only the searched GD, nothing else */
+ fpDelivStatus=new Map();
+ data.delivery.forEach(it=>{
+  const st=clean(getField(it.row,"presentStatus"))||clean(getField(it.row,"deliveryStatus"));
+  if(st&&!fpDelivStatus.has(it.key)) fpDelivStatus.set(it.key,st);
+ });
+ fpData={delivery:data.delivery.length,order:data.order.length,wip:data.wip.length};
+ if(!fpShown[activeSheetTab].length){
+  const other=FP_KINDS.find(k=>fpShown[k].length);
+  if(other) activeSheetTab=other;
+ }
+ fpRender();
+}
+let fpData={delivery:0,order:0,wip:0};
+
+function fpCols(kind){
+ if(kind==="delivery") return [
+  {label:"P.I",field:"pi"},{label:"Buyer Name",field:"buyer"},{label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},{label:"Order Qty",field:"qty"},{label:"Good Rcvd",field:"goodRcvd"},
+  {label:"Short",field:"short"},{label:"Present Status",field:"presentStatus"}
+ ];
+ if(kind==="order") return [
+  {label:"GD Number",field:"gd"},{label:"PI Number",field:"pi"},{label:"PI Received Date",field:"piReceivedDate"},
+  {label:"Greige Date",field:"greigeDate"},{label:"Deli Date",field:"deliDate"},{label:"Buyer",field:"buyer"},
+  {label:"Construction",field:"construction"},{label:"Color",field:"color"},{label:"Order Qty",field:"qty"},{label:"Remarks",field:"remarks"}
+ ];
+ return [
+  {label:"PI",field:"pi"},{label:"Buyer",field:"buyer"},{label:"Construction",field:"construction"},
+  {label:"Color",field:"color"},{label:"Order Qty (yds)",field:"qty"},{label:"Delivery Status",field:"deliveryStatus"}
+ ];
+}
+
+function fpVal(it,field){
+ if(field==="gd") return it.gd||"-";
+ let v=displayValue(it.row,field);
+ if(field==="deliveryStatus"&&(!v||v==="-")){const st=fpDelivStatus.get(it.key);if(st) v=st;}
+ return v;
+}
+
+/* rows of one sheet after the PI / Color chips (narrowing) */
+function fpNarrowed(kind){
+ let rows=fpShown[kind]||[];
+ if(selectedUpdatePI) rows=rows.filter(it=>rowMatchesPair(it.row,selectedUpdatePI,""));
+ if(selectedUpdateColor){const ck=colorKey(selectedUpdateColor);rows=rows.filter(it=>colorKey(it.color)===ck);}
+ return rows;
+}
+function fpVisible(kind){
+ const cols=fpCols(kind);
+ return fpNarrowed(kind).filter(it=>Object.keys(fpFilters).every(f=>{
+  if(!cols.some(c=>c.field===f)) return true;
+  return fpFilters[f].has(fpVal(it,f));
+ }));
+}
+const fpFmt=n=>Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+
+function fpChips(){
+ const pbox=document.getElementById("piResults"),hint=document.getElementById("piHint"),cbox=document.getElementById("colorResults");
+ pbox.innerHTML="";cbox.innerHTML="";hint.textContent="";
+ if(!fpSearched) return;
+ const all=[].concat(fpShown.delivery,fpShown.order,fpShown.wip);
+ if(!all.length){pbox.innerHTML='<span class="muted">No matching data found in uploaded sheets.</span>';return;}
+ const pis=uniqueValues(all.map(it=>it.pi)).sort((a,b)=>fpPiNum(a)-fpPiNum(b)||a.localeCompare(b,undefined,{numeric:true}));
+ if(pis.length>1){
+  pis.slice(0,PI_BUTTON_LIMIT).forEach(pi=>{
+   const b=document.createElement("button");
+   b.className="small"+(selectedUpdatePI===pi?"":" outline");
+   b.textContent=pi;
+   b.title="Click to show only this PI (click again to show all)";
+   b.onclick=()=>{selectedUpdatePI=selectedUpdatePI===pi?"":pi;selectedUpdateColor="";fpRender();};
+   pbox.appendChild(b);
+  });
+  if(pis.length>PI_BUTTON_LIMIT) hint.textContent=`Showing ${PI_BUTTON_LIMIT} of ${pis.length} PI numbers.`;
+ }
+ const base=selectedUpdatePI?all.filter(it=>rowMatchesPair(it.row,selectedUpdatePI,"")):all;
+ const colors=uniqueColors(base.map(it=>it.color));
+ if(colors.length>1){
+  colors.forEach(color=>{
+   const b=document.createElement("button");
+   b.className="small"+(selectedUpdateColor===color?"":" outline");
+   b.textContent=color;
+   b.title="Click to show only this color (click again to show all)";
+   b.onclick=()=>{selectedUpdateColor=selectedUpdateColor===color?"":color;fpRender();};
+   cbox.appendChild(b);
+  });
  }
 }
 
-document.getElementById("updatePiSearch").addEventListener("input",renderUpdatePIResults);
+function fpClosePop(){const p=document.getElementById("fpPop");if(p){p.classList.add("hidden");p.innerHTML="";}}
 
-async function renderUpdateColors(){
- const box=document.getElementById("colorResults");
- box.innerHTML="";
-
- if(!selectedUpdatePI){
-  box.innerHTML='<span class="muted">Please select a PI Number first.</span>';
-  renderSelectedSheetDetail();
-  return;
+function fpBody(kind){
+ const cols=fpCols(kind),body=document.getElementById("detailBody"),foot=document.getElementById("detailFoot");
+ const rows=fpVisible(kind);
+ body.innerHTML="";foot.innerHTML="";
+ if(!rows.length){
+  body.innerHTML=`<tr><td colspan="${cols.length}" style="padding:14px;color:#64748b;text-align:center">No rows in this sheet${Object.keys(fpFilters).length?" (check the filters)":""}.</td></tr>`;
  }
-
- const allRowsWithMeta=await getAllUploadedRows();
- const matchingRows=allRowsWithMeta.filter(item=>rowMatchesPair(item.row,selectedUpdatePI,""));
- const colors=uniqueColors(matchingRows.map(item=>item.row.color));
-
- if(!colors.length){
-  box.innerHTML='<span class="muted">No Colors found for this PI.</span>';
-  renderSelectedSheetDetail();
-  return;
- }
-
- if(selectedUpdateColor&&!colors.includes(selectedUpdateColor)){
-  selectedUpdateColor="";
- }
- if(!selectedUpdateColor&&colors.length===1){
-  selectedUpdateColor=colors[0];
- }
-
- colors.forEach(color=>{
-  const btn=document.createElement("button");
-  btn.className="small"+(selectedUpdateColor===color?"":" outline");
-  btn.textContent=color;
-  btn.onclick=()=>{
-   selectedUpdateColor=color;
-   document.querySelectorAll("#colorResults button").forEach(b=>{
-    b.className="small"+(b.textContent===color?"":" outline");
-   });
-   renderSelectedSheetDetail();
-  };
-  box.appendChild(btn);
- });
-
- renderSelectedSheetDetail();
-}
-
-async function renderSelectedSheetDetail(){
- const thead=document.getElementById("detailHead");
- const tbody=document.getElementById("detailBody");
- thead.innerHTML="";
- tbody.innerHTML="";
-
- if(!selectedUpdatePI){
-  tbody.innerHTML='<tr><td colspan="100%" style="text-align:center;padding:14px;color:#64748b">Select a PI Number and Color above to see update details.</td></tr>';
-  return;
- }
-
- const allFiles=await getAllCategoryFiles();
- let matchingItems=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,selectedUpdateColor);
- let colorFallback=false;
-
- if(!matchingItems.length&&selectedUpdateColor){
-  const piOnly=categoryRowsForPair(allFiles,activeSheetTab,selectedUpdatePI,"");
-  if(piOnly.length){
-   matchingItems=piOnly;
-   colorFallback=true;
-  }
- }
-
- let columns=[];
- if(activeSheetTab==="delivery"){
-  columns=[
-   {label:"P.I",field:"pi"},
-   {label:"Buyer Name",field:"buyer"},
-   {label:"Construction",field:"construction"},
-   {label:"Color",field:"color"},
-   {label:"Order Qty",field:"qty"},
-   {label:"Good Rcvd",field:"goodRcvd"},
-   {label:"Short",field:"short"},
-   {label:"Present Status",field:"presentStatus"}
-  ];
- }else if(activeSheetTab==="order"){
-  columns=[
-   {label:"PI Number",field:"pi"},
-   {label:"PI Received Date",field:"piReceivedDate"},
-   {label:"Greige Date",field:"greigeDate"},
-   {label:"Deli Date",field:"deliDate"},
-   {label:"Buyer",field:"buyer"},
-   {label:"Construction",field:"construction"},
-   {label:"Color",field:"color"},
-   {label:"Order Qty",field:"qty"},
-   {label:"Remarks",field:"remarks"}
-  ];
- }else if(activeSheetTab==="wip"){
-  columns=[
-   {label:"PI",field:"pi"},
-   {label:"Buyer",field:"buyer"},
-   {label:"Construction",field:"construction"},
-   {label:"Color",field:"color"},
-   {label:"Order Qty (yds)",field:"qty"},
-   {label:"Delivery Status",field:"deliveryStatus"}
-  ];
- }
-
- const trHead=document.createElement("tr");
- columns.forEach(c=>{
-  const th=document.createElement("th");
-  th.textContent=c.label;
-  trHead.appendChild(th);
- });
- thead.appendChild(trHead);
-
- if(!matchingItems.length){
-  tbody.innerHTML=`<tr><td colspan="${columns.length}" style="text-align:center;padding:14px;color:#64748b">No data found in ${activeSheetTab.toUpperCase()} sheet for PI: ${escapeHTML(selectedUpdatePI)} ${selectedUpdateColor?`| Color: ${escapeHTML(selectedUpdateColor)}`:''}</td></tr>`;
-  return;
- }
-
- if(colorFallback){
-  const note=document.createElement("tr");
-  note.className="color-note";
-  note.innerHTML=`<td colspan="${columns.length}">Color "${escapeHTML(selectedUpdateColor)}" is not written the same way in this sheet - showing all colors of PI ${escapeHTML(selectedUpdatePI)}. Check the Color column.</td>`;
-  tbody.appendChild(note);
- }
-
- matchingItems.forEach(item=>{
+ rows.slice(0,FP_LIMIT).forEach(it=>{
   const tr=document.createElement("tr");
-  columns.forEach(col=>{
+  cols.forEach(c=>{const td=document.createElement("td");td.textContent=fpVal(it,c.field);tr.appendChild(td);});
+  body.appendChild(tr);
+ });
+ const tot={};
+ rows.forEach(it=>cols.forEach(c=>{
+  if(!FP_NUM.has(c.field)) return;
+  const sv=String(fpVal(it,c.field)).replace(/,/g,"").trim(),n=Number(sv);
+  if(sv!==""&&sv!=="-"&&isFinite(n)) tot[c.field]=(tot[c.field]||0)+n;
+ }));
+ if(rows.length){
+  const tr=document.createElement("tr");tr.className="gs-foot";
+  cols.forEach((c,i)=>{
    const td=document.createElement("td");
-   let val=displayValue(item.row,col.field);
-   if(col.field==="deliveryStatus"&&(!val||val==="-")){
-    const delivMatch=categoryRowsForPair(allFiles,"delivery",item.row.pi,item.row.color);
-    if(delivMatch.length){
-     const matchedStatus=getField(delivMatch[0].row,"presentStatus")||getField(delivMatch[0].row,"deliveryStatus");
-     if(matchedStatus) val=matchedStatus;
-    }
-   }
-   td.textContent=val;
+   if(FP_NUM.has(c.field)){td.textContent=fpFmt(tot[c.field]||0);td.style.textAlign="right";}
+   else if(i===0) td.textContent="TOTAL";
+   else if(i===1) td.textContent=rows.length+" row(s)";
    tr.appendChild(td);
   });
-  tbody.appendChild(tr);
- });
+  foot.appendChild(tr);
+ }
+ const fc=Object.keys(fpFilters).length;
+ const parts=[];
+ cols.forEach(c=>{if(FP_NUM.has(c.field)&&tot[c.field]!==undefined) parts.push(`Total ${c.label}: ${fpFmt(tot[c.field])}`);});
+ document.getElementById("fpCount").textContent=`Showing ${Math.min(rows.length,FP_LIMIT)} of ${fpNarrowed(kind).length} row(s)`+(parts.length?" • "+parts.join(" • "):"")+(fc?` • ${fc} filter(s) active`:"")+(rows.length>FP_LIMIT?` • only the first ${FP_LIMIT} are drawn - narrow the search or filter`:"");
 }
+
+function fpOpenPop(btn,col,kind){
+ const pop=document.getElementById("fpPop");
+ const all=[...new Set(fpNarrowed(kind).map(it=>fpVal(it,col.field)))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
+ const sel=new Set(fpFilters[col.field]||all);
+ pop.innerHTML=`<input placeholder="Search values..." autocomplete="off">
+  <div class="gs-links"><a data-a="all">Select all</a><a data-a="none">Deselect all</a></div>
+  <div class="gs-list"></div>
+  <button type="button" class="small" style="width:100%;margin-top:8px">Done</button>`;
+ pop.querySelector("button").addEventListener("click",fpClosePop);
+ const list=pop.querySelector(".gs-list"),q=pop.querySelector("input"),boxes=[];
+ const apply=()=>{
+  if(sel.size===all.length) delete fpFilters[col.field]; else fpFilters[col.field]=new Set(sel);
+  btn.classList.toggle("active",!!fpFilters[col.field]);
+  fpBody(kind);
+ };
+ all.forEach(v=>{
+  const lab=document.createElement("label"),cb=document.createElement("input");
+  cb.type="checkbox";cb.checked=sel.has(v);
+  cb.addEventListener("change",()=>{if(cb.checked) sel.add(v); else sel.delete(v);apply();});
+  lab.appendChild(cb);lab.appendChild(document.createTextNode(v));
+  list.appendChild(lab);boxes.push({v,lab,cb});
+ });
+ q.addEventListener("input",()=>{
+  const t=normalize(q.value);
+  boxes.forEach(b=>{b.lab.style.display=!t||normalize(b.v).includes(t)?"":"none";});
+ });
+ pop.querySelectorAll(".gs-links a").forEach(a=>a.addEventListener("click",()=>{
+  boxes.forEach(b=>{
+   if(b.lab.style.display==="none") return;
+   b.cb.checked=a.dataset.a==="all";
+   if(b.cb.checked) sel.add(b.v); else sel.delete(b.v);
+  });
+  apply();
+ }));
+ pop.classList.remove("hidden");
+ if(window.innerWidth<700){
+  pop.style.width="92vw";pop.style.left="4vw";pop.style.top="8px";list.style.maxHeight="42vh";
+ }else{
+  pop.style.width="";
+  const r=btn.getBoundingClientRect();
+  pop.style.left=Math.max(6,Math.min(r.left,window.innerWidth-pop.offsetWidth-6))+"px";
+  pop.style.top=Math.min(r.bottom+4,window.innerHeight-pop.offsetHeight-6)+"px";
+  q.focus();
+ }
+}
+
+function fpRender(){
+ fpClosePop();
+ const labels={delivery:"🚚 Delivery Status",order:"📋 Order Status",wip:"⚙️ WIP"};
+ const ids={delivery:"tabDeliveryView",order:"tabOrderStatusView",wip:"tabWipView"};
+ FP_KINDS.forEach(k=>{
+  const b=document.getElementById(ids[k]);
+  b.className="small"+(activeSheetTab===k?"":" outline");
+  b.textContent=fpSearched?`${labels[k]} (${fpNarrowed(k).length})`:labels[k];
+ });
+ const head=document.getElementById("detailHead"),body=document.getElementById("detailBody"),foot=document.getElementById("detailFoot");
+ const sum=document.getElementById("fpSummary");
+ fpChips();
+ if(!fpSearched){
+  head.innerHTML="";foot.innerHTML="";sum.innerHTML="";
+  document.getElementById("fpCount").textContent="";
+  body.innerHTML='<tr><td colspan="100%" style="text-align:center;padding:14px;color:#64748b">Type a PI, GD, Color or Construction above to search.</td></tr>';
+  return;
+ }
+ const all=[].concat(fpNarrowed("delivery"),fpNarrowed("order"),fpNarrowed("wip"));
+ const pis=new Set(all.map(it=>it.pi)),pcs=new Set(all.map(it=>it.key));
+ const missing=[];
+ if(!fpData.delivery) missing.push("Delivery Status");
+ if(!fpData.order) missing.push("Order Status");
+ if(!fpData.wip) missing.push("WIP");
+ sum.innerHTML=`<span class="badge blue">${pis.size} PI</span> <span class="badge blue">${pcs.size} PI+Color</span> <span class="badge green">Delivery rows: ${fpNarrowed("delivery").length}</span> <span class="badge green">Order Status rows: ${fpNarrowed("order").length}</span> <span class="badge green">WIP rows: ${fpNarrowed("wip").length}</span>`
+  +(missing.length?` <span class="badge red">Not uploaded / no data: ${escapeHTML(missing.join(", "))}</span>`:"");
+ const cols=fpCols(activeSheetTab);
+ const trh=document.createElement("tr");
+ cols.forEach(c=>{
+  const th=document.createElement("th");
+  th.appendChild(document.createTextNode(c.label));
+  const fb=document.createElement("button");
+  fb.type="button";
+  fb.className="gs-fbtn"+(fpFilters[c.field]?" active":"");
+  fb.textContent="▼";
+  fb.title="Filter "+c.label;
+  fb.onclick=e=>{e.stopPropagation();fpOpenPop(fb,c,activeSheetTab);};
+  th.appendChild(fb);
+  trh.appendChild(th);
+ });
+ head.innerHTML="";head.appendChild(trh);
+ fpBody(activeSheetTab);
+}
+
+/* names kept so the rest of the app (upload refresh, tab buttons) works unchanged */
+async function renderUpdatePIResults(){ if(fpSearched) await fpRun(); else fpRender(); }
+function renderUpdateColors(){ fpRender(); }
+function renderSelectedSheetDetail(){ fpRender(); }
+
+document.getElementById("fpSearch").addEventListener("click",()=>{clearTimeout(fpDebounce);fpRun();});
+document.getElementById("fpClear").addEventListener("click",()=>{
+ document.getElementById("fpTerms").innerHTML="";fpAddRow(null,false);
+ fpSearched=false;fpFilters={};fpShown={delivery:[],order:[],wip:[]};selectedUpdatePI="";selectedUpdateColor="";
+ fpRender();
+});
+document.getElementById("fpClearFilters").addEventListener("click",()=>{fpFilters={};fpRender();});
+document.addEventListener("click",e=>{
+ const pp=document.getElementById("fpPop");
+ if(pp&&!pp.classList.contains("hidden")&&!pp.contains(e.target)) fpClosePop();
+});
+fpAddRow(null,false);
+fpRender();
 
 function isCategory(category,kind){
  const c=normalize(category);
@@ -2396,7 +2572,7 @@ window.addEventListener("DOMContentLoaded",init);
 (function(){
 "use strict";
 const $=id=>document.getElementById(id);
-const FIELD_OPTS=[["all","All fields"],["pi","PI"],["gd","GD"],["color","Color"],["construction","Construction"]];
+const FIELD_OPTS=[["pi","PI"],["color","Color"],["construction","Construction"],["gd","GD"]];
 const COLS={
  delivery:[
   {label:"P.I",field:"pi"},{label:"Buyer Name",field:"buyer"},{label:"Construction",field:"construction"},
@@ -2486,9 +2662,9 @@ async function run(){
  const groups={};
  let any=false;
  document.querySelectorAll("#gsTerms .gs-row").forEach(r=>{
-  const f=r.querySelector("select").value,v=normalize(r.querySelector("input").value);
-  if(!v) return;
-  (groups[f]=groups[f]||[]).push(v);any=true;
+  const f=r.querySelector("select").value,raw=r.querySelector("input").value;
+  const toks=(f==="pi"||f==="gd")?raw.split(/[,;\s]+/).map(normalize).filter(Boolean):raw.split(/[,;]+/).map(normalize).filter(Boolean);
+  toks.forEach(t=>{(groups[f]=groups[f]||[]).push(t);any=true;});
  });
  filters={};
  if(!any){
@@ -2502,13 +2678,14 @@ async function run(){
  catch(e){console.error(e);showToast("Could not read uploaded sheets","error");return;}
  searched=true;
  const pass=it=>Object.keys(groups).every(f=>groups[f].some(t=>
-  f==="all"?(it.n.pi.includes(t)||it.n.color.includes(t)||it.n.construction.includes(t)||it.n.gd.includes(t)):it.n[f].includes(t)));
+  f==="pi"?piMatchesExact(it.pi,t):(f==="gd"?gdMatchesExact(it.gd,t):it.n[f].includes(t))));
  const keys=new Set();
  ["delivery","order"].forEach(s=>data[s].forEach(it=>{if(pass(it)) keys.add(it.key);}));
  shown={
   delivery:data.delivery.filter(it=>keys.has(it.key)).sort(cmpItem),
   order:data.order.filter(it=>keys.has(it.key)).sort(cmpItem)
  };
+ if(groups.gd) shown.order=shown.order.filter(it=>groups.gd.some(t=>gdMatchesExact(it.gd,t)));   /* only the searched GD */
  const pis=new Set(),cols=new Set();
  shown.delivery.concat(shown.order).forEach(it=>{pis.add(it.pi);cols.add(it.key);});
  const missing=[];
@@ -2529,11 +2706,34 @@ function visibleRows(){
  }));
 }
 
+const GS_NUM=new Set(["qty","goodRcvd","short"]);
+function gsFoot(rows){
+ const cols=COLS[tab],foot=$("gsFoot");
+ if(!foot) return;
+ foot.innerHTML="";
+ if(!rows.length) return;
+ const tot={};
+ rows.forEach(it=>cols.forEach(c=>{
+  if(!GS_NUM.has(c.field)) return;
+  const sv=String(val(it,c.field)).replace(/,/g,"").trim(),n=Number(sv);
+  if(sv!==""&&sv!=="-"&&isFinite(n)) tot[c.field]=(tot[c.field]||0)+n;
+ }));
+ const tr=document.createElement("tr");tr.className="gs-foot";
+ cols.forEach((c,i)=>{
+  const td=document.createElement("td");
+  if(GS_NUM.has(c.field)){td.textContent=(tot[c.field]||0).toLocaleString(undefined,{maximumFractionDigits:2});td.style.textAlign="right";}
+  else if(i===0) td.textContent="TOTAL";
+  else if(i===1) td.textContent=rows.length+" row(s)";
+  tr.appendChild(td);
+ });
+ foot.appendChild(tr);
+}
+
 function render(){
  closePop();
  const bar=$("gsTabsBar"),head=$("gsHead"),body=$("gsBody");
  if(!searched){
-  bar.style.display="none";head.innerHTML="";$("gsCount").textContent="";
+  bar.style.display="none";head.innerHTML="";$("gsCount").textContent="";if($("gsFoot")) $("gsFoot").innerHTML="";
   body.innerHTML='<tr><td style="padding:14px;color:#64748b">Type a PI, GD, Color or Construction above to search.</td></tr>';
   return;
  }
@@ -2572,6 +2772,7 @@ function render(){
   cols.forEach(c=>{const td=document.createElement("td");td.textContent=val(it,c.field);tr.appendChild(td);});
   body.appendChild(tr);
  });
+ gsFoot(rows);
  const fcount=Object.keys(filters).length;
  $("gsCount").textContent=`Showing ${Math.min(rows.length,RENDER_LIMIT)} of ${shown[tab].length} row(s)`+(fcount?` • ${fcount} filter(s) active`:"")+(rows.length>RENDER_LIMIT?` • only the first ${RENDER_LIMIT} are drawn - narrow the search or filter`:"");
 }
@@ -2614,6 +2815,7 @@ function openPop(btn,col){
    COLS[tab].forEach(c=>{const td=document.createElement("td");td.textContent=val(it,c.field);tr.appendChild(td);});
    body.appendChild(tr);
   });
+  gsFoot(rows);
   const fcount=Object.keys(filters).length;
   $("gsCount").textContent=`Showing ${Math.min(rows.length,RENDER_LIMIT)} of ${shown[tab].length} row(s)`+(fcount?` • ${fcount} filter(s) active`:"");
  }
@@ -3075,7 +3277,7 @@ async function submitPerson(k){
   entries:others.concat(data[k].map(e=>Object.assign({},e,{person:k})))
  };
  if(!(await persist())) return;
- showToast(PERSONS[k]+" submitted. See WIP Excel File.","success");
+ showToast(PERSONS[k]+" submitted. Note: the WIP Excel File is built only from 'Upload Excel File' data.","info",6000);
  setTab("excel");
 }
 
@@ -3276,9 +3478,10 @@ function readWipWorkbook(buf,prefer,skip){
 
 /* rows of one file -> records keyed by PI+Color+Order Qty.
    Same key + same qty in the same process = counted once; same key + different qty = added (original workbook rule) */
-function recsFromRows(rows,ts){
+function recsFromRows(rows,ts,info){
  const map={},seen={};
  rows.forEach(r=>{
+  if(toNum(r.oq)===null){ if(info){info.skipped=(info.skipped||0)+1;(info.skippedRows=info.skippedRows||[]).push(r.pi+" / "+r.color);} return; }   /* no Order Qty = no key (same as the Master workbook) */
   const key=xlKey(r.pi,r.color,r.oq);
   let g=map[key];
   if(!g){
@@ -3317,6 +3520,7 @@ function sameRec(a,b){return JSON.stringify([a.q,a.bt,a.rem,a.x])===JSON.stringi
 
 /* ---------- consolidation (Master) ---------- */
 function buildModel(entries,when){
+ entries=[];   /* typed Save/Submit entries are NOT used for the Final file any more: Final = uploaded Person files only */
  const map=new Map(),order=[],byPC=new Map();
  const ensure=(pi,color,oq)=>{
   const key=xlKey(pi,color,oq);
@@ -3370,12 +3574,12 @@ function buildModel(entries,when){
   if(e.remarks&&g.mRem.indexOf(e.remarks)<0) g.mRem.push(e.remarks);
  });
 
- /* 3) edits / new orders from "Upload Updated Master Excel": the newer source wins for that record */
+ /* 3) Master Excel is only a source of BT/T No., Remarks and blank info columns for rows that exist in today's Person files.
+    It never adds a row and never adds / changes any qty. */
  Object.keys(xl.master||{}).forEach(k=>{
   const rec=xl.master[k];
-  const had=map.has(xlKey(rec.pi,rec.color,rec.oq));
-  const g=ensure(rec.pi,rec.color,rec.oq);
-  if(!had||(rec.ts||0)>=g.ts) g.auth=rec; else g.fill=rec;
+  const g=map.get(xlKey(rec.pi,rec.color,rec.oq));
+  if(g) g.fill=rec;
  });
 
  const totals=new Array(PROCS.length).fill(0);
@@ -3403,8 +3607,8 @@ function buildModel(entries,when){
     yds.push(total);
     cells.push(onlyExcel&&terms.length===1?total:{formula:terms.join("+"),result:total});
    });
-   bt=mergeText(mergeText(g.mBt.join("+"),g.xBt," "),g.fill?g.fill.bt:""," ");
-   rem=mergeText(mergeText(g.mRem.join(" / "),g.xRem," / "),g.fill?g.fill.rem:""," / ");
+   bt=mergeText(g.mBt.join("+"),g.xBt," ")||(g.fill?clean(g.fill.bt):"");
+   rem=mergeText(g.mRem.join(" / "),g.xRem," / ")||(g.fill?clean(g.fill.rem):"");
   }
   let total=0;
   yds.forEach((y,i)=>{if(y!==null){total+=y;totals[i]+=y;}});
@@ -3577,7 +3781,7 @@ async function downloadExcel(m){
 }
 
 /* ---------- storage of the Excel layer: read-modify-write so another person's / another tab's data is never overwritten ---------- */
-const emptyXl=()=>({p1:{},p2:{},p3:{},master:{},updatedAt:0});
+const emptyXl=()=>({p1:{},p2:{},p3:{},master:{},meta:{},updatedAt:0});
 async function refreshXl(){
  try{const d=await idbGet("app_data","wip_xl");if(d) xl=Object.assign(emptyXl(),d);}
  catch(e){console.warn("WIP Excel data load failed",e);}
@@ -3611,11 +3815,10 @@ function renderXlBox(k){
   <div class="wip-file" style="margin-top:0">
    <div>
     <strong>📤 Upload Excel File</strong>
-    <div class="muted">WIP Excel of ${PERSONS[k]} (same layout as WIP-dd-mm-yy.xlsx). Rows are matched by PI + Color + Order Qty and merged with the data this person submitted before. ${n?`<span class="badge blue">Excel records stored: ${n}</span>`:""}</div>
+    <div class="muted">WIP Excel of ${PERSONS[k]} (same layout as WIP-dd-mm-yy.xlsx). Rows are matched by PI + Color + Order Qty. Submit REPLACES this person's previous upload (old rows are never kept). ${n?`<span class="badge blue">Excel records stored: ${n}</span>`:""}</div>
    </div>
    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <input type="file" id="wipXlFile" accept=".xlsx,.xlsm,.xls" style="margin:0;max-width:260px">
-    <label class="muted" style="display:flex;gap:4px;align-items:center;font-size:12px"><input type="checkbox" id="wipXlKeep" style="margin:0"> keep old qty where new cell is blank</label>
     ${n?`<button class="small danger outline" id="wipXlClear">🗑 Clear ${PERSONS[k]} Excel data</button>`:""}
    </div>
   </div>
@@ -3626,8 +3829,9 @@ function renderXlBox(k){
   try{
    const buf=await f.arrayBuffer();
    const res=readWipWorkbook(buf,["sheet1",PERSON_SHEET[k]],["masterfile"]);
-   const recs=recsFromRows(res.rows,Date.now());
-   pendingXl[k]={file:f.name,sheet:res.sheet,rowsRead:res.rows.length,recs:recs};
+   const info={};
+   const recs=recsFromRows(res.rows,Date.now(),info);
+   pendingXl[k]={file:f.name,sheet:res.sheet,rowsRead:res.rows.length,recs:recs,skipped:info.skipped||0,skippedRows:info.skippedRows||[]};
    renderXlPreview(k);
   }catch(err){
    console.error(err);pendingXl[k]=null;
@@ -3638,7 +3842,7 @@ function renderXlBox(k){
  const clr=$("wipXlClear");
  if(clr) clr.addEventListener("click",async()=>{
   if(!window.confirm("Delete the uploaded Excel data of "+PERSONS[k]+" only? Other persons' data is not touched.")) return;
-  if(await updateXl(x=>{x[k]={};})){showToast(PERSONS[k]+" Excel data cleared","success");renderXlBox(k);}
+  if(await updateXl(x=>{x[k]={};if(x.meta) delete x.meta[k];})){showToast(PERSONS[k]+" Excel data cleared","success");renderXlBox(k);}
  });
  renderXlPreview(k);
 }
@@ -3648,39 +3852,31 @@ function renderXlPreview(k){
  if(!pv) return;
  const p=pendingXl[k];
  if(!p){pv.innerHTML="";return;}
- const keep=!!($("wipXlKeep")&&$("wipXlKeep").checked);
- let nNew=0,nUpd=0,nSame=0;
- Object.keys(p.recs).forEach(key=>{
-  const old=(xl[k]||{})[key];
-  if(!old) nNew++;
-  else if(sameRec(mergeRec(old,p.recs[key],keep),old)) nSame++;
-  else nUpd++;
- });
+ const oldStore=xl[k]||{};
+ let nNew=0,nSame=0;
+ Object.keys(p.recs).forEach(key=>{ if(oldStore[key]) nSame++; else nNew++; });
+ const nGone=Object.keys(oldStore).filter(key=>!p.recs[key]).length;
  pv.innerHTML=`<div class="wip-info">
   <strong>${escapeHTML(p.file)}</strong> (sheet ${escapeHTML(p.sheet)}) - ${p.rowsRead} row(s) read, ${Object.keys(p.recs).length} unique PI + Color + Order Qty.<br>
-  New: <b>${nNew}</b> &nbsp; Updated: <b>${nUpd}</b> &nbsp; Unchanged: <b>${nSame}</b> &nbsp; <span class="muted">Records of ${PERSONS[k]} that are not in this file stay as they are.</span>
+  Already in ${PERSONS[k]}'s previous upload: <b>${nSame}</b> &nbsp; New rows: <b>${nNew}</b> &nbsp; Old rows not in this file (will be removed): <b>${nGone}</b>
+  ${p.skipped?`<br><span style="color:#b45309">⚠ ${p.skipped} row(s) skipped because Order Qty is blank: ${escapeHTML(p.skippedRows.slice(0,6).join(", "))}${p.skippedRows.length>6?" ...":""}</span>`:""}
   <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
    <button class="success" id="wipXlSubmit">✅ Submit Excel Data</button>
    <button class="outline" id="wipXlCancel">Cancel</button>
   </div></div>`;
  $("wipXlCancel").addEventListener("click",()=>{pendingXl[k]=null;$("wipXlFile").value="";renderXlPreview(k);});
  $("wipXlSubmit").addEventListener("click",async()=>{
-  const keepNow=!!($("wipXlKeep")&&$("wipXlKeep").checked);
   const ts=Date.now();
   const ok=await updateXl(x=>{
-   const store=x[k]||(x[k]={});
-   Object.keys(p.recs).forEach(key=>{
-    const nr=Object.assign({},p.recs[key],{ts:ts});
-    const old=store[key];
-    if(!old){store[key]=nr;return;}
-    const merged=mergeRec(old,nr,keepNow);
-    if(sameRec(merged,old)) return;   /* nothing changed: keep the old timestamp */
-    store[key]=merged;
-   });
+   const store={};
+   Object.keys(p.recs).forEach(key=>{store[key]=Object.assign({},p.recs[key],{ts:ts});});
+   x[k]=store;   /* replace: only what is in this file */
+   x.meta=x.meta||{};
+   x.meta[k]={file:p.file,at:ts,count:Object.keys(store).length,rows:p.rowsRead};
   });
   if(!ok) return;
   pendingXl[k]=null;
-  showToast(`${PERSONS[k]}: ${nNew} new, ${nUpd} updated, ${nSame} unchanged. See WIP Excel File.`,"success",5000);
+  showToast(`${PERSONS[k]}: ${Object.keys(p.recs).length} record(s) submitted (${nNew} new, ${nGone} old removed). See WIP Excel File.`,"success",5000);
   setTab("excel");
  });
 }
@@ -3708,38 +3904,21 @@ function recDiffers(rec,row){
 async function uploadMaster(file){
  const msg=$("wipMasterMsg");
  try{
+  await refreshXl();
   const buf=await file.arrayBuffer();
   const res=readWipWorkbook(buf,["sheet1","masterfile"],[]);
   const ts=Date.now();
-  const recs=recsFromRows(res.rows,ts);
-  const entries=(snap&&snap.entries)||[];
-  const cur=buildModel(entries,new Date());
-  const curMap=new Map(cur.rows.map(r=>[r.key,r]));
-  const toStore=[];let nNew=0,nUpd=0,nSame=0;
-  Object.keys(recs).forEach(key=>{
-   const rec=recs[key],row=curMap.get(key);
-   if(!row){nNew++;toStore.push(rec);}
-   else if(recDiffers(rec,row)){nUpd++;toStore.push(rec);}
-   else nSame++;
-  });
-  if(!toStore.length){
-   if(msg) msg.innerHTML=`<div class="wip-info">${escapeHTML(file.name)}: ${res.rows.length} row(s) read - nothing new or changed compared with the ERP data.</div>`;
-   showToast("No new or changed rows in this Master Excel","info");
-   return;
-  }
-  const ok=await updateXl(x=>{
-   const store=x.master||(x.master={});
-   toStore.forEach(rec=>{
-    const old=store[rec.key];
-    store[rec.key]=old?mergeRec(old,rec,false):rec;
-    store[rec.key].ts=ts;
-   });
-  });
+  const recs=recsFromRows(res.rows,ts,{});
+  const cur=buildModel([],new Date());
+  const curKeys=new Set(cur.rows.map(r=>r.key));
+  let nUse=0,nSkip=0;
+  Object.keys(recs).forEach(k=>{ if(curKeys.has(k)) nUse++; else nSkip++; });
+  const ok=await updateXl(x=>{ x.master=recs; });   /* replace, never accumulate */
   if(!ok) return;
-  showToast(`Master Excel merged: ${nNew} new order(s), ${nUpd} updated, ${nSame} unchanged`,"success",5000);
   await renderExcel();
+  showToast(`Master Excel: BT/T No. and Remarks taken for ${nUse} row(s); ${nSkip} row(s) not in today's Person files were ignored`,"success",6000);
   const m2=$("wipMasterMsg");
-  if(m2) m2.innerHTML=`<div class="wip-info">${escapeHTML(file.name)} (sheet ${escapeHTML(res.sheet)}): ${res.rows.length} row(s) read - <b>${nNew}</b> new order(s), <b>${nUpd}</b> updated, <b>${nSame}</b> unchanged. The next download uses this data.</div>`;
+  if(m2) m2.innerHTML=`<div class="wip-info">${escapeHTML(file.name)} (sheet ${escapeHTML(res.sheet)}): ${res.rows.length} row(s) read - <b>${nUse}</b> row(s) matched (BT/T No. + Remarks used), <b>${nSkip}</b> not in today's Person files (ignored; no new row, no qty taken).</div>`;
  }catch(err){
   console.error(err);
   showToast("Master Excel upload failed: "+err.message,"error",6000);
@@ -3750,7 +3929,7 @@ function masterUploadHTML(){
  return `<div class="wip-file">
   <div>
    <strong>⬆ Upload Updated Master Excel</strong>
-   <div class="muted">Download the Master Excel, add or edit orders on your PC (type process qty only - Delivery Status fills itself), then upload it here. Records are matched by PI + Color + Order Qty; nothing else is deleted.</div>
+   <div class="muted">Optional: upload yesterday's Master here only to carry over BT/T No. and Remarks. Rows are matched by PI + Color + Order Qty; it never adds a row and never changes any qty - the Final file is built only from the uploaded Person files.</div>
   </div>
   <input type="file" id="wipMasterFile" accept=".xlsx,.xlsm" style="margin:0;max-width:280px">
  </div>
@@ -3771,14 +3950,14 @@ async function renderExcel(){
  await refreshXl();
  const panel=$("wipPanel");
  if(tab!=="excel") return;
- const entries=(snap&&snap.entries)||[];
- const hasXl=["p1","p2","p3","master"].some(p=>countXl(p)>0);
- if(!entries.length&&!hasXl){
-  panel.innerHTML='<div class="detail-empty">No WIP Excel file yet. Save data in Person 1 / 2 / 3 (or upload their Excel file) and press Submit to create it.</div>'+masterUploadHTML();
+ const entries=[];
+ const hasXl=["p1","p2","p3"].some(p=>countXl(p)>0);
+ if(!hasXl){
+  panel.innerHTML='<div class="detail-empty">No WIP Excel file yet. Open Person 1 / 2 / 3, use Upload Excel File and press Submit Excel Data.</div>'+masterUploadHTML();
   wireMasterUpload();
   return;
  }
- const lastTs=Math.max(Date.parse(snap&&snap.submittedAt)||0,xl.updatedAt||0)||Date.now();
+ const lastTs=Math.max.apply(null,["p1","p2","p3"].map(p=>(xl.meta&&xl.meta[p]&&xl.meta[p].at)||0).concat([0]))||xl.updatedAt||Date.now();
  const when=new Date(lastTs);
  const m=buildModel(entries,when);
  const head=["PI","Color","Order Qty (yds)"].concat(PROCS.map(p=>p+" (yds)")).concat(["Total (yds)","BT/T NO.","Remarks","Delivery Status"]);
@@ -3789,19 +3968,25 @@ async function renderExcel(){
   return "<tr>"+cells.map(v=>"<td>"+escapeHTML(v)+"</td>").join("")+"</tr>";
  }).join("");
  const totRow='<tr style="font-weight:700;background:#f8fafc"><td>Process total</td><td></td><td></td>'+m.totals.map(t=>"<td>"+fmt(Math.round(t))+"</td>").join("")+"<td>"+fmt(Math.round(m.grand))+"</td><td></td><td></td><td></td></tr>";
- const src=["p1","p2","p3"].filter(p=>countXl(p)>0||data[p].some(e=>e.submitted)).map(p=>PERSONS[p]).join(", ");
+ const todayStr=new Date().toDateString();
+ const srcList=["p1","p2","p3"].filter(p=>countXl(p)>0).map(p=>{
+  const mt=(xl.meta&&xl.meta[p])||{};
+  const old=mt.at&&new Date(mt.at).toDateString()!==todayStr;
+  return PERSONS[p]+" ("+countXl(p)+" rec"+(mt.at?", "+new Date(mt.at).toLocaleString():"")+")"+(old?" ⚠ not uploaded today":"");
+ });
+ const src=srcList.join(", ");
  panel.innerHTML=`
   <div class="wip-file">
    <div>
     <strong>📄 ${escapeHTML(m.name)}</strong>
-    <div class="muted">${m.count} row(s) • Total ${fmt(Math.round(m.grand))} yds • Latest data ${escapeHTML(when.toLocaleString())}${src?" • From: "+escapeHTML(src):""}${countXl("master")?" • Includes Master Excel edits":""}</div>
+    <div class="muted">${m.count} row(s) • Total ${fmt(Math.round(m.grand))} yds • Latest data ${escapeHTML(when.toLocaleString())}${src?" • From: "+escapeHTML(src):""}${countXl("master")?" • BT/T No. + Remarks carried from Master Excel":""}</div>
    </div>
    <button class="success" id="wipDownload">⬇ Download Excel</button>
   </div>
   ${masterUploadHTML()}
   <div class="table-wrap"><table style="min-width:900px"><thead><tr>${head.map(h=>"<th>"+escapeHTML(h)+"</th>").join("")}</tr></thead><tbody>${totRow}${trows}</tbody></table></div>`;
  $("wipDownload").addEventListener("click",async()=>{
-  try{await refreshXl();await downloadExcel(buildModel((snap&&snap.entries)||[],new Date(Math.max(Date.parse(snap&&snap.submittedAt)||0,xl.updatedAt||0)||Date.now())));}
+  try{await refreshXl();await downloadExcel(buildModel([],when));}
   catch(e){console.error(e);showToast("Excel download failed: "+e.message,"error");}
  });
  wireMasterUpload();
@@ -3854,7 +4039,7 @@ function fmtDate(v){
 function numOf(v){if(typeof v==="number") return v;const n=Number(String(v).replace(/,/g,"").trim());return String(v).trim()===""||!isFinite(n)?"":n;}
 
 let data=[], methods={}, meta=null;
-const FIELD_OPTS=[["all","All fields"],["pi","PI"],["gd","GD"],["color","Color"],["construction","Construction"]];
+const FIELD_OPTS=[["pi","PI"],["color","Color"],["construction","Construction"],["gd","GD"]];
 let shown=[], filters={}, searched=false, debounce=null;
 const COLS=[
  {k:"pi",l:"PI"},{k:"cu",l:"Customer Name"},{k:"co",l:"Construction"},{k:"cl",l:"Color"},
@@ -3917,7 +4102,7 @@ function paintSlot(){
   inf.innerHTML='<span class="slot-ok">✓ Filterwise Grey Received</span> '+esc(meta&&meta.name?meta.name:"")+" • Dyeing Method pairs: "+Object.keys(methods).length;
  }else{
   b.textContent="Not Uploaded";b.className="badge";
-  inf.textContent='Sheet used: "Filterwise Grey Received" only';
+  inf.textContent="";
  }
  if(searched) run();
 }
@@ -3940,7 +4125,7 @@ function buildUI(){
  const sec=document.createElement("div");
  sec.id="greySection";sec.className="detail-section";
  sec.innerHTML=`<h3>📑 Grey Report Search</h3>
-  <p class="muted">Search by PI, GD, Color or Construction. Press <b>+</b> for more boxes (or separate with comma). Same type = "or" (PI 15300 or PI 15302); different types = "and" (those PIs and Black). Use the <b>▼</b> in a column header to filter; totals at the bottom follow the search and filters.</p>
+  <p class="muted" style="display:none">Search by PI, GD, Color or Construction. Press <b>+</b> for more boxes (or separate with comma). Same type = "or" (PI 15300 or PI 15302); different types = "and" (those PIs and Black). Use the <b>▼</b> in a column header to filter; totals at the bottom follow the search and filters.</p>
   <div id="greyTerms"></div>
   <div class="actions"><button id="greySearch">🔍 Search</button><button class="secondary" id="greyClear">Clear</button><button class="small outline" id="greyClearF">✖ Clear filters</button><button class="small outline" id="greyExport">📥 Export Excel</button></div>
   <div id="greySummary" style="margin:8px 0"></div>
@@ -4005,7 +4190,7 @@ function run(){
  const key={pi:"np",gd:"ng",color:"nc",construction:"nco"};
  const num=s=>{const m=String(s).match(/\d+/);return m?Number(m[0]):Infinity;};
  shown=data.filter(it=>Object.keys(groups).every(f=>groups[f].some(t=>
-  f==="all"?(it.np.includes(t)||it.ng.includes(t)||it.nc.includes(t)||it.nco.includes(t)):it[key[f]].includes(t))))
+  f==="pi"?piMatchesExact(it.pi,t):(f==="gd"?gdMatchesExact(it.gn,t):it[key[f]].includes(t)))))
   .sort((a,b)=>num(a.pi)-num(b.pi)||a.i-b.i);
  render();
 }
