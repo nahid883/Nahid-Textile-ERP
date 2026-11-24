@@ -186,6 +186,11 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 .gs-pop .gs-links{display:flex;gap:10px;margin-bottom:6px;font-size:12px}
 .gs-pop .gs-links a{color:var(--primary-light);cursor:pointer;font-weight:600}
 .gs-foot td{position:sticky;bottom:0;background:#eef6ff;font-weight:700;border-top:2px solid var(--primary-light)}
+
+.dw-folders{display:flex;flex-wrap:wrap;gap:12px;margin:8px 0}
+.dw-folder{background:#fff;color:var(--primary);border:2px solid var(--border);border-radius:12px;padding:22px 34px;font-size:18px;font-weight:700;cursor:pointer;box-shadow:var(--shadow)}
+.dw-folder:hover{border-color:var(--primary-light);background:#f8fafc}
+.dw-crumb{color:var(--primary-light);text-decoration:none;font-weight:600}
 </style>
 
 <!-- WIP MANAGEMENT (independent module styles) -->
@@ -497,6 +502,27 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
    <thead id="drDetailHead"></thead><tbody id="drDetailBody"></tbody>
   </table>
  </div>
+</section>
+
+<!-- DAILY WORK -->
+<section id="dailyWork" class="page">
+<h2>🗂️ Daily Work</h2>
+<div id="dwHome">
+ <p class="muted">Folder খুলুন:</p>
+ <div class="dw-folders"><button type="button" class="dw-folder" id="dwOpenFoc">📁 FOC</button></div>
+</div>
+<div id="dwFoc" style="display:none">
+ <p class="muted"><a href="#" class="dw-crumb" id="dwBackHome" onclick="return false">Daily Work</a> › FOC</p>
+ <div class="dw-folders"><button type="button" class="dw-folder" id="dwOpenFocMaking">📁 FOC Making</button></div>
+</div>
+<div id="dwFocMaking" style="display:none">
+ <p class="muted"><a href="#" class="dw-crumb" onclick="document.getElementById('dwBackHome').click();return false">Daily Work</a> › <a href="#" class="dw-crumb" id="dwBackFoc" onclick="return false">FOC</a> › FOC Making</p>
+ <h3 style="margin-top:4px">FOC Making</h3>
+ <p class="muted">making_FOC ফাইলটা (যেখানে <b>Mail Data</b> sheet আছে) upload করে Submit দিন। Grey Received Qty, GD, Order Qty ERP-তে আগে upload করা Grey Report ও Order Status থেকে আসবে। Reference layout অনুযায়ী FOC sheet-সহ Excel তৈরি হবে, Download করে নিন।</p>
+ <input type="file" id="focMailFile" accept=".xlsx,.xlsm,.xls,.xlsb" style="margin:6px 0 10px">
+ <div class="actions"><button id="focRun">✅ Submit</button><button class="secondary" id="focClear">Clear</button></div>
+ <div id="focResult" style="margin-top:12px"></div>
+</div>
 </section>
 
 <!-- WIP MANAGEMENT -->
@@ -1969,7 +1995,7 @@ function fpCols(kind){
 function fpVal(it,field){
  if(field==="gd") return it.gd||"-";
  let v=displayValue(it.row,field);
- if(field==="deliveryStatus"&&(!v||v==="-")){const st=fpDelivStatus.get(it.key);if(st) v=st;}
+ /* WIP view shows only what the WIP sheet itself has (no fallback to the Delivery Status file) */
  return v;
 }
 
@@ -4068,7 +4094,7 @@ async function readGrey(file){
  if(hr<0) throw new Error("Header row (PI no.) not found");
  const H=a[hr].map(norm), at=n=>H.indexOf(n);
  const fb=(exact,fn)=>{let i=at(exact);return i>=0?i:H.findIndex(fn);};
- const c={pi:at("pino"),gn:at("gdno"),cu:at("customername"),co:at("construction"),cl:at("color"),oq:fb("orderqtyyds",h=>h.startsWith("orderqty")||h==="orderquantity"||h.startsWith("ordqty")||h==="qty"||h==="qtyyds"),gd:at("greyissuedate"),rq:fb("receivedqtyyds",h=>h.startsWith("receivedqty")||h.startsWith("recvqty")||h.startsWith("rcvdqty")||h.startsWith("greyreceivedqty")),rm:at("remarks"),dm:at("dyeingmethod")};
+ const c={pi:at("pino"),gn:fb("gdno",h=>h==="gd"||h==="gdnumber"||h==="gdnum"||h==="gdn"),cu:at("customername"),co:at("construction"),cl:at("color"),oq:fb("orderqtyyds",h=>h.startsWith("orderqty")||h==="orderquantity"||h.startsWith("ordqty")||h==="qty"||h==="qtyyds"),gd:at("greyissuedate"),rq:fb("receivedqtyyds",h=>h.startsWith("receivedqty")||h.startsWith("recvqty")||h.startsWith("rcvdqty")||h.startsWith("greyreceivedqty")),rm:at("remarks"),dm:at("dyeingmethod")};
  if(c.pi<0||c.cl<0) throw new Error("PI no. / Color column not found");
  const g=i=>i<0?"":i;
  const rows=[], mset={};
@@ -4325,10 +4351,362 @@ async function start(){
   if(ok) break;
   await new Promise(r=>setTimeout(r,100));
  }
- try{const rec=await idbGet("app_data","grey_report");if(rec) setData(rec);}
+ try{const rec=await idbGet("app_data","grey_report");if(rec){setData(rec);if(data.length&&!data.some(x=>x.gn)) setTimeout(()=>toast("Grey Report has no GD saved (old upload). Please upload the Grey Received file again to load GD.","error",10000),1500);}}
  catch(e){console.warn("Grey load failed",e);}
 }
 start();
+})();
+</script>
+<!-- Nahid ERP: Daily Work > FOC > FOC Making add-on -->
+<script>
+(function(){
+"use strict";
+if(window.__focModule) return; window.__focModule=true;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const cl=s=>String(s==null?"":s).trim();
+const nm=s=>cl(s).toLowerCase().replace(/[^a-z0-9]/g,"");
+const toast=(m,t,d)=>{try{showToast(m,t,d);}catch(e){alert(m);}};
+const TPL={"rows":23,"cols":19,"styles":[{"font":{"name":"Calibri","size":22.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"bottom"},"border":{"left":{"style":"medium"},"right":{"style":"medium"},"top":{"style":"medium"},"bottom":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"top":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"right":{"style":"medium"},"top":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"left":{"style":"medium"},"bottom":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"bottom":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"right":{"style":"medium"},"bottom":{"style":"medium"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center","wrapText":true},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"medium"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"right":{"style":"thin"},"top":{"style":"medium"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":28.0,"bold":true,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"medium"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"top":{"style":"medium"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"bold":true,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"bold":true},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"bottom":{"style":"thin"}},"fill":{"type":"pattern","pattern":"solid","fgColor":{"theme":0}},"numFmt":"d\\-mmm"},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center","wrapText":true},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"bold":true},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}},"numFmt":"#,##0"},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}},"numFmt":"0"},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}},"numFmt":"0%"},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}},"numFmt":"0.00%"},{"font":{"name":"Calibri","size":20.0,"bold":true,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"center"},"border":{"left":{"style":"thin"},"right":{"style":"thin"},"top":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"top":{"style":"thin"},"bottom":{"style":"thin"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"center","vertical":"bottom"},"border":{"top":{"style":"thick"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"border":{"top":{"style":"thick"}}},{"font":{"name":"Calibri","size":11.0,"color":{"theme":1}},"alignment":{"horizontal":"general","vertical":"bottom"},"border":{"top":{"style":"thick"}}}],"grid":[[0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2],[3,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,5],[6,7,8,9,10,10,10,10,10,10,10,10,10,10,10,10,8,11,12],[13,13,14,13,14,13,14,15,14,15,14,15,14,13,14,15,14,13,14],[13,15,14,13,14,16,14,17,14,17,14,18,14,13,14,13,14,19,14],[13,13,14,13,14,13,14,17,14,17,14,18,14,13,14,13,14,19,14],[13,13,14,13,14,13,14,17,14,17,14,18,14,13,14,13,14,19,14],[13,16,14,13,14,13,14,13,14,17,14,18,14,13,14,13,14,19,14],[13,13,14,13,14,13,14,13,14,17,14,18,14,13,14,13,14,19,14],[13,13,14,13,14,13,14,13,14,17,14,18,14,13,14,13,14,19,14],[13,20,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,14],[13,20,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,21,14],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,23,24,22,23,24,22,23,24,24,22,22,25,25,22,22,23,24,24],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22],[22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22,22]],"merges":[[8,14,8,15],[8,16,8,17],[7,12,7,13],[7,14,7,15],[9,2,9,3],[9,4,9,5],[10,2,10,19],[9,14,9,15],[4,4,4,5],[4,6,4,7],[4,8,4,9],[3,4,3,5],[3,6,3,7],[4,12,4,13],[17,5,17,6],[5,4,5,5],[3,8,3,9],[3,10,3,11],[5,16,5,17],[5,18,5,19],[17,17,17,19],[6,6,6,7],[6,8,6,9],[9,10,9,11],[8,4,8,5],[8,6,8,7],[7,4,7,5],[7,6,7,7],[9,16,9,17],[7,8,7,9],[7,10,7,11],[11,2,11,19],[0,1,1,19],[4,18,4,19],[3,16,3,17],[3,18,3,19],[5,6,5,7],[4,2,4,3],[3,2,3,3],[5,8,5,9],[6,18,6,19],[6,10,6,11],[6,12,6,13],[8,18,8,19],[8,12,8,13],[7,16,7,17],[7,18,7,19],[9,6,9,7],[9,8,9,9],[8,2,8,3],[9,18,9,19],[17,2,17,3],[7,2,7,3],[9,12,9,13],[5,10,5,11],[17,8,17,10],[4,10,4,11],[2,2,2,3],[4,14,4,15],[4,16,4,17],[3,12,3,13],[3,14,3,15],[5,2,5,3],[2,4,2,17],[5,12,5,13],[5,14,5,15],[6,16,6,17],[6,2,6,3],[6,4,6,5],[8,8,8,9],[8,10,8,11],[6,14,6,15]],"heights":[15.75,16.5,39.75,36.0,36.0,36.0,36.0,36.0,36.0,36.0,33.75,36.75,16.5,16.5,15.75,15.75,16.5,16.5,null,null,null,15.75,null],"widths":{"A":12.71,"I":7.29,"K":13.0,"M":12.71,"Q":7.57,"S":9.71}};
+const ACR=new Set(["csv","foc","pi","qc","gd"]);
+const titleCase=s=>cl(s).toLowerCase().replace(/[a-z0-9]+/g,(w,i,all)=>ACR.has(w)?w.toUpperCase():(/[a-z0-9']/.test(all.charAt(i-1)||" ")?w:w.charAt(0).toUpperCase()+w.slice(1)));
+const numOf=v=>{if(typeof v==="number") return isFinite(v)?v:null;const t=String(v==null?"":v).replace(/,/g,"").trim();if(!t||!/^-?\d+(\.\d+)?$/.test(t)) return null;return Number(t);};
+let lastBlob=null,lastName="";
+
+/* ---------- Mail Data reading ---------- */
+async function readMailTexts(buf){
+ const wb=XLSX.read(buf,{type:"array"});
+ const names=wb.SheetNames;
+ const name=names.find(n=>/mail/i.test(n))||names[0];
+ const ws=wb.Sheets[name];
+ const cells=Object.keys(ws).filter(k=>k[0]!=="!"&&typeof ws[k].v==="string"&&ws[k].v.trim()).map(k=>{const a=XLSX.utils.decode_cell(k);return {r:a.r,c:a.c,t:ws[k].v};});
+ cells.sort((a,b)=>a.r-b.r||a.c-b.c);
+ return {sheet:name,texts:cells.map(x=>x.t)};
+}
+function splitMails(texts){
+ const out=[];
+ texts.forEach(t=>{
+  t.replace(/\r/g,"").split(/(?=^\s*Dear\s+Mr\b)/im).forEach(seg=>{seg=seg.trim();if(seg) out.push(seg);});
+ });
+ return out;
+}
+function parseMail(seg){
+ const g=re=>{const m=seg.match(re);return m?cl(m[1]):"";};
+ const N="\\d[\\d,]*(?:\\.\\d+)?";
+ const piLine=g(/(?:^|\n)\s*P\.?I\.?\s*(?:no\.?)?[\s:\-]+([^\n]+)/i);
+ const pis=(piLine.match(/\d{4,6}/g)||[]);
+ let cons=g(/(?:^|\n)\s*cons(?:truction)?[\s:\-]+([^\n]+)/i).replace(/\s+/g,"").replace(/[*X\u00d7]/g,"x");
+ let garment=g(/(?:garments?\s*name|factory)[\s:\-]+([^\n]+)/i).replace(/\.+$/,"");
+ let buyer=g(/(?:^|\n)\s*buyer[\s:\-]+([^\n]+)/i);
+ if(buyer&&buyer===buyer.toLowerCase()) buyer=titleCase(buyer);
+ const rm=seg.match(/due\s+to\s+(.+?)\s*(purpose|[.\n]|$)/i);
+ let reason="";
+ if(rm){
+  let rt=rm[1];
+  if(rt.indexOf("(")<0) rt=rt.replace(/\)+\s*$/,"");
+  reason="Due to "+titleCase(rt.replace(/[\/,&]+/g," ").replace(/\s+/g," "))+(rm[2]&&/purpose/i.test(rm[2])?" Purpose":"");
+ }
+ const colors=[];let cur=null;
+ const NUM="(\\d[\\d,]*(?:\\.\\d+)?)";
+ const dashRe=new RegExp("^(.*?)\\s*[-\u2013\u2014_=.\u2026]{2,}\\s*"+NUM+"\\s*(?:yds?|yards?|y)?\\s*$","i");
+ seg.split("\n").map(cl).forEach(line=>{
+  let m=line.match(/^foc\s*colou?r[\s:\-]+(.*)$/i);
+  if(m){cur={color:m[1].replace(/\s*\/\s*/g,"/").replace(/\s+/g," ").trim(),fab:null,foc:null};colors.push(cur);return;}
+  /* "Color: YD-46 ---- 250 yds" style: colour, then FOC yds after the dashes */
+  m=line.match(dashRe);
+  if(m&&/[a-z0-9]/i.test(m[1])&&!/^(pi|qty|foc|date|buyer|cons)/i.test(m[1])){
+   const col=m[1].replace(/^colou?rs?\s*[:\-]+\s*/i,"").replace(/\s*\/\s*/g,"/").replace(/\s*-\s*/g,"-").replace(/\s+/g," ").trim();
+   cur={color:col,fab:null,foc:numOf(m[2])};colors.push(cur);return;
+  }
+  if(!cur) return;
+  m=line.match(/^(?:fab\s*)?qty[\s:\-]*([\d,\.]+)/i); if(m&&cur.fab==null&&!/foc/i.test(line.split(/[:\-]/)[0])){cur.fab=numOf(m[1]);return;}
+  m=line.match(/^foc\s*qty[\s:\-]*([\d,\.]+)/i); if(m){cur.foc=numOf(m[1]);return;}
+ });
+ let note="";
+ if(!colors.length){
+  /* second mail style: "Color: X" + one total FOC yards for the paper */
+  const cm=g(/(?:^|\n)\s*colou?rs?[\s:\-]+([^\n]+)/i);
+  const list=cm?cm.split(/[,;]+/).map(x=>x.replace(/\s*\/\s*/g,"/").replace(/\s+/g," ").trim()).filter(Boolean):[];
+  let foc=null;
+  const pats=[new RegExp("(?:^|\\n)\\s*foc\\s*(?:qty|quantity|yds?)?[\\s:\\-]*("+N+")","i"),new RegExp("(?:arrange|need|required?)\\s+("+N+")\\s*(?:yds?|yards?|y)?\\s*(?:of\\s+)?foc","i"),new RegExp("("+N+")\\s*(?:yds?|yards?)\\s*(?:of\\s+)?foc","i"),new RegExp("foc[^\\n]{0,25}?("+N+")\\s*(?:yds?|yards?)","i")];
+  for(const re of pats){const m=seg.match(re);if(m){const v=numOf(m[1]);if(v>0){foc=v;break;}}}
+  if(list.length===1&&foc!=null) colors.push({color:list[0],fab:null,foc});
+  else note="পাওয়া গেছে: color="+(list.join(", ")||"নেই")+", FOC yds="+(foc==null?"নেই":foc)+(list.length>1?" (একাধিক color-এ একটাই মোট FOC, ভাগ করা যায় না)":"");
+ }
+ return {pis:[...new Set(pis)],cons,garment:titleCase(garment),buyer,reason,colors,note,raw:seg};
+}
+
+/* ---------- colour matching ---------- */
+const cKey=s=>nm(String(s||"").replace(/\([^)]*\)/g," "))||nm(s);
+const cCode=s=>{const m=String(s||"").replace(/\([^)]*\)/g," ").match(/\d{2,}/);return m?m[0]:"";};
+const cWords=s=>String(s||"").replace(/\([^)]*\)/g," ").toLowerCase().match(/[a-z]{2,}/g)||[];
+const distinct=a=>new Set(a.map(cKey)).size;
+function pickColor(mail,cands){
+ const k=cKey(mail);
+ let hit=cands.filter(c=>cKey(c)===k);
+ if(hit.length) return {hit,how:"exact"};
+ const code=cCode(mail);
+ if(code){hit=cands.filter(c=>cCode(c)===code);if(hit.length) return distinct(hit)===1?{hit,how:"code"}:{hit:[],amb:hit};}
+ const w=cWords(mail);
+ if(w.length){hit=cands.filter(c=>{const cw=cWords(c);return w.every(x=>cw.includes(x));});if(hit.length) return distinct(hit)===1?{hit,how:"name"}:{hit:[],amb:hit};}
+ return {hit:[]};
+}
+const cleanColor=s=>cl(String(s||"").replace(/\([^)]*\)/g," ").replace(/\s*\/\s*/g,"/").replace(/\s+/g," "));
+
+/* ---------- build one paper's data ---------- */
+function buildPaper(req,ctx,issues){
+ const label="PI "+req.pis.join("+");
+ /* one PI number can exist for two years (e.g. 13238/25 and 13238/26): use the latest year only, so qty is never added twice */
+ const yr=x=>{const m=cl(x).match(/\/\s*(\d{2,4})\s*$/);return m?Number(m[1]):0;};
+ const latest=(list,get,p)=>{
+  const full=[...new Set(list.map(x=>cl(get(x))))];
+  if(full.length<2) return list;
+  const best=full.slice().sort((a,b)=>yr(b)-yr(a))[0];
+  const k="yr|"+p;if(!issues._y)issues._y={};
+  if(!issues._y[k]){issues._y[k]=1;issues.push(label+": PI "+p+" একাধিক বছরে আছে ("+full.join(", ")+") — সবচেয়ে নতুন "+best+" ধরা হয়েছে, দেখে নিন");}
+  return list.filter(x=>cl(get(x))===best);
+ };
+ const rowsOf=p=>latest(ctx.grey.filter(r=>piMatchesExact(r[0],nm(p))),r=>r[0],p);
+ const itemsOf=p=>latest(ctx.order.filter(it=>piMatchesExact(it.pi,nm(p))),it=>it.pi,p);
+ const piFull=req.pis.map(p=>{
+  const b=rowsOf(p)[0],a=itemsOf(p)[0];
+  const full=b?cl(b[0]):(a?cl(a.pi):"");
+  if(!full){issues.push(label+": PI "+p+" Grey বা Order Status ফাইলে পাওয়া যায়নি (শুধু নম্বর বসানো হয়েছে)");return p;}
+  return full;
+ });
+ const multi=req.pis.length>1;
+ const lines=[],usedRows=[],colorRows=[];
+ req.colors.forEach(mc=>{
+  const dispSet=[];
+  const parts=[];
+  const seenRow=new Set(),seenOq=new Set(); /* a Grey row is used once, and one PI+colour order qty is counted once (it repeats on every received row) */
+  /* does this colour exist in any of the mail's PIs? one-colour mails apply to every listed PI; multi-colour mails only to the PI that owns the colour */
+  const matchedSomewhere=req.pis.some(p=>pickColor(mc.color,[...new Set(rowsOf(p).map(r=>cl(r[3])).filter(Boolean))]).hit.length>0);
+  const allowSole=req.colors.length===1||!matchedSomewhere;
+  let oqSum=0,oqAny=false;
+  req.pis.forEach(p=>{
+   const gr=rowsOf(p),it=itemsOf(p);
+   const gCols=[...new Set(gr.map(r=>cl(r[3])).filter(Boolean))];
+   const oCols=[...new Set(it.map(x=>cl(x.color)).filter(Boolean))];
+   let pg=pickColor(mc.color,gCols),po=pickColor(mc.color,oCols);
+   if(pg.amb) issues.push(label+" / PI "+p+" / "+mc.color+": Grey-তে একাধিক সম্ভাব্য color ("+pg.amb.map(cleanColor).join(", ")+") — অনুমান করা হয়নি");
+   if(!pg.hit.length&&!pg.amb&&gCols.length===1&&allowSole){pg={hit:gCols,how:"sole"};issues.push(label+" / PI "+p+": mail color "+mc.color+", Grey-তে এই PI-র একমাত্র color "+cleanColor(gCols[0])+" — ধরে নেওয়া হয়েছে, দেখে নিন");}
+   else if(!pg.hit.length&&!pg.amb&&!matchedSomewhere) issues.push(label+" / PI "+p+" / "+mc.color+": Grey ফাইলে এই color মেলেনি");
+   else if(pg.how&&pg.how!=="exact") issues.push(label+" / PI "+p+": mail color "+mc.color+" → "+cleanColor(pg.hit[0])+" হিসেবে ধরা হয়েছে, দেখে নিন");
+   if(!po.hit.length&&!po.amb&&oCols.length===1) po={hit:oCols,how:"sole"};
+   const cRows=gr.filter(r=>pg.hit.indexOf(cl(r[3]))>=0&&!seenRow.has(r));
+   cRows.forEach(r=>{seenRow.add(r);colorRows.push(r);});
+   pg.hit.forEach(c=>{const d=cleanColor(c);if(d&&dispSet.indexOf(d)<0) dispSet.push(d);});
+   /* order qty of this PI: Grey report first (once per colour), then Order Status */
+   let pq=null;
+   cRows.forEach(r=>{const k=nm(r[0])+"|"+cKey(r[3]);if(seenOq.has(k)) return;if(typeof r[4]==="number"&&r[4]>0){seenOq.add(k);pq=(pq||0)+r[4];}});
+   const oqVals=[...new Set(cRows.map(r=>r[4]).filter(v=>typeof v==="number"&&v>0))];
+   if(oqVals.length>1) issues.push(label+" / PI "+p+" / "+cleanColor(pg.hit[0])+": Grey-তে এই color-এর Order Qty একাধিক ("+oqVals.join(", ")+") — প্রথম row-র "+oqVals[0]+" একবারই ধরা হয়েছে, দেখে নিন");
+   if(pq==null){for(const c of po.hit){const x=it.find(y=>cl(y.color)===c&&numberValue(getField(y.row,"qty"))>0);if(x){pq=(pq||0)+numberValue(getField(x.row,"qty"));break;}}}
+   if(pq!=null){oqSum+=pq;oqAny=true;} else if(cRows.length||po.hit.length) issues.push(label+" / PI "+p+": Order Qty পাওয়া যায়নি");
+   /* grey received qty: Shortfall and FOC rows skipped, all other rows added */
+   cRows.forEach(r=>{
+    if(/short\s*-?\s*fall|foc/i.test(cl(r[7]))) return;
+    if(typeof r[6]==="number"&&r[6]>0){parts.push(r[6]);usedRows.push(r);}
+   });
+  });
+  const display=dispSet.length?dispSet.join("+"):cleanColor(mc.color);
+  if(!dispSet.length) issues.push(label+" / "+mc.color+": এই color Grey ফাইলে কোনো PI-তেই মেলেনি (mail-এর নাম রাখা হয়েছে)");
+  let oq=oqAny?oqSum:null;
+  if(oq==null&&mc.fab!=null){oq=mc.fab;issues.push(label+" / "+display+": Order Qty Grey/Order Status-এ নেই, mail-এর Fab qty ("+mc.fab+") বসানো হয়েছে");}
+  if(oq==null) issues.push(label+" / "+display+": Order Qty পাওয়া যায়নি (ঘর খালি)");
+  if(!parts.length) issues.push(label+" / "+display+": Grey Received Qty পাওয়া যায়নি (ঘর খালি)");
+  if(mc.foc==null) issues.push(label+" / "+display+": mail-এ FOC Qty নেই (ঘর খালি)");
+  lines.push({color:display,oq,parts,foc:mc.foc});
+ });
+ /* GD: only from the Grey rows that were counted as received qty */
+ const gdSet=[];
+ const addGd=v=>cl(v).split(/[+,;\s]+/).filter(Boolean).forEach(x=>{if(gdSet.indexOf(x)<0) gdSet.push(x);});
+ usedRows.forEach(r=>addGd(r[8]));
+ if(!gdSet.length) req.pis.forEach(p=>itemsOf(p).forEach(it=>addGd(it.gd)));
+ if(!gdSet.length) issues.push(label+": GD No পাওয়া যায়নি (ঘর খালি)");
+ /* buyer */
+ const allG=colorRows.concat(req.pis.flatMap(rowsOf));
+ const greyName=(allG.map(r=>cl(r[1])).find(Boolean))||"";
+ const ordName=req.pis.flatMap(itemsOf).map(it=>cl(getField(it.row,"buyer"))).find(Boolean)||"";
+ let buyer="";
+ const composed=req.garment?((req.buyer?"("+req.buyer+")":"")+req.garment):"";
+ if(ordName) buyer=ordName;
+ else if(greyName&&(!composed||nm(greyName)===nm(composed)||nm(greyName).indexOf(nm(composed))===0||(!req.buyer&&nm(greyName).endsWith(nm(req.garment))))) buyer=greyName;
+ else if(composed){buyer=composed;if(greyName) issues.push(label+": Buyer/Factory নাম mail থেকে নেওয়া ("+composed+"), Grey-তে আছে ("+greyName+") — মিলিয়ে দেখুন");}
+ else buyer=greyName;
+ if(!buyer) issues.push(label+": Buyer পাওয়া যায়নি (ঘর খালি)");
+ /* construction */
+ const consSet=[...new Set((colorRows.length?colorRows:allG).map(r=>cl(r[2])).filter(Boolean))];
+ let cons=consSet[0]||req.cons||req.pis.flatMap(itemsOf).map(it=>cl(it.construction)).find(Boolean)||"";
+ if(multi&&req.cons) cons=req.cons;
+ if(consSet.length>1) issues.push(label+": PI অনুযায়ী Construction আলাদা ("+consSet.join(" | ")+") — Paper-এ "+cons+" বসানো হয়েছে, দেখে নিন");
+ if(!cons) issues.push(label+": Construction পাওয়া যায়নি (ঘর খালি)");
+ if(!req.reason) issues.push(label+": mail-এ Reason (due to ...) পাওয়া যায়নি (ঘর খালি)");
+ return {pi:piFull.join("+"),gd:gdSet.join("+"),buyer,cons,reason:req.reason,lines,pis:req.pis};
+}
+
+/* ---------- writing papers with the reference layout ---------- */
+function cloneSt(i){return JSON.parse(JSON.stringify(TPL.styles[i]));}
+function applyStyle(cell,st){
+ if(st.font) cell.font=st.font;
+ if(st.alignment) cell.alignment=st.alignment;
+ if(st.border) cell.border=st.border;
+ if(st.fill) cell.fill=st.fill;
+ if(st.numFmt) cell.numFmt=st.numFmt;
+}
+const L=n=>{let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+function paperRows(d){return TPL.rows+Math.max(0,d.lines.length-6);}
+function writePaper(ws,s,d,date){
+ const n=d.lines.length, k=Math.max(0,n-6);
+ /* styles and heights: template row 9 (last colour row) is repeated for every colour beyond the 6 in the reference */
+ for(let r=0;r<TPL.rows+k;r++){
+  const t=r<10?r:(r<10+k?9:r-k);
+  for(let c=1;c<=TPL.cols;c++) applyStyle(ws.getCell(s+r,c),cloneSt(TPL.grid[t][c-1]));
+  const h=TPL.heights[t]; if(h) ws.getRow(s+r).height=h;
+ }
+ TPL.merges.forEach(m=>{
+  if(m[0]<10){
+   ws.mergeCells(s+m[0],m[1],s+m[2],m[3]);
+   if(m[0]===9&&m[2]===9) for(let j=1;j<=k;j++) ws.mergeCells(s+9+j,m[1],s+9+j,m[3]);
+  }else ws.mergeCells(s+m[0]+k,m[1],s+m[2]+k,m[3]);
+ });
+ const V=(r,c,v)=>{ws.getCell(s+r,c).value=v;};
+ const fit=(r,txt,per,base)=>{const ln=Math.max(1,Math.ceil(String(txt||"").length/per));const t=r<10?r:r-k;const h=Math.max(TPL.heights[t]||15,ln*base);ws.getRow(s+r).height=h;};
+ const wrap=(r,c)=>{const cell=ws.getCell(s+r,c);cell.alignment=Object.assign({},cell.alignment,{wrapText:true});};
+ fit(2,d.pi,18,17);fit(3,d.gd,18,17);fit(4,d.buyer,22,17);fit(5,d.cons,22,17);fit(11+k,d.reason,48,30);
+ wrap(11+k,2);wrap(3,2);wrap(5,2);
+ V(0,1,"FOC");
+ V(2,1,"PI NO");V(2,2,d.pi);V(2,18,"Date:");V(2,19,date);
+ V(3,1,"GD No");V(3,2,d.gd===""?null:(/^\d+$/.test(d.gd)?Number(d.gd):d.gd));
+ [["Color",4],["Order Qty",6],["Grey Rec Qty",8],["Grey Rec qty (with FOC)",10],["Grey Rec % (with FOC)",12],["FOC Qty",14],["Grey Required QTY",16],["FOC %",18]].forEach(x=>V(3,x[1],x[0]));
+ const r1=s+4, r2=s+3+n;
+ let sumF=0,sumN=0,sumP=0;
+ d.lines.forEach((ln,i)=>{
+  const r=4+i, R=s+r;
+  V(r,4,ln.color);
+  if(ln.oq!=null) V(r,6,ln.oq);
+  const hv=ln.parts.length?ln.parts.reduce((a,b)=>a+b,0):null;
+  if(ln.parts.length===1) V(r,8,ln.parts[0]); else if(ln.parts.length>1) V(r,8,{formula:ln.parts.join("+"),result:hv});
+  if(ln.foc!=null){
+   const P=ln.foc+80;
+   V(r,14,ln.foc);
+   V(r,16,{formula:"N"+R+"+80",result:P});
+   if(ln.oq) V(r,18,{formula:"N"+R+"/F"+R,result:ln.foc/ln.oq});
+   if(hv!=null){V(r,10,{formula:"H"+R+"+P"+R,result:hv+P});if(ln.oq) V(r,12,{formula:"(J"+R+"-F"+R+")/F"+R,result:(hv+P-ln.oq)/ln.oq});}
+   sumP+=P;sumN+=ln.foc;
+  }
+  if(ln.oq) sumF+=ln.oq;
+ });
+ V(4,1,"Buyer");V(4,2,d.buyer||null);
+ V(5,1,"Const:");V(5,2,d.cons||null);
+ V(6,1,"Color:");V(6,2,String(n).padStart(2,"0")+" color");
+ V(7,1,"Order Qty:");V(7,2,{formula:"SUM(F"+r1+":F"+r2+")",result:sumF});
+ V(8,1,"FOC Qty:");V(8,2,{formula:"SUM(N"+r1+":N"+r2+")",result:sumN});
+ V(9,1,"Stock QTY: ");
+ V(10+k,1,"Need Greige:");V(10+k,2,{formula:"SUM(P"+r1+":P"+r2+")",result:sumP});
+ V(11+k,1,"Reason");V(11+k,2,d.reason||null);
+ V(17+k,2,"QC Head");V(17+k,5,"DGM Planning");V(17+k,8,"DGM Operation");V(17+k,13,"Technical Directior");V(17+k,17,"Project Director");
+ d.sumF=sumF;d.sumN=sumN;d.need=sumP;
+}
+
+/* ---------- main run ---------- */
+async function run(){
+ const f=$("focMailFile").files[0];
+ if(!f){toast("আগে Mail Data ফাইলটা (making_FOC) বেছে নিন।","error");return;}
+ if(!window.XLSX||!window.ExcelJS){toast("Excel library লোড হয়নি, internet দেখুন।","error");return;}
+ showLoading("FOC Paper বানানো হচ্ছে...");
+ const issues=[],notes=[];
+ try{
+  const buf=await f.arrayBuffer();
+  const mail=await readMailTexts(buf.slice(0));
+  const segs=splitMails(mail.texts);
+  if(!segs.length) throw new Error("Mail Data-তে কোনো mail পাওয়া যায়নি");
+  /* sources */
+  let grey=[];
+  try{const rec=await idbGet("app_data","grey_report");if(rec&&rec.rows) grey=rec.rows;}catch(e){}
+  let order=[];
+  try{order=(await fpLoad()).order||[];}catch(e){}
+  if(!grey.length) notes.push("⚠ ERP-তে Grey Report upload করা নেই — Grey Received Qty ও GD খালি থাকবে।");
+  if(!order.length) notes.push("⚠ ERP-তে Order Status upload করা নেই — GD, Order Qty, Buyer, Construction Grey/mail থেকে নেওয়া হয়েছে (যতটুকু পাওয়া গেছে)।");
+  /* parse + dedupe */
+  const seen=new Set(),papers=[],skipped=[],dups=[];
+  segs.forEach((seg,i)=>{
+   const req=parseMail(seg);
+   const tag="Mail "+(i+1)+(req.pis.length?" (PI "+req.pis.join("+")+")":"");
+   if(!req.pis.length){skipped.push(tag+": PI নম্বর পাওয়া যায়নি");return;}
+   if(!req.colors.length){skipped.push(tag+": color ও FOC qty স্পষ্টভাবে পাওয়া যায়নি — Paper বানাইনি, নিজে দেখে নিন"+(req.note?" ["+req.note+"]":""));return;}
+   const sig=req.pis.slice().sort().join("+")+"|"+req.colors.map(c=>cKey(c.color)+":"+c.foc+":"+c.fab).sort().join(",");
+   if(seen.has(sig)){dups.push(tag+" — একই request আগেও আছে, বাদ দেওয়া হয়েছে");return;}
+   seen.add(sig);
+   papers.push(req);
+  });
+  if(!papers.length) throw new Error("কোনো Paper বানানোর মতো request পাওয়া যায়নি"+(skipped.length?" — "+skipped.join(" | "):""));
+  const data=papers.map(p=>buildPaper(p,{grey,order},issues));
+  /* workbook: keep the uploaded file (Mail Data untouched), add FOC sheet */
+  const wb=new ExcelJS.Workbook();
+  let loaded=false;
+  try{await wb.xlsx.load(buf.slice(0));loaded=true;}catch(e){loaded=false;}
+  if(!loaded){
+   const ms=wb.addWorksheet("Mail Data");
+   mail.texts.forEach((t,i)=>{ms.getCell(1+i*15,1).value=t;ms.getCell(1+i*15,1).alignment={wrapText:true,vertical:"top"};ms.mergeCells(1+i*15,1,14+i*15,5);});
+   notes.push("ℹ ফাইলটা সরাসরি খোলা যায়নি, তাই Mail Data নতুন করে সাজানো হয়েছে (লেখা একই)।");
+  }
+  const old=wb.getWorksheet("FOC"); if(old) wb.removeWorksheet(old.id);
+  const ws=wb.addWorksheet("FOC",{pageSetup:{orientation:"landscape",paperSize:9,fitToPage:true,fitToWidth:1,fitToHeight:0}});
+  Object.keys(TPL.widths).forEach(k=>{ws.getColumn(k).width=TPL.widths[k];});
+  const now=new Date(),date=new Date(Date.UTC(now.getFullYear(),now.getMonth(),now.getDate()));
+  let row=1;data.forEach(d=>{writePaper(ws,row,d,date);row+=paperRows(d);});
+  const out=await wb.xlsx.writeBuffer();
+  lastBlob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const p2=n=>String(n).padStart(2,"0");
+  lastName="FOC_Paper_"+p2(now.getDate())+"-"+p2(now.getMonth()+1)+"-"+now.getFullYear()+".xlsx";
+  hideLoading();
+  showResult(data,issues,notes,skipped,dups);
+  toast(data.length+"টি FOC Paper তৈরি হয়েছে। Download করুন।","success",5000);
+ }catch(e){
+  hideLoading();console.error(e);lastBlob=null;
+  $("focResult").innerHTML='<p style="color:#991b1b"><b>Error:</b> '+esc(e.message)+"</p>";
+  toast("FOC Making error: "+e.message,"error",8000);
+ }
+}
+function showResult(data,issues,notes,skipped,dups){
+ const fm=n=>Number(n).toLocaleString(undefined,{maximumFractionDigits:2});
+ let h='<div style="margin:10px 0"><span class="badge green">'+data.length+' Paper তৈরি</span> <button class="small" id="focDownload">⬇ Download Excel</button></div>';
+ h+='<div class="table-wrap"><table class="gs-table"><thead><tr><th>#</th><th>PI</th><th>GD</th><th>Color</th><th>Order Qty</th><th>FOC Qty</th><th>Need Greige</th></tr></thead><tbody>';
+ data.forEach((d,i)=>{h+="<tr><td>"+(i+1)+"</td><td>"+esc(d.pi)+"</td><td>"+esc(d.gd)+"</td><td>"+d.lines.length+"</td><td>"+fm(d.sumF)+"</td><td>"+fm(d.sumN)+"</td><td><b>"+fm(d.need)+"</b></td></tr>";});
+ h+="</tbody></table></div>";
+ const sec=(t,a,cls)=>a.length?'<h4 style="margin:14px 0 4px">'+t+'</h4><ul style="margin:0;padding-left:18px;font-size:13px'+(cls?";color:"+cls:"")+'">'+a.map(x=>"<li>"+esc(x)+"</li>").join("")+"</ul>":"";
+ h+=sec("নোট",notes,"#92400e")+sec("যাচাই করা দরকার",issues,"#991b1b")+sec("Paper বানানো হয়নি",skipped,"#991b1b")+sec("Duplicate বাদ",dups,"#475569");
+ $("focResult").innerHTML=h;
+ $("focDownload").onclick=()=>{
+  if(!lastBlob) return;
+  const a=document.createElement("a");a.href=URL.createObjectURL(lastBlob);a.download=lastName;
+  document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+ };
+}
+
+/* ---------- navigation: Daily Work > FOC > FOC Making ---------- */
+function view(v){
+ ["dwHome","dwFoc","dwFocMaking"].forEach(id=>{const e=$(id);if(e) e.style.display=(id===v?"block":"none");});
+}
+function initUI(){
+ const nav=document.querySelector("nav");
+ if(nav&&!nav.querySelector('[data-page="dailyWork"]')){
+  const b=document.createElement("button");b.dataset.page="dailyWork";b.textContent="🗂️ Daily Work";
+  b.addEventListener("click",()=>{switchPage("dailyWork");view("dwHome");});
+  const wipBtn=nav.querySelector('[data-page="wip"]');
+  if(wipBtn) nav.insertBefore(b,wipBtn); else nav.appendChild(b);
+ }
+ $("dwOpenFoc").onclick=()=>view("dwFoc");
+ $("dwOpenFocMaking").onclick=()=>view("dwFocMaking");
+ $("dwBackHome").onclick=()=>view("dwHome");
+ $("dwBackFoc").onclick=()=>view("dwFoc");
+ $("focRun").onclick=run;
+ $("focClear").onclick=()=>{$("focMailFile").value="";$("focResult").innerHTML="";lastBlob=null;};
+ view("dwHome");
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initUI); else initUI();
 })();
 </script>
  <script src="cloud.js"></script>
