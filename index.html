@@ -4036,13 +4036,13 @@ function fmtDate(v){
  if(typeof v==="number"&&v>20000&&v<80000){const d=new Date(Date.UTC(1899,11,30)+Math.floor(v)*864e5);return p2(d.getUTCDate())+"/"+p2(d.getUTCMonth()+1)+"/"+d.getUTCFullYear();}
  return String(v);
 }
-function numOf(v){if(typeof v==="number") return v;const n=Number(String(v).replace(/,/g,"").trim());return String(v).trim()===""||!isFinite(n)?"":n;}
+function numOf(v){if(typeof v==="number") return isFinite(v)?v:"";const t=String(v==null?"":v).replace(/,/g,"").replace(/[^0-9.\-]/g,"");if(t===""||t==="-"||t===".") return "";const n=Number(t);return isFinite(n)?n:"";}
 
 let data=[], methods={}, meta=null;
 const FIELD_OPTS=[["pi","PI"],["color","Color"],["construction","Construction"],["gd","GD"]];
 let shown=[], filters={}, searched=false, debounce=null;
 const COLS=[
- {k:"pi",l:"PI"},{k:"cu",l:"Customer Name"},{k:"co",l:"Construction"},{k:"cl",l:"Color"},
+ {k:"gn",l:"GD"},{k:"pi",l:"PI"},{k:"cu",l:"Customer Name"},{k:"co",l:"Construction"},{k:"cl",l:"Color"},
  {k:"oq",l:"Order Qty (Yds)",num:1},{k:"gd",l:"Grey Issue Date"},{k:"rq",l:"Received Qty (Yds)",num:1},{k:"rm",l:"Remarks"}
 ];
 const disp=(it,c)=>c.num?(it[c.k]===""?"":fmt(it[c.k])):(c.k==="gd"?fmtDate(it.gd):cl(it[c.k]));
@@ -4067,7 +4067,8 @@ async function readGrey(file){
  for(let r=0;r<Math.min(a.length,40);r++){if(a[r].some(x=>norm(x)==="pino")){hr=r;break;}}
  if(hr<0) throw new Error("Header row (PI no.) not found");
  const H=a[hr].map(norm), at=n=>H.indexOf(n);
- const c={pi:at("pino"),gn:at("gdno"),cu:at("customername"),co:at("construction"),cl:at("color"),oq:at("orderqtyyds"),gd:at("greyissuedate"),rq:at("receivedqtyyds"),rm:at("remarks"),dm:at("dyeingmethod")};
+ const fb=(exact,fn)=>{let i=at(exact);return i>=0?i:H.findIndex(fn);};
+ const c={pi:at("pino"),gn:at("gdno"),cu:at("customername"),co:at("construction"),cl:at("color"),oq:fb("orderqtyyds",h=>h.startsWith("orderqty")||h==="orderquantity"||h.startsWith("ordqty")||h==="qty"||h==="qtyyds"),gd:at("greyissuedate"),rq:fb("receivedqtyyds",h=>h.startsWith("receivedqty")||h.startsWith("recvqty")||h.startsWith("rcvdqty")||h.startsWith("greyreceivedqty")),rm:at("remarks"),dm:at("dyeingmethod")};
  if(c.pi<0||c.cl<0) throw new Error("PI no. / Color column not found");
  const g=i=>i<0?"":i;
  const rows=[], mset={};
@@ -4112,7 +4113,7 @@ function buildUI(){
  const box=$("threeSheetsUploadContainer");
  if(!box||$("greySection")) return;
  const st=document.createElement("style");
- st.textContent=".grey-foot td{position:sticky;bottom:0;background:#eef6ff;font-weight:700;border-top:2px solid var(--primary-light)}#greyBody td:nth-child(5),#greyBody td:nth-child(7){text-align:right}";
+ st.textContent=".grey-foot td{position:sticky;bottom:0;background:#eef6ff;font-weight:700;border-top:2px solid var(--primary-light)}#greyBody td:nth-child(6),#greyBody td:nth-child(8){text-align:right}";
  document.head.appendChild(st);
  const slot=document.createElement("div");
  slot.className="slot-card";
@@ -4226,7 +4227,7 @@ function ordSet(rows){
 function renderBody(){
  const rows=visible(), os=ordSet(rows), body=$("greyBody"), LIM=1000;
  body.innerHTML="";
- if(!rows.length) body.innerHTML='<tr><td colspan="8" style="padding:14px;color:#64748b;text-align:center">No rows found'+(Object.keys(filters).length?" (check the filters)":"")+".</td></tr>";
+ if(!rows.length) body.innerHTML='<tr><td colspan="9" style="padding:14px;color:#64748b;text-align:center">No rows found'+(Object.keys(filters).length?" (check the filters)":"")+".</td></tr>";
  rows.slice(0,LIM).forEach(it=>{
   const tr=document.createElement("tr");
   COLS.forEach(c=>{const td=document.createElement("td");td.textContent=c.k==="oq"?(os.has(it)?fmt(it.oq):""):disp(it,c);tr.appendChild(td);});
@@ -4235,7 +4236,7 @@ function renderBody(){
  let oq=0,rq=0;
  os.forEach(it=>{oq+=it.oq;});
  rows.forEach(it=>{if(it.rq!=="") rq+=it.rq;});
- $("greyFoot").innerHTML='<tr class="grey-foot"><td>TOTAL</td><td>'+rows.length+' row(s)</td><td></td><td></td><td style="text-align:right">'+esc(fmt(oq))+'</td><td></td><td style="text-align:right">'+esc(fmt(rq))+"</td><td></td></tr>";
+ $("greyFoot").innerHTML='<tr class="grey-foot"><td>TOTAL</td><td>'+rows.length+' row(s)</td><td></td><td></td><td></td><td style="text-align:right">'+esc(fmt(oq))+'</td><td></td><td style="text-align:right">'+esc(fmt(rq))+"</td><td></td></tr>";
  const pis=new Set(rows.map(r=>r.pi)), fc=Object.keys(filters).length;
  $("greySummary").innerHTML='<span class="badge blue">'+pis.size+' PI</span> <span class="badge blue">'+os.size+' PI+Color</span> <span class="badge blue">'+rows.length+' rows</span> <span class="badge green">Order Qty (once per PI+Color): '+esc(fmt(oq))+'</span> <span class="badge green">Received Qty: '+esc(fmt(rq))+"</span>"+(fc?' <span class="badge yellow">'+fc+" filter(s) active</span>":"")+(rows.length>LIM?' <span class="badge red">first '+LIM+" rows drawn, totals include all</span>":"");
 }
@@ -4287,7 +4288,7 @@ function exportXlsx(){
   if(it.rq!=="") rq+=it.rq;
   return COLS.map(c=>c.k==="oq"?(os.has(it)?it.oq:""):(c.num?it[c.k]:(c.k==="gd"?fmtDate(it.gd):it[c.k])));
  }));
- aoa.push(["TOTAL",rows.length+" rows","","",oq,"",rq,""]);
+ aoa.push(["TOTAL",rows.length+" rows","","","",oq,"",rq,""]);
  const wb=XLSX.utils.book_new();
  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(aoa),"Grey Report");
  XLSX.writeFile(wb,"GreyReport-Search.xlsx");
