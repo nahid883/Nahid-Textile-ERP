@@ -13,6 +13,7 @@
 <title>Nahid Textile ERP - High Performance</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
 :root{
  --primary:#0f3f6e;
@@ -509,7 +510,7 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
 <h2>🗂️ Daily Work</h2>
 <div id="dwHome">
  <p class="muted">Folder খুলুন:</p>
- <div class="dw-folders"><button type="button" class="dw-folder" id="dwOpenFoc">📁 FOC</button></div>
+ <div class="dw-folders"><button type="button" class="dw-folder" id="dwOpenFoc">📁 FOC</button><button type="button" class="dw-folder" id="dwOpenRfd">📁 RFD Reconciliation</button></div>
 </div>
 <div id="dwFoc" style="display:none">
  <p class="muted"><a href="#" class="dw-crumb" id="dwBackHome" onclick="return false">Daily Work</a> › FOC</p>
@@ -522,6 +523,18 @@ footer{text-align:center;color:var(--text-muted);font-size:12px;padding:16px}
  <input type="file" id="focMailFile" accept=".xlsx,.xlsm,.xls,.xlsb" style="margin:6px 0 10px">
  <div class="actions"><button id="focRun">✅ Submit</button><button class="secondary" id="focClear">Clear</button></div>
  <div id="focResult" style="margin-top:12px"></div>
+</div>
+<div id="dwRfd" style="display:none">
+ <p class="muted"><a href="#" class="dw-crumb" id="dwRfdBack" onclick="return false">Daily Work</a> › RFD Reconciliation</p>
+ <h3 style="margin-top:4px">RFD Reconciliation</h3>
+ <p class="muted">File 1 = Quantity Reconciliation All Report, File 2 = মাসের ফাইল (Singeing &amp; Desize, Bleaching, Mercerize, Peach sheet-সহ)। দুটো <b>.xlsx</b> ফাইল দিয়ে Submit করুন, তারপর আপডেট হওয়া দুটো ফাইলই Download করে নিন। ফাইলের নাম বা column-এর অবস্থান বদলালে সমস্যা নেই, sheet ও column-এর নাম দেখে কাজ হয়।</p>
+ <label style="display:block;font-weight:600;margin-top:8px">File 1 — Quantity Reconciliation All Report</label>
+ <input type="file" id="rfdFile1" accept=".xlsx,.xlsm" style="margin:4px 0 10px">
+ <label style="display:block;font-weight:600">File 2 — মাসের ফাইল</label>
+ <input type="file" id="rfdFile2" accept=".xlsx,.xlsm" style="margin:4px 0 10px">
+ <div class="actions"><button id="rfdRun">✅ Submit</button><button class="secondary" id="rfdClear">Clear</button></div>
+ <p class="muted" id="rfdStatus" style="margin:8px 0 0"></p>
+ <div id="rfdResult" style="margin-top:12px"></div>
 </div>
 </section>
 
@@ -4688,7 +4701,7 @@ function showResult(data,issues,notes,skipped,dups){
 
 /* ---------- navigation: Daily Work > FOC > FOC Making ---------- */
 function view(v){
- ["dwHome","dwFoc","dwFocMaking"].forEach(id=>{const e=$(id);if(e) e.style.display=(id===v?"block":"none");});
+ ["dwHome","dwFoc","dwFocMaking","dwRfd"].forEach(id=>{const e=$(id);if(e) e.style.display=(id===v?"block":"none");});
 }
 function initUI(){
  const nav=document.querySelector("nav");
@@ -4708,6 +4721,579 @@ function initUI(){
 }
 if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",initUI); else initUI();
 })();
+</script>
+<!-- Nahid ERP: Daily Work > RFD Reconciliation add-on -->
+<script>
+/* RFD Reconciliation core: matching + direct XLSX XML patching (keeps formatting/comments untouched) */
+(function(root){
+"use strict";
+const cl=s=>String(s==null?"":s).trim();
+const ws1=s=>cl(s).replace(/\s+/g," ");
+const colNum=c=>{let n=0;for(const ch of c)n=n*26+ch.charCodeAt(0)-64;return n;};
+const colLet=n=>{let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+const xmlEsc=s=>String(s).replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const xmlUn=s=>String(s).replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,"&");
+const r2=n=>Math.round(n*100)/100;
+
+/* ===================== matching helpers ===================== */
+function piList(raw){
+ const s=cl(raw).toUpperCase(); if(!s) return [];
+ const out=[];
+ s.split(/[+,&;]/).forEach(p=>{
+  p=p.trim().replace(/\/\s*\d{2,4}$/,"");
+  (p.match(/\d{4,6}/g)||[]).forEach(x=>out.push(String(Number(x))));
+ });
+ return out;
+}
+function consParse(raw){
+ let s=cl(raw).toUpperCase().replace(/\s+/g,"").replace(/[\u00d7*]/g,"X");
+ if(!s) return null;
+ const full=s;
+ const dm=s.match(/\/\d+(?:\.\d+)?X\d+(?:\.\d+)?$/);
+ let head=s, dens="";
+ if(dm){head=s.slice(0,dm.index);dens=dm[0];}
+ const toks=head.split("X");
+ const counts=[],plus=[],extra=[];
+ toks.forEach(t=>{
+  const parts=t.split("+");
+  const b=parts[0].match(/\d+(?:\.\d+)?/);
+  if(b) counts.push(Number(b[0]));
+  parts.slice(1).forEach(p=>{const m=p.match(/\d+(?:\.\d+)?/);if(!m)return;if(/D/.test(p))plus.push(Number(m[0]));else extra.push(Number(m[0]));});
+ });
+ plus.sort((a,b)=>a-b);
+ const el=/ELASTANE|SPANDEX|LYCRA|ELASTIC/.test(head);
+ return {full,head,dens,counts,plus,extra,el};
+}
+const linenEq=(a,b)=>{const s=Math.min(a,b),l=Math.max(a,b);if(!s)return false;const q=l/s;return q>=2.7&&q<=3.6;};
+function consCompare(a,b,linen){
+ const A=consParse(a),B=consParse(b);
+ if(!A||!B) return {ok:false,why:"construction ফাঁকা"};
+ if(A.full===B.full) return {ok:true,exact:true};
+ if(A.counts.length<2||B.counts.length<2||A.counts.length!==B.counts.length) return {ok:false,why:"count বোঝা যায়নি"};
+ const samePlus=A.plus.length===B.plus.length&&A.plus.every((v,i)=>v===B.plus[i]);
+ let elNote="";
+ if(!samePlus){
+  if((A.plus.length&&!B.plus.length&&B.el)||(B.plus.length&&!A.plus.length&&A.el)) elNote="একদিকে elastic-এর denier লেখা নেই (Elastane) ";
+  else return {ok:false,why:"elastic/denier ভিন্ন"};
+ }
+ if(A.extra.length!==B.extra.length||A.extra.some((v,i)=>v!==B.extra[i])) elNote+="বাড়তি yarn count (+"+(A.extra.length?A.extra:B.extra).join("+")+") উপেক্ষা করা হয়েছে ";
+ let useLinen=false, diff=false;
+ for(let i=0;i<A.counts.length;i++){
+  const x=A.counts[i],y=B.counts[i];
+  if(x===y) continue;
+  diff=true;
+  if(Math.abs(x-y)<=2) continue;
+  if(linen&&linenEq(x,y)){useLinen=true;continue;}
+  return {ok:false,why:"yarn count ভিন্ন"};
+ }
+ if(useLinen) return {ok:true,exact:false,why:elNote+"Linen Lea/Ne count একই ধরা হয়েছে ("+cl(a)+" ~ "+cl(b)+")"};
+ if(diff) return {ok:true,exact:false,why:elNote+"yarn count ±2 এর মধ্যে ("+cl(a)+" ~ "+cl(b)+")"};
+ return {ok:true,exact:false,why:elNote+(elNote?"; ":"")+"শুধু density ভিন্ন, উপেক্ষা করা হয়েছে ("+cl(a)+" ~ "+cl(b)+")"};
+}
+function lev(a,b){
+ const m=a.length,n=b.length; if(!m) return n; if(!n) return m;
+ let prev=[],cur=[]; for(let j=0;j<=n;j++) prev[j]=j;
+ for(let i=1;i<=m;i++){cur=[i];for(let j=1;j<=n;j++){cur[j]=Math.min(prev[j]+1,cur[j-1]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));}prev=cur;}
+ return prev[n];
+}
+function colorKey(raw){
+ let s=cl(raw).toUpperCase();
+ s=s.replace(/Y\s*\/\s*D/g,"YD").replace(/\bLITE\b/g,"LIGHT").replace(/\bLT\b\.?/g,"LIGHT").replace(/\bDK\b\.?/g,"DARK");
+ return {all:s.replace(/[^A-Z0-9]/g,""),letters:s.replace(/[^A-Z]/g,""),digits:(s.match(/\d+/g)||[]).join(""),yd:/\bYD\b/.test(s),sorted:s.split(/[^A-Z0-9]+/).filter(Boolean).sort().join(""),toks:s.split(/[^A-Z0-9]+/).filter(Boolean)};
+}
+const stripParen=raw=>cl(raw).replace(/\([^)]*\)?/g,"").trim();
+function colorCompare(a,b,inner){
+ const A=colorKey(a),B=colorKey(b);
+ if(!A.all||!B.all) return {ok:false,why:"color ফাঁকা"};
+ if(!inner){ const A0=colorKey(stripParen(a)||a),B0=colorKey(stripParen(b)||b); if(A0.yd!==B0.yd) return {ok:false,why:"color মেলেনি (Y/D একদিকে আছে)"}; }
+ const t=" ("+cl(a)+" ~ "+cl(b)+")";
+ if(cl(a)===cl(b)) return {ok:true,exact:true};
+ if(A.all===B.all) return {ok:true,exact:false,why:"বড়/ছোট হাতের অক্ষর, space বা চিহ্নের পার্থক্য"+t};
+ if(A.sorted===B.sorted) return {ok:true,exact:false,why:"শব্দের ক্রম আলাদা"+t};
+ let res=null;
+ if(A.digits&&B.digits){
+  if(A.digits!==B.digits) return {ok:false,why:"color code ভিন্ন"};
+  if(!A.letters||!B.letters) res={ok:true,exact:false,why:"color-এর সাথে বাড়তি শব্দ আছে"+t};
+  else if(A.letters.includes(B.letters)||B.letters.includes(A.letters)) res={ok:true,exact:false,why:"color-এর সাথে বাড়তি শব্দ আছে"+t};
+  else if(lev(A.letters,B.letters)<=1&&Math.min(A.letters.length,B.letters.length)>=3) res={ok:true,exact:false,why:"ছোট spelling ভুল"+t};
+  else if(lev(A.letters,B.letters)<=2&&Math.min(A.letters.length,B.letters.length)>=6) res={ok:true,exact:false,why:"ছোট spelling ভুল"+t};
+ } else if(A.digits!==B.digits){
+  const sh=A.letters.length<B.letters.length?A.letters:B.letters, lg=sh===A.letters?B.letters:A.letters;
+  if(sh.length>=5&&lg.includes(sh)) res={ok:true,exact:false,why:"color-এর সাথে বাড়তি code আছে"+t};
+ } else {
+  const len=Math.min(A.letters.length,B.letters.length),d=lev(A.letters,B.letters);
+  if((len>=5&&d<=1)||(len>=9&&d<=2)) res={ok:true,exact:false,why:"ছোট spelling ভুল"+t};
+ }
+ if(!res&&A.digits===B.digits){
+  const sh=A.toks.length<=B.toks.length?A.toks:B.toks, lg=sh===A.toks?B.toks:A.toks;
+  if(sh.length&&sh.join("").length>=3&&sh.length<lg.length&&sh.every(t=>lg.includes(t))) res={ok:true,exact:false,why:"color-এর সাথে বাড়তি শব্দ আছে"+t};
+ }
+ if(res) return res;
+ if(!inner){
+  const sa=stripParen(a),sb=stripParen(b);
+  if((sa!==cl(a)||sb!==cl(b))&&sa&&sb){
+   const r=colorCompare(sa,sb,true);
+   if(r.ok) return {ok:true,exact:false,why:"বন্ধনীর ভেতরের অংশ বাদ দিয়ে মিলেছে"+t+(r.exact?"":" ; "+r.why.replace(/ \(.*$/,""))};
+  }
+ }
+ return {ok:false,why:"color মেলেনি"};
+}
+
+/* ===================== xlsx package helpers ===================== */
+async function readText(zip,path){const f=zip.file(path);if(!f) throw new Error("ফাইলে "+path+" পাওয়া যায়নি");return f.async("string");}
+async function sheetMap(zip){
+ const wbx=await readText(zip,"xl/workbook.xml");
+ const rels=await readText(zip,"xl/_rels/workbook.xml.rels");
+ const rm={};
+ rels.replace(/<Relationship\b[^>]*>/g,t=>{const id=(t.match(/\bId="([^"]*)"/)||[])[1],tg=(t.match(/\bTarget="([^"]*)"/)||[])[1];if(id)rm[id]=tg;return t;});
+ const map={};
+ wbx.replace(/<sheet\b[^>]*>/g,t=>{
+  const nm=xmlUn((t.match(/\bname="([^"]*)"/)||[])[1]||"");
+  const rid=(t.match(/\br:id="([^"]*)"/)||[])[1];
+  let tg=(rm[rid]||"").replace(/^\//,""); if(!/^xl\//.test(tg)) tg="xl/"+tg;
+  map[nm]=tg; return t;
+ });
+ return {map,wbx,rels};
+}
+function colStyleOf(xml,cn){
+ let res=null;
+ (xml.match(/<col\b[^>]*>/g)||[]).forEach(t=>{
+  const mn=+(t.match(/\bmin="(\d+)"/)||[])[1],mx=+(t.match(/\bmax="(\d+)"/)||[])[1],st=(t.match(/\bstyle="(\d+)"/)||[])[1];
+  if(st!==undefined&&cn>=mn&&cn<=mx) res=st;
+ });
+ return res;
+}
+function cellsInRow(rowStr){
+ const list=[],re=/<c\s+r="([A-Z]+)(\d+)"[^>]*?(?:\/>|>[\s\S]*?<\/c>)/g;let m;
+ while((m=re.exec(rowStr))) list.push({col:m[1],cn:colNum(m[1]),start:m.index,end:m.index+m[0].length,raw:m[0]});
+ return list;
+}
+/* apply fn to a single cell of a row string. fn(existingRaw|null) -> newRaw (string) */
+function setCellInRow(rowStr,col,rowNum,fn){
+ const cells=cellsInRow(rowStr),cn=colNum(col);
+ const ex=cells.find(c=>c.cn===cn);
+ if(ex){const nr=fn(ex.raw);return rowStr.slice(0,ex.start)+nr+rowStr.slice(ex.end);}
+ const nr=fn(null);
+ const nxt=cells.find(c=>c.cn>cn);
+ if(nxt) return rowStr.slice(0,nxt.start)+nr+rowStr.slice(nxt.start);
+ const lastClose=rowStr.lastIndexOf("</row>");
+ if(lastClose>=0) return rowStr.slice(0,lastClose)+nr+rowStr.slice(lastClose);
+ /* self-closing row */
+ return rowStr.replace(/\s*\/>$/,">")+nr+"</row>";
+}
+function dropSpans(rowStr){return rowStr.replace(/^<row\b[^>]*>/,t=>t.replace(/\sspans="[^"]*"/,""));}
+/* rows: Map rowNum -> fn(rowStr,rowNum)->rowStr */
+function patchRows(xml,rows){
+ const found=[],re=/<row\b[^>]*>/g;let m;
+ while((m=re.exec(xml))){
+  const r=+(m[0].match(/\br="(\d+)"/)||[])[1];
+  if(rows.has(r)){
+   const start=m.index;let end;
+   if(m[0].endsWith("/>")) end=start+m[0].length; else {const e=xml.indexOf("</row>",start);end=e<0?start+m[0].length:e+6;}
+   found.push({r,start,end});
+  }
+ }
+ found.sort((a,b)=>b.start-a.start);
+ found.forEach(f=>{const ns=rows.get(f.r)(xml.slice(f.start,f.end),f.r);xml=xml.slice(0,f.start)+ns+xml.slice(f.end);});
+ const got=new Set(found.map(f=>f.r));
+ return {xml,missing:[...rows.keys()].filter(r=>!got.has(r))};
+}
+/* add qty to one cell (keeps formula) */
+function addToCellRaw(raw,ref,add,defaultStyle){
+ if(raw===null){
+  const s=defaultStyle!=null?` s="${defaultStyle}"`:"";
+  return {raw:`<c r="${ref}"${s}><v>${r2(add)}</v></c>`,prevVal:null,prevDisp:"",newVal:r2(add)};
+ }
+ const om=raw.match(/^<c\b([^>]*?)(\/?)>/);
+ let attrs=om[1]; const self=om[2]==="/";
+ const inner=self?"":raw.slice(om[0].length,raw.length-4);
+ const t=(attrs.match(/\bt="([^"]*)"/)||[])[1];
+ const fm=inner.match(/<f\b([^>]*?)(?:\/>|>([\s\S]*?)<\/f>)/);
+ const vm=inner.match(/<v>([\s\S]*?)<\/v>/);
+ if(fm){
+  if(/t="(shared|array)"/.test(fm[1])||fm[2]===undefined) return {err:"cell-এ shared/array formula আছে, নিরাপদে বদলানো যায়নি"};
+  const ftxt=xmlUn(fm[2]);
+  const cached=vm&&(!t||t==="n")?Number(vm[1]):null;
+  const newF=ftxt+"+"+r2(add);
+  const nv=cached!=null&&isFinite(cached)?r2(cached+add):null;
+  const attrs2=attrs.replace(/\st="[^"]*"/,"");
+  return {raw:`<c${attrs2}><f>${xmlEsc(newF)}</f>${nv!=null?`<v>${nv}</v>`:""}</c>`,prevVal:cached,prevDisp:"="+ftxt,newVal:nv,formula:"="+newF};
+ }
+ if(t&&t!=="n") return {err:"cell-এ text আছে, নিরাপদে বদলানো যায়নি"};
+ const pv=vm&&vm[1]!==""?Number(vm[1]):null;
+ if(pv!==null&&!isFinite(pv)) return {err:"cell-এর মান বোঝা যায়নি"};
+ const nv=r2((pv||0)+add);
+ attrs=attrs.replace(/\st="[^"]*"/,"");
+ return {raw:`<c${attrs}><v>${nv}</v></c>`,prevVal:pv,prevDisp:pv===null?"":String(pv),newVal:nv};
+}
+
+/* ---------- styles: clone xf with green fill, bold header ---------- */
+function makeStyler(stylesXml){
+ const fm=stylesXml.match(/<fills\s+count="(\d+)"[^>]*>/);
+ const xm=stylesXml.match(/<cellXfs\s+count="(\d+)"[^>]*>([\s\S]*?)<\/cellXfs>/);
+ const fnm=stylesXml.match(/<fonts\s+count="(\d+)"[^>]*>/);
+ if(!fm||!xm||!fnm) throw new Error("styles.xml পড়া যায়নি");
+ const fillCount=+fm[1],fontCount=+fnm[1];
+ const xfs=xm[2].match(/<xf\b[^>]*?(?:\/>|>[\s\S]*?<\/xf>)/g)||[];
+ const baseCount=xfs.length;
+ const greenFill=fillCount; /* new fill index */
+ const cache={};
+ const st={
+  green(old){
+   const o=(old==null||!xfs[old])?0:old;
+   if(cache[o]!=null) return cache[o];
+   const xf=xfs[o].replace(/^<xf\b([^>]*?)(\/?)>/,(m,a,sl)=>`<xf${a.replace(/\sfillId="\d+"/,"").replace(/\sapplyFill="\d"/,"")} fillId="${greenFill}" applyFill="1"${sl}>`);
+   xfs.push(xf);cache[o]=xfs.length-1;return cache[o];
+  },
+  header(){
+   if(st._h!=null) return st._h;
+   xfs.push(`<xf numFmtId="0" fontId="${fontCount}" fillId="${fillCount+1}" borderId="0" xfId="0" applyFont="1" applyFill="1"/>`);
+   st._h=xfs.length-1;return st._h;
+  },
+  out(){
+   let x=stylesXml;
+   x=x.replace(/<fills\s+count="\d+"([^>]*)>([\s\S]*?)<\/fills>/,(m,a,b)=>`<fills count="${fillCount+2}"${a}>${b}<fill><patternFill patternType="solid"><fgColor rgb="FFC6EFCE"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill></fills>`);
+   x=x.replace(/<fonts\s+count="\d+"([^>]*)>([\s\S]*?)<\/fonts>/,(m,a,b)=>`<fonts count="${fontCount+1}"${a}>${b}<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts>`);
+   x=x.replace(/<cellXfs\s+count="\d+"([^>]*)>[\s\S]*?<\/cellXfs>/,(m,a)=>`<cellXfs count="${xfs.length}"${a}>${xfs.join("")}</cellXfs>`);
+   return x;
+  }
+ };
+ return st;
+}
+
+/* ===================== sheet reading (SheetJS) ===================== */
+function cellVal(ws,addr){
+ const c=ws[addr]; if(!c) return {v:null,f:null};
+ return {v:c.v===undefined?null:c.v,f:c.f||null};
+}
+function numOfCell(c,ws){
+ if(c.v!=null&&c.v!==""){
+  if(typeof c.v==="number") return isFinite(c.v)?c.v:null;
+  const t=String(c.v).replace(/,/g,"").trim(); if(/^-?\d+(\.\d+)?$/.test(t)) return Number(t); return null;
+ }
+ if(c.f){ /* simple fallback: =J3*1.09361 */
+  const m=c.f.replace(/\s/g,"").match(/^=?\$?([A-Z]+)\$?(\d+)\*(\d+(?:\.\d+)?)$/);
+  if(m){const b=ws[m[1]+m[2]];if(b&&typeof b.v==="number") return b.v*Number(m[3]);}
+ }
+ return null;
+}
+function findHeader(ws,tests){
+ const ref=ws["!ref"]; if(!ref) return null;
+ const rg=ws.constructor&&root.XLSX?root.XLSX.utils.decode_range(ref):null;
+ return rg;
+}
+
+/* ===================== main ===================== */
+const PROC=[
+ {key:"singe",re:/singe|desiz/i,hdr:/singeing/i,label:"Singeing",def:"AA"},
+ {key:"bleach",re:/bleach/i,hdr:/bleach/i,label:"Bleaching",def:"AB"},
+ {key:"merc",re:/merceri/i,hdr:/merceri/i,label:"Mercerize",def:"AC"},
+ {key:"peach",re:/peach/i,hdr:/peach/i,label:"Peach",def:"AD"}
+];
+
+function scanHeader(XLSX,ws,matchers){
+ /* find first row (within 12 rows) whose cells satisfy matchers.required; return {row, cols} */
+ if(!ws["!ref"]) return null;
+ const rg=XLSX.utils.decode_range(ws["!ref"]);
+ for(let r=rg.s.r;r<=Math.min(rg.e.r,rg.s.r+11);r++){
+  const cols={};
+  for(let c=rg.s.c;c<=rg.e.c;c++){
+   const cell=ws[XLSX.utils.encode_cell({r,c})]; if(!cell||cell.v==null) continue;
+   const t=ws1(cell.v);
+   for(const k in matchers.map){ if(cols[k]===undefined&&matchers.map[k].test(t)) cols[k]=c; }
+  }
+  if(matchers.required.every(k=>cols[k]!==undefined)) return {r,cols,rg};
+ }
+ return null;
+}
+
+async function run(deps,inp){
+ const {XLSX,JSZip}=deps; root.XLSX=XLSX;
+ const log=inp.onProgress||(()=>{});
+ /* ---------- File 1 ---------- */
+ log("File 1 পড়া হচ্ছে...");
+ const wb1=XLSX.read(inp.buf1,{type:"array"});
+ let rep=null;
+ for(const sn of wb1.SheetNames){
+  const h=scanHeader(XLSX,wb1.Sheets[sn],{map:{pi:/^pi\s*no\.?$/i,cons:/^construction$/i,color:/^colou?r$/i,design:/^fabric\s*design$/i,
+   singe:/singeing\s*process/i,bleach:/bleach\s*process/i,merc:/mercerize\s*process/i,peach:/peach\s*process/i},required:["pi","cons","color","singe"]});
+  if(h){rep={sheet:sn,h};break;}
+ }
+ if(!rep) throw new Error("File 1-এ All Report sheet পাওয়া যায়নি (PI No., Construction, Color ও Singeing Process Qty column লাগবে)। ফাইল দুটো উল্টো দিয়েছেন কি?");
+ const rws=wb1.Sheets[rep.sheet],H=rep.h;
+ const targetCol={};
+ PROC.forEach(p=>{targetCol[p.key]=H.cols[p.key]!==undefined?colLet(H.cols[p.key]+1):p.def;});
+ const rows=[];
+ for(let r=H.r+1;r<=H.rg.e.r;r++){
+  const g=c=>{const x=rws[XLSX.utils.encode_cell({r,c})];return x&&x.v!=null?x.v:"";};
+  const pi=g(H.cols.pi),cons=g(H.cols.cons),color=g(H.cols.color),design=H.cols.design!==undefined?g(H.cols.design):"";
+  if(cl(pi)===""&&cl(cons)===""&&cl(color)==="") continue;
+  rows.push({row:r+1,pi:cl(pi),pis:piList(pi),cons:cl(cons),color:cl(color),design:cl(design)});
+ }
+ const byPi=new Map();
+ rows.forEach(x=>x.pis.forEach(p=>{if(!byPi.has(p)) byPi.set(p,[]);byPi.get(p).push(x);}));
+
+ /* ---------- File 2 ---------- */
+ log("File 2 পড়া হচ্ছে...");
+ const wb2=XLSX.read(inp.buf2,{type:"array"});
+ const zip2=await JSZip.loadAsync(inp.buf2);
+ const sm2=await sheetMap(zip2);
+ const alreadyDone=Object.keys(sm2.map).some(n=>/^update log$/i.test(n));
+ const results=[]; const sheetInfo=[];
+ PROC.forEach(p=>{
+  const sn=wb2.SheetNames.find(n=>p.re.test(n)); if(!sn) return;
+  const ws=wb2.Sheets[sn];
+  const h=scanHeader(XLSX,ws,{map:{pi:/^pi(\s*no\.?)?$/i,cons:/^construction$/i,color:/^colou?r$/i,qty:/^total\s*qty/i,design:/^fabric\s*design$/i,comp:/^composition$/i},required:["pi","cons","color","qty"]});
+  if(!h){sheetInfo.push({sheet:sn,proc:p,error:"header (PI No / Construction / Color / Total QTY) পাওয়া যায়নি"});return;}
+  sheetInfo.push({sheet:sn,proc:p,col:targetCol[p.key],qtyCol:colLet(h.cols.qty+1),ok:true});
+  for(let r=h.r+1;r<=h.rg.e.r;r++){
+   const cell=c=>{const a=XLSX.utils.encode_cell({r,c});return ws[a]?{v:ws[a].v==null?null:ws[a].v,f:ws[a].f||null}:{v:null,f:null};};
+   const pi=cell(h.cols.pi).v,cons=cell(h.cols.cons).v,color=cell(h.cols.color).v;
+   const qc=cell(h.cols.qty),qtyRaw=numOfCell(qc,ws);
+   const design=(h.cols.design!==undefined?cl(cell(h.cols.design).v):"")+" "+(h.cols.comp!==undefined?cl(cell(h.cols.comp).v):"");
+   if(cl(pi)===""&&cl(cons)===""&&cl(color)==="") continue; /* ফাঁকা বা total row */
+   results.push({sheet:sn,proc:p,col:targetCol[p.key],srcRow:r+1,pi:cl(pi),cons:cl(cons),color:cl(color),qty:qtyRaw,design,lastCol:h.rg.e.c});
+  }
+ });
+ if(!sheetInfo.length) throw new Error("File 2-এ Singeing / Bleaching / Mercerize / Peach কোনো sheet পাওয়া যায়নি।");
+
+ /* ---------- matching ---------- */
+ log("Match করা হচ্ছে...");
+ results.forEach(x=>{
+  x.status="skip";
+  if(x.qty==null||!(x.qty>0)){x.reason="qty নেই";return;}
+  const mp=piList(x.pi);
+  if(!mp.length){x.reason="PI নেই";return;}
+  let cands=[];const seen=new Set();
+  mp.forEach(p=>(byPi.get(p)||[]).forEach(c=>{if(!seen.has(c.row)){seen.add(c.row);cands.push(c);}}));
+  if(!cands.length){x.reason="PI All Report-এ পাওয়া যায়নি";return;}
+  const withColor=[];
+  cands.forEach(c=>{const cc=colorCompare(x.color,c.color);if(cc.ok) withColor.push({c,cc});});
+  if(!withColor.length){x.reason="color মেলেনি";x.hint="All Report-এ এই PI-র color: "+[...new Set(cands.map(c=>c.color))].join(" | ");x.related=cands.map(c=>c.row);return;}
+  const both=[];
+  withColor.forEach(w=>{
+   const linen=/linen/i.test(x.design)||/linen/i.test(w.c.design);
+   const k=consCompare(x.cons,w.c.cons,linen);
+   if(k.ok) both.push({c:w.c,cc:w.cc,k});
+  });
+  if(!both.length){x.reason="construction মেলেনি";x.hint="All Report-এ এই PI+color-র construction: "+[...new Set(withColor.map(w=>w.c.cons))].join(" | ");x.related=withColor.map(w=>w.c.row);return;}
+  both.forEach(b=>{b.score=(b.k.exact?2:0)+(b.cc.exact?1:0);});
+  both.sort((a,b)=>b.score-a.score||a.c.row-b.c.row);
+  const best=both[0];
+  x.status="match";x.target=best.c.row;
+  const why=[];
+  if(!best.cc.exact) why.push("Color: "+best.cc.why);
+  if(!best.k.exact) why.push("Construction: "+best.k.why);
+  x.matchType=why.length?"Fuzzy":"Exact";x.fuzzyWhy=why.join(" ; ");
+  if(both.length>1){x.multi=true;x.related=both.map(b=>b.c.row);x.multiNote="All Report-এ একই PI+Color+Construction-এর "+both.length+"টা row ("+both.map(b=>b.c.row).join(", ")+"); row "+best.c.row+"-এ বসানো হয়েছে";}
+ });
+
+ /* group totals per target cell */
+ const groups=new Map();
+ results.forEach(x=>{if(x.status!=="match")return;const k=x.col+x.target;if(!groups.has(k))groups.set(k,{col:x.col,row:x.target,sum:0,items:[]});const g=groups.get(k);g.sum+=x.qty;g.items.push(x);});
+ groups.forEach(g=>{g.add=Math.round(g.sum);g.items.forEach(i=>{i.groupAdd=g.add;i.groupN=g.items.length;});});
+
+ /* ---------- patch File 1 ---------- */
+ log("File 1 আপডেট হচ্ছে...");
+ const zip1=await JSZip.loadAsync(inp.buf1);
+ const sm1=await sheetMap(zip1);
+ const path1=sm1.map[rep.sheet];
+ let sx=await readText(zip1,path1);
+ const byRow=new Map();
+ groups.forEach(g=>{if(g.add===0){g.items.forEach(i=>{i.status="skip";i.reason="qty শূন্য ধরা হয়েছে (round করে 0)";});return;}if(!byRow.has(g.row))byRow.set(g.row,[]);byRow.get(g.row).push(g);});
+ const rowFns=new Map();
+ byRow.forEach((gs,r)=>{
+  rowFns.set(r,(rowStr,rn)=>{
+   let s=dropSpans(rowStr);
+   gs.forEach(g=>{
+    s=setCellInRow(s,g.col,rn,ex=>{
+     const ref=g.col+rn;
+     const res=addToCellRaw(ex,ref,g.add,colStyleOf(sx,colNum(g.col)));
+     g.res=res;
+     return res.err?(ex||""):res.raw;
+    });
+   });
+   return s;
+  });
+ });
+ const pr=patchRows(sx,rowFns); sx=pr.xml;
+ pr.missing.forEach(r=>{byRow.get(r).forEach(g=>{g.res={err:"All Report-এ row "+r+" পাওয়া যায়নি"};});});
+ groups.forEach(g=>{
+  if(!g.res) return;
+  g.items.forEach(i=>{
+   if(g.res.err){i.status="skip";i.reason=g.res.err;return;}
+   i.prev=g.res.prevDisp;i.prevVal=g.res.prevVal;i.newTotal=g.res.newVal;i.newFormula=g.res.formula||"";
+  });
+ });
+ zip1.file(path1,sx);
+ let wbx1=sm1.wbx;
+ if(/<calcPr\b/.test(wbx1)){ if(!/fullCalcOnLoad/.test(wbx1)) wbx1=wbx1.replace(/<calcPr\b/,'<calcPr fullCalcOnLoad="1"'); }
+ else if(/<extLst/.test(wbx1)) wbx1=wbx1.replace(/<extLst/,'<calcPr fullCalcOnLoad="1"/><extLst');
+ else wbx1=wbx1.replace(/<\/workbook>/,'<calcPr fullCalcOnLoad="1"/></workbook>');
+ zip1.file("xl/workbook.xml",wbx1);
+
+ /* ---------- patch File 2: green rows + Update Log ---------- */
+ log("File 2 আপডেট হচ্ছে...");
+ const styler=makeStyler(await readText(zip2,"xl/styles.xml"));
+ const bySheet=new Map();
+ results.forEach(x=>{if(x.status!=="match")return;if(!bySheet.has(x.sheet))bySheet.set(x.sheet,[]);bySheet.get(x.sheet).push(x);});
+ for(const [sn,items] of bySheet){
+  const path=sm2.map[sn]; let x=await readText(zip2,path);
+  const fns=new Map(); const lastC=Math.max(...items.map(i=>i.lastCol));
+  items.forEach(i=>{fns.set(i.srcRow,(rowStr,rn)=>{
+   let s=dropSpans(rowStr);
+   for(let c=0;c<=lastC;c++){
+    const col=colLet(c+1);
+    s=setCellInRow(s,col,rn,ex=>{
+     const ref=col+rn;
+     if(!ex) return `<c r="${ref}" s="${styler.green(colStyleOf(x,c+1))}"/>`;
+     const om=ex.match(/^<c\b[^>]*?\/?>/)[0];
+     const sm=om.match(/\ss="(\d+)"/);
+     const ns=styler.green(sm?+sm[1]:null);
+     const om2=sm?om.replace(/\ss="\d+"/,` s="${ns}"`):om.replace(/^<c\b/,`<c s="${ns}"`).replace(/^<c s="(\d+)"( r="[^"]*")/,`<c$2 s="$1"`);
+     return om2+ex.slice(om.length);
+    });
+   }
+   return s;
+  });});
+  const p2=patchRows(x,fns);
+  zip2.file(path,p2.xml);
+ }
+ /* log rows */
+ const header=["Sheet","মাসের ফাইলের row","PI","Construction","Color","Qty (Yds)","ফলাফল","All Report row","All Report column","আগের Qty","যোগ হলো","নতুন Total","Match ধরন","Fuzzy কারণ / না হওয়ার কারণ","সংশ্লিষ্ট All Report row","বিশেষ নোট"];
+ const logRows=[header];
+ results.forEach(x=>{
+  if(x.status==="match"){
+   logRows.push([x.sheet,x.srcRow,x.pi,x.cons,x.color,r2(x.qty),"Update হয়েছে",x.target,x.col,x.prev===""?"ফাঁকা":x.prev,x.groupAdd,x.newFormula?x.newFormula+" = "+(x.newTotal==null?"":x.newTotal):x.newTotal,x.matchType+(x.multi?" (Multiple)":""),x.fuzzyWhy||"",x.related?x.related.join(", "):"",
+    (x.groupN>1?"এই order-এর "+x.groupN+"টা লাইন যোগ করে মোট "+x.groupAdd+" বসেছে। ":"")+(x.multiNote||"")]);
+  } else {
+   logRows.push([x.sheet,x.srcRow,x.pi,x.cons,x.color,x.qty==null?"":r2(x.qty),"Update হয়নি","","","","","","",x.reason||"",x.related?x.related.join(", "):"",x.hint||""]);
+  }
+ });
+ const widths=[18,10,14,24,26,11,13,10,10,22,10,26,14,60,16,60];
+ const hs=styler.header();
+ let lx='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>';
+ widths.forEach((w,i)=>{lx+=`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`;});
+ lx+="</cols><sheetData>";
+ logRows.forEach((row,i)=>{
+  lx+=`<row r="${i+1}">`;
+  row.forEach((v,j)=>{
+   if(v===null||v===undefined||v==="") return;
+   const ref=colLet(j+1)+(i+1),sa=i===0?` s="${hs}"`:"";
+   if(typeof v==="number"&&isFinite(v)) lx+=`<c r="${ref}"${sa}><v>${v}</v></c>`;
+   else lx+=`<c r="${ref}"${sa} t="inlineStr"><is><t xml:space="preserve">${xmlEsc(v)}</t></is></c>`;
+  });
+  lx+="</row>";
+ });
+ lx+=`</sheetData><autoFilter ref="A1:${colLet(header.length)}${logRows.length}"/></worksheet>`;
+ /* register sheet */
+ let wbx2=sm2.wbx,rels2=sm2.rels,ct=await readText(zip2,"[Content_Types].xml");
+ const existing=Object.keys(sm2.map).find(n=>/^update log$/i.test(n));
+ if(existing){ zip2.file(sm2.map[existing],lx); }
+ else{
+  let n=1; while(zip2.file("xl/worksheets/sheet"+n+".xml")) n++;
+  const sid=Math.max(0,...(wbx2.match(/\bsheetId="(\d+)"/g)||[]).map(t=>+t.match(/\d+/)[0]))+1;
+  const rid="rId"+(Math.max(0,...(rels2.match(/\bId="rId(\d+)"/g)||[]).map(t=>+t.match(/\d+/)[0]))+1);
+  zip2.file("xl/worksheets/sheet"+n+".xml",lx);
+  wbx2=wbx2.replace(/<\/sheets>/,`<sheet name="Update Log" sheetId="${sid}" r:id="${rid}"/></sheets>`);
+  rels2=rels2.replace(/<\/Relationships>/,`<Relationship Id="${rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${n}.xml"/></Relationships>`);
+  ct=ct.replace(/<\/Types>/,`<Override PartName="/xl/worksheets/sheet${n}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>`);
+  zip2.file("xl/workbook.xml",wbx2);zip2.file("xl/_rels/workbook.xml.rels",rels2);zip2.file("[Content_Types].xml",ct);
+ }
+ zip2.file("xl/styles.xml",styler.out());
+
+ log("ফাইল তৈরি হচ্ছে...");
+ const out1=await zip1.generateAsync({type:"uint8array",compression:"DEFLATE"});
+ const out2=await zip2.generateAsync({type:"uint8array",compression:"DEFLATE"});
+ return {out1,out2,results,sheetInfo,targetCol,reportSheet:rep.sheet,alreadyDone,allReportRows:rows.length};
+}
+const api={run,piList,consCompare,colorCompare,consParse};
+if(typeof module!=="undefined"&&module.exports) module.exports=api; else root.RFDCore=api;
+})(typeof window!=="undefined"?window:globalThis);
+
+</script>
+<script>
+(function(){
+"use strict";
+if(window.__rfdModule) return; window.__rfdModule=true;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toast=(m,t,d)=>{try{showToast(m,t,d);}catch(e){alert(m);}};
+let out1=null,out2=null,nm1="",nm2="",busy=false,url1="",url2="";
+function freeUrls(){try{if(url1)URL.revokeObjectURL(url1);if(url2)URL.revokeObjectURL(url2);}catch(e){}url1=url2="";}
+const MIME="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const outName=n=>n.replace(/\.(xlsx|xlsm)$/i,"")+" (Updated).xlsx";
+
+function showView(v){
+ ["dwHome","dwFoc","dwFocMaking","dwRfd"].forEach(id=>{const e=$(id);if(e) e.style.display=(id===v?"block":"none");});
+}
+function download(bytes,name){
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([bytes],{type:MIME}));a.download=name;
+ document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},1500);
+}
+function isZip(buf){const u=new Uint8Array(buf.slice(0,2));return u[0]===0x50&&u[1]===0x4B;}
+function table(head,rows){
+ return '<div class="table-wrap" style="max-height:340px;overflow:auto"><table><thead><tr>'+head.map(h=>"<th>"+esc(h)+"</th>").join("")+"</tr></thead><tbody>"+
+  rows.map(r=>"<tr>"+r.map(c=>"<td>"+esc(c)+"</td>").join("")+"</tr>").join("")+"</tbody></table></div>";
+}
+function render(r){
+ const res=r.results;
+ const sheets=[...new Set(res.map(x=>x.sheet))];
+ const upd=res.filter(x=>x.status==="match"),skip=res.filter(x=>x.status!=="match");
+ const fuzzy=upd.filter(x=>x.matchType==="Fuzzy"),multi=upd.filter(x=>x.multi);
+ let h='<div style="padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc">';
+ if(r.alreadyDone) h+='<p style="color:#991b1b"><b>সতর্কতা:</b> File 2-তে আগে থেকেই "Update Log" ছিল, অর্থাৎ ফাইলটা আগে process হয়ে থাকতে পারে।</p>';
+ h+='<h3 style="margin:0 0 6px">✅ কাজ শেষ</h3><p class="muted" style="margin:0 0 8px">All Report sheet: <b>'+esc(r.reportSheet)+'</b> • মোট '+upd.length+'টা row update হয়েছে, '+skip.length+'টা হয়নি।</p>';
+ h+=table(["Sheet","All Report column","মোট row","Update হয়েছে","Update হয়নি"],sheets.map(s=>{
+  const a=res.filter(x=>x.sheet===s),u=a.filter(x=>x.status==="match").length;
+  const info=r.sheetInfo.find(i=>i.sheet===s);
+  return [s,info&&info.col||"",a.length,u,a.length-u];
+ }));
+ freeUrls();
+ url1=URL.createObjectURL(new Blob([out1],{type:MIME}));url2=URL.createObjectURL(new Blob([out2],{type:MIME}));
+ const lk="display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none;font-weight:600;margin:0 8px 8px 0";
+ h+='<div style="margin:12px 0"><a id="rfdDl1" href="'+url1+'" download="'+esc(outName(nm1))+'" style="'+lk+'">⬇️ File 1 Download</a><a id="rfdDl2" href="'+url2+'" download="'+esc(outName(nm2))+'" style="'+lk+'">⬇️ File 2 Download</a><button class="secondary" id="rfdDlBoth">⬇️ দুটোই Download</button></div><p class="muted" style="margin:0 0 8px">ফাইল: '+esc(outName(nm1))+' • '+esc(outName(nm2))+'</p>';
+ h+='<p class="muted" style="margin:0 0 8px">Qty সবসময় পুরো সংখ্যায় বসেছে (একই order-এর সব লাইন যোগ করে তারপর round)। File 2-তে update হওয়া row হালকা সবুজ, আর "Update Log" sheet-এ প্রতিটা row-র বিস্তারিত আছে।</p>';
+ const det=(title,count,body,open)=>count?'<details style="margin:8px 0"'+(open?" open":"")+'><summary style="cursor:pointer;font-weight:600">'+title+" ("+count+")</summary>"+body+"</details>":"";
+ h+=det("⚠️ Update হয়নি — আপনি নিজে দেখবেন",skip.length,table(["Sheet","Row","PI","Construction","Color","Qty","কারণ","সংশ্লিষ্ট তথ্য"],skip.map(x=>[x.sheet,x.srcRow,x.pi,x.cons,x.color,x.qty==null?"":Math.round(x.qty*100)/100,x.reason||"",(x.hint||"")+(x.related?" [All Report row: "+x.related.slice(0,8).join(", ")+"]":"")])),true);
+ h+=det("🔍 Fuzzy (প্রায় মিল) ধরা row — দেখে নিন",fuzzy.length,table(["Sheet","Row","PI","Color","All Report row","কেন Fuzzy"],fuzzy.map(x=>[x.sheet,x.srcRow,x.pi,x.color,x.target,x.fuzzyWhy])),false);
+ h+=det("📌 Multiple row ছিল — একটায় বসানো হয়েছে",multi.length,table(["Sheet","Row","PI","Color","বসেছে row","All Report-এর সব row"],multi.map(x=>[x.sheet,x.srcRow,x.pi,x.color,x.target,x.related.join(", ")])),false);
+ h+="</div>";
+ $("rfdResult").innerHTML=h;
+ $("rfdDlBoth").onclick=()=>{$("rfdDl1").click();setTimeout(()=>$("rfdDl2").click(),1200);};
+}
+async function hasLog(buf){
+ try{const z=await JSZip.loadAsync(buf);const f=z.file("xl/workbook.xml");if(!f) return false;return /name="Update Log"/i.test(await f.async("string"));}catch(e){return false;}
+}
+async function run(){
+ if(busy) return;
+ const f1=$("rfdFile1").files[0],f2=$("rfdFile2").files[0];
+ if(!f1||!f2){toast("File 1 ও File 2 দুটোই দিন","error");return;}
+ if(!window.XLSX||!window.JSZip){toast("Excel library লোড হয়নি, পেজ refresh করে আবার চেষ্টা করুন","error");return;}
+ busy=true;const btn=$("rfdRun");btn.disabled=true;
+ const st=$("rfdStatus");st.textContent="শুরু হচ্ছে...";$("rfdResult").innerHTML="";out1=out2=null;
+ try{
+  const b1=await f1.arrayBuffer(),b2=await f2.arrayBuffer();
+  if(!isZip(b1)||!isZip(b2)) throw new Error("দুটো ফাইলই .xlsx হতে হবে (.xls বা .xlsb নয়)। Excel-এ Save As → .xlsx করে দিন।");
+  if(await hasLog(b2)&&!confirm("File 2-তে আগে থেকেই \"Update Log\" আছে, মানে ফাইলটা আগে process হয়েছে। আবার চালালে qty দ্বিগুণ হয়ে যেতে পারে। তবুও চালাবেন?")){st.textContent="বাতিল করা হয়েছে।";return;}
+  const r=await RFDCore.run({XLSX:window.XLSX,JSZip:window.JSZip},{buf1:b1,buf2:b2,onProgress:m=>{st.textContent=m;}});
+  out1=r.out1;out2=r.out2;nm1=f1.name;nm2=f2.name;
+  st.textContent="";render(r);
+ }catch(e){
+  console.error(e);st.textContent="";
+  $("rfdResult").innerHTML='<p style="color:#991b1b"><b>সমস্যা:</b> '+esc(e.message||e)+"</p>";
+ }finally{busy=false;btn.disabled=false;}
+}
+function init(){
+ const open=$("dwOpenRfd"); if(!open) return;
+ open.onclick=()=>showView("dwRfd");
+ $("dwRfdBack").onclick=()=>{const b=$("dwBackHome");if(b) b.click();showView("dwHome");};
+ $("rfdRun").onclick=run;
+ $("rfdClear").onclick=()=>{$("rfdFile1").value="";$("rfdFile2").value="";$("rfdResult").innerHTML="";$("rfdStatus").textContent="";out1=out2=null;freeUrls();};
+}
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init); else init();
+})();
+
 </script>
  <script src="cloud.js"></script>
 </body>
