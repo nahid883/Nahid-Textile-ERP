@@ -22,6 +22,7 @@ body.auth-lock .container{display:none}
 @media(min-width:700px){nav{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))!important}}
 body[data-role=viewer] #entry,body[data-role=viewer] nav [data-page=entry],body[data-role=viewer] nav [data-page=wip],body[data-role=viewer] nav [data-page=matching],body[data-role=viewer] #threeSheetsUploadContainer{display:none!important}
 body[data-role=viewer] nav [data-page=dailyWork],body[data-role=viewer] #dailyWork{display:none!important}
+body[data-role=viewer] button[onclick*="switchPage('matching')"],body[data-role=viewer] button[onclick*="switchPage('entry')"]{display:none!important}
 body:not([data-role=admin]) #deleteDeliveryBtn,body:not([data-role=admin]) #deleteOrderStatusBtn,body:not([data-role=admin]) #deleteWipBtn,body:not([data-role=admin]) #deleteGreyBtn,body:not([data-role=admin]) #clearOrdersBtn,body:not([data-role=admin]) #orderTable .danger,body:not([data-role=admin]) #wipReset{display:none!important}`;
 document.head.appendChild(css);
 document.body.classList.add("auth-lock");
