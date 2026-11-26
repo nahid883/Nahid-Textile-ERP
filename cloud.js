@@ -9,6 +9,8 @@ const oPut=idbPut,oGet=idbGet,oSave=saveCategoryFile,oDel=deleteCategoryFile;
 let me=null,booted="",rt=null,busy=false,again=false,st=null;
 const base={},pend={},timers={},lastPay={};
 const isAdmin=()=>me&&me.role==="admin", canWrite=()=>me&&me.active&&(me.role==="admin"||me.role==="editor");
+/* Daily Work (FOC / RFD / Finish Reconciliation) Submit-e role check-এর জন্য — viewer hole false */
+window.__erpCanWrite=canWrite;window.__erpIsAdmin=isAdmin;window.__erpRole=()=>me?me.role:null;
 const ver=()=>{try{return JSON.parse(localStorage.getItem("erp_ver")||"{}")}catch(e){return{}}};
 const setVer=o=>localStorage.setItem("erp_ver",JSON.stringify(o));
 
@@ -19,6 +21,7 @@ css.textContent=`#authGate{position:fixed;inset:0;z-index:10000;background:var(-
 body.auth-lock .container{display:none}
 @media(min-width:700px){nav{grid-template-columns:repeat(auto-fit,minmax(110px,1fr))!important}}
 body[data-role=viewer] #entry,body[data-role=viewer] nav [data-page=entry],body[data-role=viewer] nav [data-page=wip],body[data-role=viewer] nav [data-page=matching],body[data-role=viewer] #threeSheetsUploadContainer{display:none!important}
+body[data-role=viewer] nav [data-page=dailyWork],body[data-role=viewer] #dailyWork,body[data-role=viewer] nav [data-page=update],body[data-role=viewer] #update{display:none!important}
 body:not([data-role=admin]) #deleteDeliveryBtn,body:not([data-role=admin]) #deleteOrderStatusBtn,body:not([data-role=admin]) #deleteWipBtn,body:not([data-role=admin]) #deleteGreyBtn,body:not([data-role=admin]) #clearOrdersBtn,body:not([data-role=admin]) #orderTable .danger,body:not([data-role=admin]) #wipReset{display:none!important}`;
 document.head.appendChild(css);
 document.body.classList.add("auth-lock");
