@@ -5043,8 +5043,15 @@ async function run(deps,inp){
  PROC.forEach(p=>{
   const sn=wb2.SheetNames.find(n=>p.re.test(n)); if(!sn) return;
   const ws=wb2.Sheets[sn];
-  const h=scanHeader(XLSX,ws,{map:{pi:/^pi(\s*no\.?)?$/i,cons:/^construction$/i,color:/^colou?r$/i,qty:/^total\s*qty/i,design:/^fabric\s*design$/i,comp:/^composition$/i},required:["pi","cons","color","qty"]});
-  if(!h){sheetInfo.push({sheet:sn,proc:p,error:"header (PI No / Construction / Color / Total QTY) পাওয়া যায়নি"});return;}
+  /* এই মাসের ফাইলে Singeing-এর Qty আছে "Quantity (Yds)" কলামে (M),
+     অন্য তিনটি process sheet-এ Qty আছে "Peach QTY (Yds)" কলামে (K)।
+     Total QTY নামের পুরোনো format-ও fallback হিসেবে রাখা হলো। */
+  /* November-2026-এর সব process sheet-এ populated Yards Qty হলো
+     "Peach QTY (Yds)" (K column)। Singeing-এর "Quantity (Yds)"
+     (M column) ফাঁকা, তাই সেটি fallback হিসেবে রাখা হয়েছে। */
+  const qtyHeader = /^(?:peach\s*qty\s*\(\s*yds?\s*\)|quantity\s*\(\s*yds?\s*\)|total\s*qty)/i;
+  const h=scanHeader(XLSX,ws,{map:{pi:/^pi(\s*no\.?)?$/i,cons:/^construction$/i,color:/^colou?r$/i,qty:qtyHeader,design:/^fabric\s*design$/i,comp:/^composition$/i},required:["pi","cons","color","qty"]});
+  if(!h){sheetInfo.push({sheet:sn,proc:p,error:"সঠিক Qty header (Peach QTY (Yds) / Quantity (Yds) / Total QTY) পাওয়া যায়নি"});return;}
   sheetInfo.push({sheet:sn,proc:p,col:targetCol[p.key],qtyCol:colLet(h.cols.qty+1),ok:true});
   for(let r=h.r+1;r<=h.rg.e.r;r++){
    const cell=c=>{const a=XLSX.utils.encode_cell({r,c});return ws[a]?{v:ws[a].v==null?null:ws[a].v,f:ws[a].f||null}:{v:null,f:null};};
